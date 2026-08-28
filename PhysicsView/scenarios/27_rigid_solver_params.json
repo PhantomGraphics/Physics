@@ -1,0 +1,19 @@
+{
+  "name": "27_rigid_solver_params",
+  "steps": [
+    { "label": "Set SphereDrop preset", "command": "SetPreset:SphereDrop", "expect": "OK" },
+    { "label": "Zero out rigid-body gravity (previously unexercised by any scenario -- rigid SetGravity is distinct from fluid's SetFluidGravity)", "command": "SetGravity:0:0:0", "expect": "OK" },
+    { "label": "Precondition: sphere starts at drop height y=3", "command": "GetBodyPositionY:1", "expect": "3.000000", "store_as": "y0" },
+    { "label": "Run under zero gravity (~1.6s)", "command": "Step:100", "expect": "OK" },
+    { "label": "Invariant (negative control): with zero gravity, the sphere does not fall", "command": "GetBodyPositionY:1", "expect": "${y0}" },
+
+    { "label": "Restore default downward gravity", "command": "SetGravity:0:-9.8:0", "expect": "OK" },
+    { "label": "Reduce solver iterations (previously unexercised)", "command": "SetSolverIter:2", "expect": "OK" },
+    { "label": "Widen the time step (previously unexercised as a live rigid-body knob)", "command": "SetTimeStep:0.02", "expect": "OK" },
+    { "label": "Run under gravity, fewer iterations, larger step (~2s at the new step size)", "command": "Step:100", "expect": "OK" },
+    { "label": "Change: with gravity restored, the sphere actually falls", "command": "GetBodyPositionY:1", "store_as": "y1" },
+    { "label": "Invariant: still bounded (not exploding despite the coarser solver settings)", "command": "GetBodyPositionY:1", "expect_range": "-5,5" },
+    { "label": "Invariant: body count stable", "command": "GetBodyCount", "expect": "Count:2" }
+  ],
+  "post_assert": "y1 < y0"
+}

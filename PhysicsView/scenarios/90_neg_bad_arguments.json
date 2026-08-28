@@ -1,0 +1,12 @@
+{
+  "name": "90_neg_bad_arguments",
+  "steps": [
+    { "label": "A body to query out-of-range indices against", "command": "SetPreset:SphereDrop", "expect": "OK" },
+    { "label": "Non-numeric float argument is rejected", "command": "SetFluidRadius:abc", "expect_prefix": "Error:" },
+    { "label": "Insufficient gravity components are rejected (regression check, see docs/issue/CODEBASE_ISSUES.md 1.5 history)",
+      "command": "SetFluidGravity:1", "expect_prefix": "Error:" },
+    { "label": "Out-of-range rigid body index is rejected", "command": "GetBodyPositionY:999", "expect_prefix": "Error:" },
+    { "label": "Unknown solver name is rejected", "command": "SetSimulationType:Bogus", "expect_prefix": "Error:" },
+    { "label": "Nonexistent STL path is rejected", "command": "LoadMeshBoundary:no_such_boundary_file.stl", "expect_prefix": "Error:" }
+  ]
+}

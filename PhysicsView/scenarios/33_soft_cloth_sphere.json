@@ -1,0 +1,17 @@
+{
+  "name": "33_soft_cloth_sphere",
+  "steps": [
+    { "label": "Set ClothWithSphere preset (20x20 cloth spawns above a static sphere collider)", "command": "SetPreset:ClothWithSphere", "expect": "OK" },
+    { "label": "Precondition: 1 body", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Precondition: 400 particles", "command": "GetSoftParticleCount", "expect": "Particles:400" },
+    { "label": "Precondition: cloth spawns flat at y=1.5, above the sphere (sphere top at y=0.8)", "command": "GetSoftMinPositionY", "expect": "1.500000", "store_as": "min_y_before" },
+    { "label": "Cloth falls and drapes over the sphere (~3.3s)", "command": "Step:200", "expect": "OK" },
+    { "label": "Change: the cloth has fallen -- min Y after draping is measurably lower than its flat starting height", "command": "GetSoftMinPositionY", "store_as": "min_y_after" },
+    { "label": "Invariant: body/particle counts stable", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Invariant: particle count stable", "command": "GetSoftParticleCount", "expect": "Particles:400" },
+    { "label": "Invariant: no velocity explosion (cloth settles onto the sphere, not thousands of m/s)", "command": "GetMaxSpeed", "expect_range": "0.0,20.0" },
+    { "label": "Reset restores scene", "command": "Reset", "expect": "OK" },
+    { "label": "Body count after reset", "command": "GetSoftBodyCount", "expect": "Count:1" }
+  ],
+  "post_assert": "min_y_after < min_y_before"
+}

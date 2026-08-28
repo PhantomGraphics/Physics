@@ -1,0 +1,22 @@
+{
+  "name": "31_soft_cloth_top_edge",
+  "steps": [
+    { "label": "Set ClothTopEdge preset (entire top row pinned, not just 2 corners)", "command": "SetPreset:ClothTopEdge", "expect": "OK" },
+    { "label": "Precondition: 1 body", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Precondition: 400 particles (20x20)", "command": "GetSoftParticleCount", "expect": "Particles:400" },
+    { "label": "Precondition: top-edge particle 0 starts at y=0", "command": "GetSoftParticlePositionY:0:0", "expect": "0.000000", "store_as": "top0_y" },
+    { "label": "Precondition: top-edge particle 9 starts at y=0", "command": "GetSoftParticlePositionY:0:9", "expect": "0.000000", "store_as": "top9_y" },
+    { "label": "Precondition: top-edge particle 19 starts at y=0", "command": "GetSoftParticlePositionY:0:19", "expect": "0.000000", "store_as": "top19_y" },
+    { "label": "Precondition: like ClothTwoPin, this spawns flush against the always-on floor -- no vertical room to fall (see 30_soft_cloth_two_pins.json)", "command": "GetSoftMaxPositionY", "expect": "0.000000" },
+    { "label": "Simulate 100 steps", "command": "Step:100", "expect": "OK" },
+    { "label": "Change: continuing another 100 steps confirms this is a stable fixed point, not just momentarily static", "command": "Step:100", "expect": "OK" },
+    { "label": "Max Y after 200 total steps", "command": "GetSoftMaxPositionY", "expect": "0.000000" },
+    { "label": "Invariant: pinned top-edge particle 0 did not move", "command": "GetSoftParticlePositionY:0:0", "expect": "${top0_y}" },
+    { "label": "Invariant: pinned top-edge particle 9 did not move", "command": "GetSoftParticlePositionY:0:9", "expect": "${top9_y}" },
+    { "label": "Invariant: pinned top-edge particle 19 did not move", "command": "GetSoftParticlePositionY:0:19", "expect": "${top19_y}" },
+    { "label": "Invariant: body/particle counts stable", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Invariant: no velocity explosion", "command": "GetMaxSpeed", "expect_range": "0.0,20.0" },
+    { "label": "Reset OK", "command": "Reset", "expect": "OK" },
+    { "label": "Body count after reset", "command": "GetSoftBodyCount", "expect": "Count:1" }
+  ]
+}

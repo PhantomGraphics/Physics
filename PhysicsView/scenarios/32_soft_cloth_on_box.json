@@ -1,0 +1,16 @@
+{
+  "name": "32_soft_cloth_on_box",
+  "steps": [
+    { "label": "Set ClothOnBox preset (4x4 cloth, unpinned, spawns above a static rigid box)", "command": "SetPreset:ClothOnBox", "expect": "OK" },
+    { "label": "Precondition: 1 body", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Precondition: 16 particles (4x4)", "command": "GetSoftParticleCount", "expect": "Particles:16" },
+    { "label": "Precondition: cloth spawns flat at y=1.0, above the box (box top at y=0.2)", "command": "GetSoftMinPositionY", "expect": "1.000000", "store_as": "min_y_before" },
+    { "label": "Cloth falls and drapes onto the rigid box (~3.3s)", "command": "Step:200", "expect": "OK" },
+    { "label": "Change: the cloth has fallen -- min Y after draping is measurably lower than its flat starting height", "command": "GetSoftMinPositionY", "store_as": "min_y_after" },
+    { "label": "Invariant: cloth rests on the box top (y=0.2) and does not penetrate through it", "command": "GetSoftMinPositionY", "expect_range": "0.15,5" },
+    { "label": "Invariant: body/particle counts stable", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Invariant: particle count stable", "command": "GetSoftParticleCount", "expect": "Particles:16" },
+    { "label": "Invariant: no velocity explosion", "command": "GetMaxSpeed", "expect_range": "0.0,20.0" }
+  ],
+  "post_assert": "min_y_after < min_y_before"
+}

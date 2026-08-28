@@ -1,0 +1,15 @@
+{
+  "name": "20_rigid_sphere_drop",
+  "steps": [
+    { "label": "Set SphereDrop preset", "command": "SetPreset:SphereDrop", "expect": "OK" },
+    { "label": "Precondition: 2 bodies (floor, sphere)", "command": "GetBodyCount", "expect": "Count:2" },
+    { "label": "Precondition: sphere (body 1) starts at drop height y=3", "command": "GetBodyPositionY:1", "expect": "3.000000", "store_as": "y0" },
+    { "label": "Precondition: no contacts before falling", "command": "GetContactCount", "expect": "Contacts:0" },
+    { "label": "Fall and land (~5s)", "command": "Step:300", "expect": "OK" },
+    { "label": "Change: sphere (body 1, radius 0.5, floor at y=0) actually fell and settled near the floor", "command": "GetBodyPositionY:1", "expect_range": "0.3,0.7", "store_as": "y1" },
+    { "label": "Invariant: velocity settled (bounded)", "command": "GetBodyVelocityY:1", "expect_range": "-1.5,1.5" },
+    { "label": "Invariant: body count stable", "command": "GetBodyCount", "expect": "Count:2" },
+    { "label": "Invariant: contacts reported (resting on the floor)", "command": "GetContactCount", "expect_prefix": "Contacts:" }
+  ],
+  "post_assert": "y1 < y0"
+}

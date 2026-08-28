@@ -1,0 +1,26 @@
+{
+  "name": "17_fluid_pbsph_small_scale_regression",
+  "tags": ["slow"],
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "Regression check for the small-effectLength blowup fixed in PBSPHParticle::calculatePressure() (calculateLambda() normalization)", "command": "SetSimulationType:PBSPH", "expect": "OK" },
+    { "label": "Rest density", "command": "SetFluidDensity:1000", "expect": "OK" },
+    { "label": "Stiffness", "command": "SetFluidStiffness:1.0", "expect": "OK" },
+    { "label": "No viscosity", "command": "SetFluidViscosity:0.0", "expect": "OK" },
+    { "label": "Small effect length (matches WCSPH/DFSPH's own small-scale baselines)", "command": "SetFluidEffectLength:0.1", "expect": "OK" },
+    { "label": "Particle radius 0.025 (spacing 0.05, matches a 3x3x3 resting block)", "command": "SetFluidRadius:0.025", "expect": "OK" },
+    { "label": "Small time step", "command": "SetFluidTimeStep:0.005", "expect": "OK" },
+    { "label": "Resting 3x3x3 block, x/z in [-0.05,0.05], y in [0.3,0.4]", "command": "SetFluidBounds:-0.05:0.3:-0.05:0.05:0.4:0.05", "expect": "OK" },
+    { "label": "Boundary placed far away so it never triggers (isolates the fluid-fluid pressure fix)", "command": "SetFluidBoundary:-5:-5:-5:5:5:5", "expect": "OK" },
+    { "label": "Rebuild fluid", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: sane, non-zero seed count", "command": "GetParticleCount", "expect_prefix": "Count:", "store_as": "count0", "strip_prefix": "Count:" },
+    { "label": "Precondition: block starts resting at y in [0.3,0.4]", "command": "GetMinParticlePositionY", "expect_range": "0.29,0.31", "store_as": "min_y_before" },
+    { "label": "Long run, must stay bounded/settled, not diverging (~3s)", "command": "Step", "expect": "OK", "repeat": 600 },
+    { "label": "Change: min Y after the long run is measurably lower than the pre-drop min Y", "command": "GetMinParticlePositionY", "store_as": "min_y_after" },
+    { "label": "Invariant: particle count conserved over 600 steps", "command": "GetParticleCount", "expect": "Count:${count0}" },
+    { "label": "Invariant: stays within the container (upper bound)", "command": "GetMaxParticlePositionY", "expect_range": "-5.5,5.5" },
+    { "label": "Invariant: stays within the container (lower bound)", "command": "GetMinParticlePositionY", "expect_range": "-5.5,5.5" },
+    { "label": "Invariant: no velocity explosion", "command": "GetMaxParticleSpeed", "expect_range": "0,100" }
+  ],
+  "post_assert": "min_y_after < min_y_before"
+}

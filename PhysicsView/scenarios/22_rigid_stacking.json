@@ -1,0 +1,20 @@
+{
+  "name": "22_rigid_stacking",
+  "steps": [
+    { "label": "Set Stacking preset (5 boxes stacked on a floor)", "command": "SetPreset:Stacking", "expect": "OK" },
+    { "label": "Precondition: 6 bodies (floor + 5 boxes)", "command": "GetBodyCount", "expect": "Count:6" },
+    { "label": "Precondition: bottom box (body 1) starts at y=0.5", "command": "GetBodyPositionY:1", "expect": "0.500000" },
+    { "label": "Precondition: top box (body 5) starts at y=4.5", "command": "GetBodyPositionY:5", "expect": "4.500000" },
+    { "label": "Precondition: no contacts before the stack settles", "command": "GetContactCount", "expect": "Contacts:0" },
+    { "label": "Let the stack settle under gravity (~5s)", "command": "Step:300", "expect": "OK" },
+    { "label": "Change: settling under gravity produced contacts between the resting boxes", "command": "GetContactCount", "expect_not": "Contacts:0" },
+    { "label": "Invariant: bottom box stays near the floor, doesn't fly away", "command": "GetBodyPositionY:1", "expect_range": "-0.1,8.0", "store_as": "y1_after" },
+    { "label": "Invariant: bottom box velocity bounded (not exploding)", "command": "GetBodyVelocityY:1", "expect_range": "-10,10" },
+    { "label": "Invariant: top box stays above the floor, doesn't fly away", "command": "GetBodyPositionY:5", "expect_range": "-0.1,8.0", "store_as": "y5_after" },
+    { "label": "Invariant: top box velocity bounded (not exploding)", "command": "GetBodyVelocityY:5", "expect_range": "-10,10" },
+    { "label": "Invariant: body count stable", "command": "GetBodyCount", "expect": "Count:6" },
+    { "label": "Reset restores the initial stack", "command": "Reset", "expect": "OK" },
+    { "label": "Body count after reset", "command": "GetBodyCount", "expect": "Count:6" }
+  ],
+  "post_assert": "y5_after > y1_after"
+}

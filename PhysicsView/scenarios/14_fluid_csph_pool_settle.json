@@ -1,0 +1,15 @@
+{
+  "name": "14_fluid_csph_pool_settle",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "GPU_CSPH -- note the CPU-side position/velocity readback (GetMax/MinParticlePositionY, GetAvgParticlePositionY, GetMaxParticleSpeed) is unavailable for this type (FluidWorld::getParticlePositions()/getParticleVelocities() are empty for GPU_CSPH -- no CPU *Fluid instance backs it), so this scenario can only observe particle count, not position/velocity -- a real coverage gap, not a scenario bug", "command": "SetSimulationType:GPU_CSPH", "expect": "OK" },
+    { "label": "Resting 3x3x3 block at the default radius (spacing 2.0), y in [8,12]", "command": "SetFluidBounds:-2:8:-2:2:12:2", "expect": "OK" },
+    { "label": "Container walls sized for the default-scale block", "command": "SetFluidBoundary:-8:-8:-8:8:14:8", "expect": "OK" },
+    { "label": "Rebuild fluid (GPU buffers)", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: sane, non-zero seed count", "command": "GetParticleCount", "expect_prefix": "Count:", "store_as": "count0", "strip_prefix": "Count:" },
+    { "label": "Precondition: reports as GPU_CSPH", "command": "GetSimulationType", "expect": "GPU_CSPH" },
+    { "label": "Change: GPU compute step runs without erroring, repeatedly (~2s -- the closest thing to a 'settling' observation available for this type)", "command": "Step", "expect": "OK", "repeat": 200 },
+    { "label": "Invariant: particle count conserved across 200 GPU steps (no desync/loss between CPU-side bookkeeping and the GPU buffer)", "command": "GetParticleCount", "expect": "Count:${count0}" },
+    { "label": "Process exits cleanly after GPU_CSPH was selected (regression check for the VMA shutdown abort, see docs/issue/CODEBASE_ISSUES.md 1.3 history)", "command": "GetStatus", "expect": "OK" }
+  ]
+}

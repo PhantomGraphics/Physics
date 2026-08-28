@@ -1,0 +1,26 @@
+{
+  "name": "71_pipe_volume_to_mesh",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "DFSPH", "command": "SetSimulationType:DFSPH", "expect": "OK" },
+    { "label": "Small effect length", "command": "SetFluidEffectLength:0.1", "expect": "OK" },
+    { "label": "Particle radius 0.025 (spacing 0.05)", "command": "SetFluidRadius:0.025", "expect": "OK" },
+    { "label": "Resting 3x3x3 block, x/z in [-0.05,0.05], y in [0.3,0.4]", "command": "SetFluidBounds:-0.05:0.3:-0.05:0.05:0.4:0.05", "expect": "OK" },
+    { "label": "Container walls", "command": "SetFluidBoundary:-0.5:-0.5:-0.5:0.5:0.5:0.5", "expect": "OK" },
+    { "label": "Rebuild fluid", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: particle count sane", "command": "GetParticleCount", "expect_prefix": "Count:" },
+    { "label": "Precondition: no mesh before the first ConvertToMesh", "command": "GetMeshTriangleCount", "expect": "Count:0" },
+    { "label": "Precondition: converting to mesh before any volume exists fails", "command": "ConvertToMesh", "expect_prefix": "Error:" },
+
+    { "label": "Conversion radius matches particle spacing", "command": "SetVolumeParticleRadius:0.025", "expect": "OK" },
+    { "label": "Conversion cell length matches particle spacing", "command": "SetVolumeCellLength:0.05", "expect": "OK" },
+    { "label": "Isotropic kernel", "command": "SetVolumeKernel:Isotropic", "expect": "OK" },
+    { "label": "Convert the live particle set to a SparseVolume first", "command": "ConvertToVolume", "expect": "OK" },
+    { "label": "Isotropic conversion produced active voxels", "command": "GetVolumeVoxelCount", "expect_prefix": "Count:", "expect_not": "Count:0" },
+
+    { "label": "Iso level below the (background=0, particle>0) surface", "command": "SetVolumeIsoLevel:0.5", "expect": "OK" },
+    { "label": "Extract a triangle mesh via Marching Cubes", "command": "ConvertToMesh", "expect": "OK" },
+    { "label": "Change: mesh extraction produced triangles where there were none before", "command": "GetMeshTriangleCount", "expect_prefix": "Count:", "expect_not": "Count:0" },
+    { "label": "Save the mesh as an .obj file", "command": "SaveMeshToObj:testdata/fluid_to_mesh/isotropic.obj", "expect": "OK" }
+  ]
+}

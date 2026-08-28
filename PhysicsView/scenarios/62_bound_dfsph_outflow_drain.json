@@ -1,0 +1,24 @@
+{
+  "name": "62_bound_dfsph_outflow_drain",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "DFSPH at FluidWorld::Params defaults (see 10_fluid_dfsph_pool_settle.json)", "command": "SetSimulationType:DFSPH", "expect": "OK" },
+    { "label": "Resting 3x3x3 block at the default radius (spacing 2.0), y in [8,12]", "command": "SetFluidBounds:-2:8:-2:2:12:2", "expect": "OK" },
+    { "label": "Container walls sized for the default-scale block", "command": "SetFluidBoundary:-8:-8:-8:8:14:8", "expect": "OK" },
+    { "label": "Rebuild fluid", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: sane, non-zero seed count", "command": "GetParticleCount", "expect_prefix": "Count:", "store_as": "count0", "strip_prefix": "Count:" },
+    { "label": "Precondition: no outflow regions registered yet", "command": "GetOutflowRegionCount", "expect": "0" },
+    { "label": "Register a drain slab spanning the container floor's full XZ footprint", "command": "AddOutflowRegion:-8,-8,-8,8,-6,8", "expect": "OK" },
+    { "label": "One outflow region now registered", "command": "GetOutflowRegionCount", "expect": "1" },
+    { "label": "Block falls under gravity and drains through the floor slab (~4s)", "command": "Step", "expect": "OK", "repeat": 400 },
+    { "label": "Change: particles that reached the drain have been deleted -- count is measurably lower than the seed count", "command": "GetParticleCount", "expect_prefix": "Count:", "expect_not": "Count:${count0}", "store_as": "count_drained", "strip_prefix": "Count:" },
+    { "label": "Invariant: no NaN/explosion among whatever particles remain", "command": "GetMaxParticleSpeed", "expect_range": "0,100" },
+
+    { "label": "Run further: drained count never grows back once particles are removed", "command": "Step", "expect": "OK", "repeat": 100 },
+    { "label": "Invariant: particle count is exactly preserved from the moment of the first drain-count sample", "command": "GetParticleCount", "expect": "Count:${count_drained}" },
+
+    { "label": "Clearing outflow regions stops further removal", "command": "ClearOutflowRegions", "expect": "OK" },
+    { "label": "No outflow regions remain", "command": "GetOutflowRegionCount", "expect": "0" }
+  ],
+  "post_assert": "count_drained < count0"
+}

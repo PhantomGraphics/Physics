@@ -1,0 +1,55 @@
+#version 450
+
+layout(local_size_x = 64) in;
+
+layout(set = 0, binding = 0, std430) buffer ParticlePos   { vec4 positions[];  };
+layout(set = 0, binding = 1, std430) buffer ParticleVel   { vec4 velocities[]; };
+layout(set = 0, binding = 2, std430) buffer ParticleForce { vec4 forces[];     };
+
+layout(push_constant) uniform PC {
+    uint  numParticles;
+    float timeStep;
+    float gravX;
+    float gravY;
+    float gravZ;
+    float bMinX;
+    float bMinY;
+    float bMinZ;
+    float bMaxX;
+    float bMaxY;
+    float bMaxZ;
+    float boundaryK;
+} pc;
+
+vec3 boundaryForce(vec3 pos)
+{
+    vec3 bMin = vec3(pc.bMinX, pc.bMinY, pc.bMinZ);
+    vec3 bMax = vec3(pc.bMaxX, pc.bMaxY, pc.bMaxZ);
+    vec3 overMin = max(vec3(0.0), bMin - pos);
+    vec3 overMax = max(vec3(0.0), pos - bMax);
+    return (overMin - overMax) * pc.boundaryK;
+}
+
+void main()
+{
+    uint i = gl_GlobalInvocationID.x;
+    if (i >= pc.numParticles) return;
+
+    float rho = velocities[i].w;
+    if (rho < 1e-6) return;
+
+    vec3 pos = positions[i].xyz;
+    vec3 vel = velocities[i].xyz;
+    vec3 f   = forces[i].xyz;
+
+    vec3 grav = vec3(pc.gravX, pc.gravY, pc.gravZ);
+    f += grav * rho;
+    f += boundaryForce(pos) * rho;
+
+    vec3 acc = f / rho;
+    vel += acc * pc.timeStep;
+    pos += vel * pc.timeStep;
+
+    velocities[i].xyz = vel;
+    positions[i].xyz  = pos;
+}

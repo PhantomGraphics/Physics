@@ -1,0 +1,17 @@
+{
+  "name": "38_soft_jelly_on_box",
+  "steps": [
+    { "label": "Set JellyOnBox preset (3x3x3 jelly cube spawns above a static rigid box)", "command": "SetPreset:JellyOnBox", "expect": "OK" },
+    { "label": "Precondition: 1 body", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Precondition: 64 particles", "command": "GetSoftParticleCount", "expect": "Particles:64" },
+    { "label": "Precondition: cube spawns at y in [1.2,2.2], above the box (box top at y=0.3)", "command": "GetSoftMinPositionY", "expect": "1.200000", "store_as": "min_y_before" },
+    { "label": "Cube falls and settles on the box (~3.3s)", "command": "Step:200", "expect": "OK" },
+    { "label": "Change: the cube has fallen -- min Y after settling is measurably lower than its spawn height", "command": "GetSoftMinPositionY", "store_as": "min_y_after" },
+    { "label": "Invariant: body/particle counts stable", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Invariant: particle count stable", "command": "GetSoftParticleCount", "expect": "Particles:64" },
+    { "label": "Invariant: no velocity explosion (settles on the rigid box, not thousands of m/s)", "command": "GetMaxSpeed", "expect_range": "0.0,20.0" },
+    { "label": "Reset restores scene", "command": "Reset", "expect": "OK" },
+    { "label": "Body count after reset", "command": "GetSoftBodyCount", "expect": "Count:1" }
+  ],
+  "post_assert": "min_y_after < min_y_before"
+}

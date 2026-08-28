@@ -1,0 +1,18 @@
+{
+  "name": "34_soft_rope_hanging",
+  "steps": [
+    { "label": "Set RopeHanging preset (30-particle chain, pinned at the top, hangs down to y=-3)", "command": "SetPreset:RopeHanging", "expect": "OK" },
+    { "label": "Precondition: 1 body", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Precondition: 30 particles", "command": "GetSoftParticleCount", "expect": "Particles:30" },
+    { "label": "Precondition: pinned start (particle 0) at y=0", "command": "GetSoftParticlePositionY:0:0", "expect": "0.000000", "store_as": "start_y" },
+    { "label": "Precondition: chain hangs down to y=-3 initially (length 3, straight down)", "command": "GetSoftMinPositionY", "expect": "-3.000000", "store_as": "min_y_before" },
+    { "label": "Chain settles/relaxes under gravity and its own constraints (~1.6s)", "command": "Step:100", "expect": "OK" },
+    { "label": "Change: the chain's extent has shifted from its initial dead-straight-down configuration", "command": "GetSoftMinPositionY", "store_as": "min_y_after" },
+    { "label": "Invariant: pinned start did not move", "command": "GetSoftParticlePositionY:0:0", "expect": "${start_y}" },
+    { "label": "Invariant: body/particle counts stable", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Invariant: no velocity explosion", "command": "GetMaxSpeed", "expect_range": "0.0,20.0" },
+    { "label": "Reset OK", "command": "Reset", "expect": "OK" },
+    { "label": "Particle count after reset", "command": "GetSoftParticleCount", "expect": "Particles:30" }
+  ],
+  "post_assert": "min_y_after != min_y_before"
+}

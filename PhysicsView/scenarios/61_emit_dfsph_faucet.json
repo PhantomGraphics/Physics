@@ -1,0 +1,24 @@
+{
+  "name": "61_emit_dfsph_faucet",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "DFSPH, default FluidWorld::Params scale (see 10_fluid_dfsph_pool_settle.json)", "command": "SetSimulationType:DFSPH", "expect": "OK" },
+    { "label": "Start with an empty pool: no initial block", "command": "SetFluidBounds:0:0:0:0:0:0", "expect": "OK" },
+    { "label": "Container walls sized for the default-scale emitter jet", "command": "SetFluidBoundary:-8:-8:-8:8:14:8", "expect": "OK" },
+    { "label": "Rebuild fluid (degenerate bounds seed at most 1 particle)", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: starts with just the single degenerate-bounds seed particle", "command": "GetParticleCount", "expect": "Count:1", "store_as": "count0", "strip_prefix": "Count:" },
+    { "label": "Precondition: no emitters registered yet", "command": "GetEmitterCount", "expect": "0" },
+    { "label": "Register a downward-jetting faucet emitter above the pool. rate and speed are picked together so consecutive particles land speed/rate = 2.0 apart -- one particle diameter at the default radius 1.0 (FluidWorld::addEmitter() forces Emitter::particleRadius to the scene radius). A faster rate stacks brand-new particles inside each other, which is a density error no incompressibility solve can resolve except by firing them apart.", "command": "AddEmitter:0,10,0,1.0,5,0,-1,0,10", "expect": "OK" },
+    { "label": "One emitter now registered", "command": "GetEmitterCount", "expect": "1" },
+    { "label": "Run the faucet for exactly 1s (100 steps * dt=0.01) at rate=5/s: 5 new particles", "command": "Step", "expect": "OK", "repeat": 100 },
+    { "label": "Change: emitting has grown the particle count well past the initial seed (not pinned to exactly 21 -- rate*dt=0.2 isn't exactly representable in float, so the accumulator can drift a step over 100 additions, see DFSPHSolverTest.EmittedParticlesAtSceneRadiusStayFiniteWhileFallingIntoExistingFluid)", "command": "GetParticleCount", "expect_prefix": "Count:", "expect_not": "Count:${count0}", "store_as": "count_emitting", "strip_prefix": "Count:" },
+    { "label": "Invariant: no NaN/explosion: stays inside the container (upper bound)", "command": "GetMaxParticlePositionY", "expect_range": "-8.5,14.5" },
+    { "label": "Invariant: no NaN/explosion: stays inside the container (lower bound)", "command": "GetMinParticlePositionY", "expect_range": "-8.5,14.5" },
+
+    { "label": "Clearing emitters stops further spawning", "command": "ClearEmitters", "expect": "OK" },
+    { "label": "No emitters remain", "command": "GetEmitterCount", "expect": "0" },
+    { "label": "Run another 0.5s with no emitter left to add particles", "command": "Step", "expect": "OK", "repeat": 50 },
+    { "label": "Invariant: with the emitter cleared, the particle count from the moment of clearing is exactly preserved -- no further growth", "command": "GetParticleCount", "expect": "Count:${count_emitting}" }
+  ],
+  "post_assert": "count_emitting > count0"
+}

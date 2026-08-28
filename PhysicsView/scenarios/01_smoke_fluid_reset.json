@@ -1,0 +1,12 @@
+{
+  "name": "01_smoke_fluid_reset",
+  "steps": [
+    { "label": "Rebuild fluid at default DFSPH scale", "command": "Reset", "expect": "OK" },
+    { "label": "Record particle count after first reset", "command": "GetParticleCount", "expect_prefix": "Count:", "store_as": "count_a", "strip_prefix": "Count:" },
+    { "label": "Non-zero seeding", "command": "GetParticleCount", "expect_not": "Count:0" },
+    { "label": "Reset again is idempotent", "command": "Reset", "expect": "OK" },
+    { "label": "Particle count unchanged by a second reset", "command": "GetParticleCount", "expect": "Count:${count_a}" },
+    { "label": "Plain Step advances the fluid without changing particle count (no births/deaths in plain DFSPH; note \"Step:N\" with a colon does NOT step the fluid at all -- see CommandDispatcher::route(), it only advances rigid()/softWorld_, unlike its class doc comment's claim that Step:N affects all three worlds)", "command": "Step", "expect": "OK", "repeat": 5 },
+    { "label": "Particle count still unchanged after stepping", "command": "GetParticleCount", "expect": "Count:${count_a}" }
+  ]
+}

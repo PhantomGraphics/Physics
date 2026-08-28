@@ -1,0 +1,24 @@
+{
+  "name": "72_pipe_render_toggles",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "DFSPH", "command": "SetSimulationType:DFSPH", "expect": "OK" },
+    { "label": "Small effect length", "command": "SetFluidEffectLength:0.1", "expect": "OK" },
+    { "label": "Particle radius 0.025 (spacing 0.05)", "command": "SetFluidRadius:0.025", "expect": "OK" },
+    { "label": "Resting 3x3x3 block, x/z in [-0.05,0.05], y in [0.3,0.4]", "command": "SetFluidBounds:-0.05:0.3:-0.05:0.05:0.4:0.05", "expect": "OK" },
+    { "label": "Container walls", "command": "SetFluidBoundary:-0.5:-0.5:-0.5:0.5:0.5:0.5", "expect": "OK" },
+    { "label": "Rebuild fluid", "command": "Reset", "expect": "OK" },
+
+    { "label": "Precondition: volume rendering is off by default", "command": "IsVolumeRenderEnabled", "expect": "No" },
+    { "label": "Change: enable volume point rendering", "command": "SetVolumeRenderEnabled:true", "expect": "OK" },
+    { "label": "Volume rendering now on", "command": "IsVolumeRenderEnabled", "expect": "OK" },
+    { "label": "Disable volume rendering again", "command": "SetVolumeRenderEnabled:false", "expect": "OK" },
+    { "label": "Invariant: volume rendering off again, matches the precondition", "command": "IsVolumeRenderEnabled", "expect": "No" },
+
+    { "label": "Precondition: mesh rendering is off by default", "command": "IsMeshRenderEnabled", "expect": "No" },
+    { "label": "Change: enable mesh rendering", "command": "SetMeshRenderEnabled:true", "expect": "OK" },
+    { "label": "Mesh rendering now on", "command": "IsMeshRenderEnabled", "expect": "OK" },
+    { "label": "Disable mesh rendering again", "command": "SetMeshRenderEnabled:false", "expect": "OK" },
+    { "label": "Invariant: mesh rendering off again, matches the precondition", "command": "IsMeshRenderEnabled", "expect": "No" }
+  ]
+}

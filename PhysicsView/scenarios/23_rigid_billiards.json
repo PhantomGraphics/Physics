@@ -1,0 +1,16 @@
+{
+  "name": "23_rigid_billiards",
+  "steps": [
+    { "label": "Set Billiards preset (cue ball + 5-ball rack)", "command": "SetPreset:Billiards", "expect": "OK" },
+    { "label": "Precondition: 7 bodies (floor + 6 balls)", "command": "GetBodyCount", "expect": "Count:7" },
+    { "label": "Precondition: no contacts before the cue ball reaches the rack", "command": "GetContactCount", "expect": "Contacts:0" },
+    { "label": "Precondition: cue ball (body 1) starts at rest height y=0.5", "command": "GetBodyPositionY:1", "expect": "0.500000" },
+    { "label": "Cue ball crosses the table and strikes the rack (~0.5s)", "command": "Step:30", "expect": "OK" },
+    { "label": "Change: the strike produced contacts (this dispatcher exposes no X/Z getters, so the collision's horizontal momentum transfer is only observable indirectly via contact events -- see docs/todo/PLAN_physics_scenario_test_rebuild.md)", "command": "GetContactCount", "expect_not": "Contacts:0" },
+    { "label": "Bodies remain after the strike", "command": "GetBodyCount", "expect": "Count:7" },
+    { "label": "Let the balls continue to interact (~0.5s more)", "command": "Step:30", "expect": "OK" },
+    { "label": "Invariant: bodies still intact", "command": "GetBodyCount", "expect": "Count:7" },
+    { "label": "Invariant: cue ball stays at table height (didn't launch into the air)", "command": "GetBodyPositionY:1", "expect_range": "0.3,0.7" },
+    { "label": "Invariant: a rack ball (body 4) stays at table height too", "command": "GetBodyPositionY:4", "expect_range": "0.3,0.7" }
+  ]
+}

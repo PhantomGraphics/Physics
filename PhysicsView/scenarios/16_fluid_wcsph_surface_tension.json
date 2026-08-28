@@ -1,0 +1,31 @@
+{
+  "name": "16_fluid_wcsph_surface_tension",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "WCSPH", "command": "SetSimulationType:WCSPH", "expect": "OK" },
+    { "label": "Rest density", "command": "SetFluidDensity:1.0", "expect": "OK" },
+    { "label": "Pressure coe scale (Params default)", "command": "SetFluidPressureCoeScale:1960.0", "expect": "OK" },
+    { "label": "Low viscosity", "command": "SetFluidViscosity:0.5", "expect": "OK" },
+    { "label": "Effect length", "command": "SetFluidEffectLength:1.0", "expect": "OK" },
+    { "label": "Particle radius 0.15 (spacing 0.3)", "command": "SetFluidRadius:0.15", "expect": "OK" },
+    { "label": "Small time step", "command": "SetFluidTimeStep:0.005", "expect": "OK" },
+    { "label": "Resting 3x3x3 block, x/z in [-0.3,0.3], y in [0.6,1.2]", "command": "SetFluidBounds:-0.3:0.6:-0.3:0.3:1.2:0.3", "expect": "OK" },
+    { "label": "Roomy container walls", "command": "SetFluidBoundary:-3:-3:-3:3:3:3", "expect": "OK" },
+
+    { "label": "Baseline run: surface tension disabled", "command": "SetFluidTension:0.0", "expect": "OK" },
+    { "label": "Rebuild fluid (tension=0)", "command": "Reset", "expect": "OK" },
+    { "label": "Baseline particle count", "command": "GetParticleCount", "expect_prefix": "Count:", "store_as": "count0", "strip_prefix": "Count:" },
+    { "label": "Settle without tension (~0.5s)", "command": "Step", "expect": "OK", "repeat": 100 },
+    { "label": "No-tension max Y", "command": "GetMaxParticlePositionY", "store_as": "max_y_no_tension" },
+    { "label": "No-tension stays bounded (no explosion)", "command": "GetMaxParticlePositionY", "expect_range": "-3.1,3.1" },
+
+    { "label": "Comparison run: strong surface tension", "command": "SetFluidTension:5.0", "expect": "OK" },
+    { "label": "Rebuild fluid (tension=5.0, same initial block)", "command": "Reset", "expect": "OK" },
+    { "label": "Same particle count with tension enabled", "command": "GetParticleCount", "expect": "Count:${count0}" },
+    { "label": "Settle with strong tension, same duration (~0.5s)", "command": "Step", "expect": "OK", "repeat": 100 },
+    { "label": "High-tension max Y", "command": "GetMaxParticlePositionY", "store_as": "max_y_high_tension" },
+    { "label": "High-tension stays bounded (no explosion)", "command": "GetMaxParticlePositionY", "expect_range": "-3.1,3.1" },
+    { "label": "High-tension no velocity explosion", "command": "GetMaxParticleSpeed", "expect_range": "0,100" }
+  ],
+  "post_assert": "max_y_high_tension > max_y_no_tension"
+}

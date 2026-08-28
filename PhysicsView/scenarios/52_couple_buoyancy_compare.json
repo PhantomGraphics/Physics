@@ -1,0 +1,33 @@
+{
+  "name": "52_couple_buoyancy_compare",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "DFSPH (Two-Way/Track B capable)", "command": "SetSimulationType:DFSPH", "expect": "OK" },
+    { "label": "Effect length (same regime as 51_couple_rigid_fluid_twoway.json)", "command": "SetFluidEffectLength:0.6", "expect": "OK" },
+    { "label": "Boundary stiffness for the Two-Way Akinci force, same regime as 51_couple_rigid_fluid_twoway.json (WCSPHFluid::estimatePressureCoe(0.6, 98.0) = 58.8)", "command": "SetFluidPressureCoeScale:98.0", "expect": "OK" },
+    { "label": "Rest density", "command": "SetFluidDensity:1.0", "expect": "OK" },
+    { "label": "Particle radius (spacing 0.6)", "command": "SetFluidRadius:0.3", "expect": "OK" },
+    { "label": "Shallow pool just below ScenePreset::SphereDrop's fixed y=3/r=0.5 spawn (bottom of the sphere starts at y=2.5, clear of the pool's y=2.2 top)", "command": "SetFluidBounds:-1.2:1.6:-1.2:1.2:2.2:1.2", "expect": "OK" },
+    { "label": "Domain floor at y=0; x/z open", "command": "SetFluidBoundary:-1000:0:-1000:1000:1000:1000", "expect": "OK" },
+    { "label": "Floor + sphere dropping from y=3", "command": "SetPreset:SphereDrop", "expect": "OK" },
+    { "label": "Enable Rigid-Fluid coupling", "command": "SetCouplingEnabled:true", "expect": "OK" },
+
+    { "label": "Baseline run: One-Way (SDF penalty only, no reaction force back on the sphere)", "command": "SetCouplingMode:OneWay", "expect": "OK" },
+    { "label": "Rebuild fluid+rigid+bindings", "command": "Reset", "expect": "OK" },
+    { "label": "One-Way confirmed active", "command": "GetActiveCouplingMode", "expect": "OneWay" },
+    { "label": "Sphere falls into the pool, unaffected by any buoyant reaction (~0.4s)", "command": "Step", "expect": "OK", "repeat": 40 },
+    { "label": "One-Way sphere height after falling", "command": "GetBodyPositionY:1", "store_as": "bodyY_oneway" },
+
+    { "label": "Comparison run: Two-Way (Akinci boundary particles, buoyant reaction now applies)", "command": "SetPreset:SphereDrop", "expect": "OK" },
+    { "label": "Enable Rigid-Fluid coupling", "command": "SetCouplingEnabled:true", "expect": "OK" },
+    { "label": "Two-Way requested", "command": "SetCouplingMode:TwoWay", "expect": "OK" },
+    { "label": "Rebuild fluid+rigid+bindings", "command": "Reset", "expect": "OK" },
+    { "label": "Two-Way confirmed active for this dynamic, non-Plane body", "command": "GetActiveCouplingMode", "expect": "TwoWay" },
+    { "label": "Sphere falls into the pool, same duration, now with a buoyant reaction pushing back (~0.4s)", "command": "Step", "expect": "OK", "repeat": 40 },
+    { "label": "Change: Two-Way sphere height after falling", "command": "GetBodyPositionY:1", "store_as": "bodyY_twoway" },
+
+    { "label": "Invariant: the Two-Way run's fluid stays bounded -- it used to explode to max particle Y in the thousands on sphere impact (docs/issue/CODEBASE_ISSUES.md 1.6)", "command": "GetMaxParticlePositionY", "expect_range": "-0.1,3.6" },
+    { "label": "Invariant: the sphere is still falling, but slower than the discrete free-fall velocity -g*dt*n = -3.92 the One-Way run reproduces exactly", "command": "GetBodyVelocityY:1", "expect_range": "-3.92,-2.0" }
+  ],
+  "post_assert": "bodyY_twoway > bodyY_oneway"
+}

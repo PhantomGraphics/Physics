@@ -1,0 +1,27 @@
+{
+  "name": "73_pipe_iso_level_sensitivity",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "DFSPH", "command": "SetSimulationType:DFSPH", "expect": "OK" },
+    { "label": "Small effect length", "command": "SetFluidEffectLength:0.1", "expect": "OK" },
+    { "label": "Particle radius 0.025 (spacing 0.05)", "command": "SetFluidRadius:0.025", "expect": "OK" },
+    { "label": "Resting 3x3x3 block, x/z in [-0.05,0.05], y in [0.3,0.4]", "command": "SetFluidBounds:-0.05:0.3:-0.05:0.05:0.4:0.05", "expect": "OK" },
+    { "label": "Container walls", "command": "SetFluidBoundary:-0.5:-0.5:-0.5:0.5:0.5:0.5", "expect": "OK" },
+    { "label": "Rebuild fluid", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: particle count sane", "command": "GetParticleCount", "expect_prefix": "Count:" },
+
+    { "label": "Conversion radius matches particle spacing", "command": "SetVolumeParticleRadius:0.025", "expect": "OK" },
+    { "label": "Conversion cell length matches particle spacing", "command": "SetVolumeCellLength:0.05", "expect": "OK" },
+    { "label": "Isotropic kernel", "command": "SetVolumeKernel:Isotropic", "expect": "OK" },
+    { "label": "Convert the live particle set to a SparseVolume once (both mesh extractions below reuse it)", "command": "ConvertToVolume", "expect": "OK" },
+    { "label": "Precondition: conversion produced active voxels", "command": "GetVolumeVoxelCount", "expect_prefix": "Count:", "expect_not": "Count:0" },
+
+    { "label": "Low iso level -- includes more of the density field's periphery", "command": "SetVolumeIsoLevel:0.1", "expect": "OK" },
+    { "label": "Extract at the low iso level", "command": "ConvertToMesh", "expect": "OK" },
+    { "label": "Triangle count at low iso level", "command": "GetMeshTriangleCount", "expect_prefix": "Count:", "store_as": "triangles_low", "strip_prefix": "Count:" },
+
+    { "label": "High iso level -- above the density field's peak anywhere in this small block", "command": "SetVolumeIsoLevel:3.0", "expect": "OK" },
+    { "label": "Change: re-extracting at the high iso level from the same volume finds no valid isosurface at all -- the iso level knob actually affects the extracted surface, from a real mesh at 0.1 down to nothing at 3.0", "command": "ConvertToMesh", "expect_prefix": "Error:" },
+    { "label": "Invariant: a failed conversion clears the mesh rather than leaving stale triangles from the earlier low-iso extraction around", "command": "GetMeshTriangleCount", "expect": "Count:0" }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "80_capture_screenshot",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "A visible scene to capture", "command": "SetPreset:SphereDrop", "expect": "OK" },
+    { "label": "Precondition: 2 bodies (floor, sphere)", "command": "GetBodyCount", "expect": "Count:2" },
+    { "label": "Let it fall partway so the frame isn't just the static spawn pose", "command": "Step:30", "expect": "OK" },
+    { "label": "Screenshot round-trip completes and the process keeps running afterward (regression check, see docs/issue/CODEBASE_ISSUES.md 1.8 history)",
+      "command": "SaveScreenshot:testdata/screenshots/80_capture_screenshot.png", "expect": "OK" },
+    { "label": "Invariant: the app is still alive and responsive after the capture round-trip", "command": "GetStatus", "expect": "OK" },
+    { "label": "Invariant: bodies unchanged by the capture", "command": "GetBodyCount", "expect": "Count:2" }
+  ]
+}

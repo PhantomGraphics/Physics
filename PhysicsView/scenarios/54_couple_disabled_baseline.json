@@ -1,0 +1,42 @@
+{
+  "name": "54_couple_disabled_baseline",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "WCSPH (same regime as 50_couple_rigid_fluid_oneway.json)", "command": "SetSimulationType:WCSPH", "expect": "OK" },
+    { "label": "Effect length 0.6 = one seed spacing", "command": "SetFluidEffectLength:0.6", "expect": "OK" },
+    { "label": "Pressure coe scale (WCSPHFluid::estimatePressureCoe(0.6, 98.0))", "command": "SetFluidPressureCoeScale:98.0", "expect": "OK" },
+    { "label": "Rest density", "command": "SetFluidDensity:1.0", "expect": "OK" },
+    { "label": "Particle radius 0.3 = seed spacing 0.6, which puts seeds on x=0/z=0 and therefore inside ScenePreset::BoxDrop's 1x1x1 drop column (docs/issue/CODEBASE_ISSUES.md 1.7)", "command": "SetFluidRadius:0.3", "expect": "OK" },
+    { "label": "Shallow pool, x/z in [-1.2,1.2], y in [0,1.2]", "command": "SetFluidBounds:-1.2:0:-1.2:1.2:1.2:1.2", "expect": "OK" },
+    { "label": "Container: floor at y=0, walls just outside the pool, open top", "command": "SetFluidBoundary:-1.5:0:-1.5:1.5:1000:1.5", "expect": "OK" },
+    { "label": "Floor + box dropping from y=3", "command": "SetPreset:BoxDrop", "expect": "OK" },
+
+    { "label": "Negative baseline: coupling disabled entirely", "command": "SetCouplingEnabled:false", "expect": "OK" },
+    { "label": "Rebuild fluid+rigid, uncoupled", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: coupling reports disabled", "command": "IsCouplingEnabled", "expect": "No" },
+    { "label": "Precondition: 5x3x5 seeded pool", "command": "GetParticleCount", "expect": "Count:75" },
+    { "label": "Pool settles onto the floor while the box is still above it", "command": "Step", "expect": "OK", "repeat": 40 },
+    { "label": "Reference sample taken before the box could reach the pool either way -- the coupled pass below has to reproduce this exactly", "command": "GetMaxParticleSpeed", "store_as": "speed_before_contact" },
+    { "label": "The box passes straight through the pool's position: with no boundary registered for it the fluid never feels it, and simply keeps settling (~0.6s)", "command": "Step", "expect": "OK", "repeat": 60 },
+    { "label": "Uncoupled: the pool is quietly settling, nothing has disturbed it", "command": "GetMaxParticleSpeed", "expect_range": "0,0.5", "store_as": "speed_uncoupled" },
+    { "label": "Uncoupled: the box occupies the same volume as the fluid, because nothing pushed the fluid out of it", "command": "GetAvgParticlePositionY", "store_as": "avg_y_uncoupled" },
+
+    { "label": "Comparison run: same scene, coupling enabled One-Way", "command": "SetPreset:BoxDrop", "expect": "OK" },
+    { "label": "Enable Rigid-Fluid coupling", "command": "SetCouplingEnabled:true", "expect": "OK" },
+    { "label": "One-Way (SDF penalty on fluid)", "command": "SetCouplingMode:OneWay", "expect": "OK" },
+    { "label": "Rebuild fluid+rigid+bindings", "command": "Reset", "expect": "OK" },
+    { "label": "One-Way confirmed active", "command": "GetActiveCouplingMode", "expect": "OneWay" },
+    { "label": "Same 40 steps as the baseline run", "command": "Step", "expect": "OK", "repeat": 40 },
+    { "label": "Precondition: while the box is still clear of the pool the two runs are bit-for-bit identical -- so any divergence past this point is the coupling and nothing else", "command": "GetMaxParticleSpeed", "expect": "${speed_before_contact}" },
+    { "label": "Box plunges through the pool, now pushed out of its way by the box's SDF penalty", "command": "Step", "expect": "OK", "repeat": 60 },
+    { "label": "Change: the pool is being actively stirred, orders of magnitude above the undisturbed baseline. This is the suite's proof that One-Way coupling reaches the solver; note the original form of this check sampled GetMaxParticlePositionY instead, which is dominated by a rim particle the box never touches and reads identical either way.", "command": "GetMaxParticleSpeed", "expect_range": "1.0,50", "store_as": "speed_oneway" },
+    { "label": "Diagnostic: the penalty has pushed fluid out of the volume the box now occupies, so the pool's centre of mass sits a little below the uncoupled run's (~0.475 vs ~0.494). Only the range is asserted here -- that 4% gap is too small to hang the scenario's contract on, which is why speed_oneway/speed_uncoupled is what post_assert compares.", "command": "GetAvgParticlePositionY", "expect_range": "0.2,0.6", "store_as": "avg_y_oneway" },
+
+    { "label": "Let the box finish settling on the floor (~0.5s more)", "command": "Step", "expect": "OK", "repeat": 50 },
+    { "label": "Invariant: fluid stays bounded (no explosion)", "command": "GetMaxParticlePositionY", "expect_range": "-0.1,2.5" },
+    { "label": "Invariant: fluid rests on the floor (no penetration beyond numerical slop)", "command": "GetMinParticlePositionY", "expect_range": "-0.1,0.1" },
+    { "label": "Invariant: box (body 1) reaches the floor regardless of coupling (One-Way never pushes back on the box)", "command": "GetBodyPositionY:1", "expect_range": "0.3,0.7" },
+    { "label": "Invariant: particle count conserved", "command": "GetParticleCount", "expect": "Count:75" }
+  ],
+  "post_assert": "speed_oneway > speed_uncoupled"
+}

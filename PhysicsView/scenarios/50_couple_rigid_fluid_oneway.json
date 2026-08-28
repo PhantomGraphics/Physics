@@ -1,0 +1,33 @@
+{
+  "name": "50_couple_rigid_fluid_oneway",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "WCSPH (validated stable regime with a real y=0 floor boundary)", "command": "SetSimulationType:WCSPH", "expect": "OK" },
+    { "label": "Effect length 0.6 = one seed spacing, the same pool regime 51/52 use", "command": "SetFluidEffectLength:0.6", "expect": "OK" },
+    { "label": "Pressure coe scale (WCSPHFluid::estimatePressureCoe(0.6, 98.0) = 58.8)", "command": "SetFluidPressureCoeScale:98.0", "expect": "OK" },
+    { "label": "Rest density", "command": "SetFluidDensity:1.0", "expect": "OK" },
+    { "label": "Particle radius 0.3, i.e. seed spacing 0.6. This has to divide the pool bounds so that seeds land on x=0/z=0: ScenePreset::BoxDrop's box is only 1x1x1 about the origin, so a pool seeded off those axes (as this scenario's original radius-1.0 / spacing-2.0 pool was) leaves the box's whole drop column empty and the SDF penalty never fires -- see docs/issue/CODEBASE_ISSUES.md 1.7.", "command": "SetFluidRadius:0.3", "expect": "OK" },
+    { "label": "Shallow pool, x/z in [-1.2,1.2] (5 seeds each, centred on 0), y in [0,1.2]", "command": "SetFluidBounds:-1.2:0:-1.2:1.2:1.2:1.2", "expect": "OK" },
+    { "label": "Container: floor at y=0 matching the rendered rigid floor, walls just outside the pool, open top", "command": "SetFluidBoundary:-1.5:0:-1.5:1.5:1000:1.5", "expect": "OK" },
+    { "label": "Floor + box dropping from y=3", "command": "SetPreset:BoxDrop", "expect": "OK" },
+    { "label": "Precondition: 2 bodies (floor, box)", "command": "GetBodyCount", "expect": "Count:2" },
+    { "label": "Enable Rigid-Fluid coupling", "command": "SetCouplingEnabled:true", "expect": "OK" },
+    { "label": "One-Way requested (SDF penalty on fluid; box unaffected by fluid reaction, falls to the floor as usual)", "command": "SetCouplingMode:OneWay", "expect": "OK" },
+    { "label": "Rebuild fluid+rigid+bindings", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: coupling reports enabled", "command": "IsCouplingEnabled", "expect": "OK" },
+    { "label": "Precondition: effective mode is really One-Way (not silently something else)", "command": "GetActiveCouplingMode", "expect": "OneWay" },
+    { "label": "Precondition: 5x3x5 seeded pool", "command": "GetParticleCount", "expect": "Count:75" },
+    { "label": "Precondition: box starts at drop height", "command": "GetBodyPositionY:1", "expect": "3.000000", "store_as": "box_y_before" },
+    { "label": "Precondition: pool settles onto the floor and goes quiet while the box is still in free fall well above it (box bottom is at y=1.7 at this point, the pool surface at ~1.0)", "command": "Step", "expect": "OK", "repeat": 40 },
+    { "label": "Precondition: the pool is nearly at rest just before the box arrives, so anything it does next is the box's doing", "command": "GetMaxParticleSpeed", "expect_range": "0,1.0" },
+    { "label": "Box plunges through the pool down to the floor (~0.6s)", "command": "Step", "expect": "OK", "repeat": 60 },
+    { "label": "Change: the box actually fell and settled on the floor", "command": "GetBodyPositionY:1", "store_as": "box_y_after" },
+    { "label": "Change: the SDF penalty has visibly stirred the pool -- this reads ~0.04 (i.e. still settling quietly) with coupling disabled, see 54_couple_disabled_baseline.json", "command": "GetMaxParticleSpeed", "expect_range": "1.0,50" },
+    { "label": "Invariant: fluid stays bounded (no explosion)", "command": "GetMaxParticlePositionY", "expect_range": "-0.1,2.5" },
+    { "label": "Invariant: fluid rests on the floor. The slop here is wider than the other pool scenarios' +/-0.1 because this samples while the box is still driving particles down into the floor plane (it settles back to ~-0.004 once the box comes to rest, see 54_couple_disabled_baseline.json's own invariant)", "command": "GetMinParticlePositionY", "expect_range": "-0.15,0.1" },
+    { "label": "Invariant: box (body 1) rests on the floor, unaffected by fluid buoyancy", "command": "GetBodyPositionY:1", "expect_range": "0.3,0.7" },
+    { "label": "Invariant: bodies unchanged", "command": "GetBodyCount", "expect": "Count:2" },
+    { "label": "Invariant: particle count conserved", "command": "GetParticleCount", "expect": "Count:75" }
+  ],
+  "post_assert": "box_y_after < box_y_before"
+}

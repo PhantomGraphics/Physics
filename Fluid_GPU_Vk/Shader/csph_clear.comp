@@ -1,0 +1,16 @@
+#version 450
+
+layout(local_size_x = 64) in;
+
+layout(set = 0, binding = 3, std430) buffer CellCount { int cellCount[]; };
+
+layout(push_constant) uniform PC {
+    uint numCells;
+} pc;
+
+void main()
+{
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= pc.numCells) return;
+    cellCount[idx] = 0;
+}

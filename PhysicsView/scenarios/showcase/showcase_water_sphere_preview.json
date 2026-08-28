@@ -1,0 +1,43 @@
+{
+  "name": "showcase_water_sphere_preview",
+  "_comment": [
+    "Native PhysicsView port of the Blender crystal_sph_addon preset",
+    "SHOWCASE_WATER_SPHERE_PREVIEW -- same geometry/camera framing as",
+    "SHOWCASE_WATER_SPHERE (showcase_water_sphere.json) but with particle radius",
+    "doubled (~44k particles instead of ~354k). Same wall-damping setting, and the same",
+    "emit_speed_jitter/emitter-position notes -- see showcase_water_sphere.json's",
+    "_comment. This is the tier docs/issue/water_sphere_showcase_emitter_instability.md's",
+    "own repro used (labeled there as \"下見ティア\"), and the tier its section 9",
+    "measured the fix on.",
+    "  PhysicsView.exe --run-scenario scenarios/showcase/showcase_water_sphere_preview.json"
+  ],
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "WCSPH", "command": "SetSimulationType:WCSPH", "expect": "OK" },
+    { "label": "particle_radius=0.005 (2x SHOWCASE_WATER_SPHERE)", "command": "SetFluidRadius:0.005", "expect": "OK" },
+    { "label": "effect_length_factor=4.0 -> effectLength=4*radius=0.02", "command": "SetFluidEffectLength:0.02", "expect": "OK" },
+    { "label": "rest_density=1000 kg/m^3", "command": "SetFluidDensity:1000", "expect": "OK" },
+    { "label": "viscosity_coe=0.010 -- same as SHOWCASE_WATER_SPHERE (viscosityCoe is a kinematic viscosity and is not rescaled with the radius)", "command": "SetFluidViscosity:0.010", "expect": "OK" },
+    { "label": "tension_coe=0.0", "command": "SetFluidTension:0.0", "expect": "OK" },
+    { "label": "pressure_coe_scale=20.0 (same as SHOWCASE_WATER_SPHERE, not scaled with radius)", "command": "SetFluidPressureCoeScale:20.0", "expect": "OK" },
+    { "label": "time_step=0.0002 (dt upper bound scales with sqrt(effectLength), not radius -- see presets.py's note)", "command": "SetFluidTimeStep:0.0002", "expect": "OK" },
+    { "label": "gravity (0,0,-9.8) Blender -> (0,-9.8,0) native", "command": "SetFluidGravity:0:-9.8:0", "expect": "OK" },
+    { "label": "wall damping 0.35: takes the restitution off the wall penalty spring, which on its own has a measured coefficient of restitution of 1.03. Kept because it costs nothing, but it is NOT what fixed this scene -- with the density clamp and viscosity right, particles penetrate the wall by only ~5% of h and zeta changes peak speed by under 1% at this tier (docs/issue/water_sphere_showcase_emitter_instability.md section 11.5)", "command": "SetFluidBoundaryDamping:0.35", "expect": "OK" },
+    { "label": "boundary_min/max (-0.30,-0.30,-0.35)/(0.30,0.30,0.30) Blender -> native", "command": "SetFluidBoundary:-0.3:-0.35:-0.3:0.3:0.3:0.3", "expect": "OK" },
+    { "label": "empty at frame 1: degenerate (zero-size) box seeds at most 1 particle at the origin (see showcase_water_sphere.json's note)", "command": "SetFluidBounds:0:0:0:0:0:0", "expect": "OK" },
+    { "label": "no box/sphere source regions either", "command": "ClearFluidSources", "expect": "OK" },
+    { "label": "clear any previous sphere boundary", "command": "ClearBoundarySpheres", "expect": "OK" },
+    { "label": "Water Sphere container: center (0,0,0) r=0.25 max_penetration=0.04 (2x, matching this tier's 2x effect length)", "command": "AddBoundarySphere:0,0,0,0.25,0.04", "expect": "OK" },
+    { "label": "1 sphere boundary registered", "command": "GetBoundarySphereCount", "expect": "1" },
+    { "label": "emitter budget at this spacing (0.010): pi*(R^2 z - z^3/3 + 2R^3/3) / 0.010^3", "command": "SetFluidMaxParticles:44280", "expect": "OK" },
+    { "label": "rebuild: 0 particles, sphere boundary + max-particle budget now active", "command": "Reset", "expect": "OK" },
+    { "label": "precondition: starts essentially empty (0 or 1 particle)", "command": "GetParticleCount", "expect_prefix": "Count:", "store_as": "count_start", "strip_prefix": "Count:" },
+    { "label": "Inflow emitter: center (0.04,0,0.15) r=0.075 dir=(0,0,-1) speed=2.45 Blender -> native; rate = pi*0.075^2*2.45/0.010^3", "command": "AddEmitter:0.04,0.15,0.0,0.075,43295,0,-1,0,2.45", "expect": "OK" },
+    { "label": "1 emitter registered", "command": "GetEmitterCount", "expect": "1" },
+    { "label": "PLY sequence output directory (gitignored screenshots/)", "command": "SetPLYOutputDir:${repo_root}/screenshots/showcase_water_sphere_preview_ply", "expect": "OK" },
+    { "label": "bake 240 frames x 25 substeps = 6000 physics steps (1 frame = 25*2e-4 = 5.00ms physical time), one PLY per frame", "command": "StepFrameAndSavePLY:25", "expect": "OK", "repeat": 240 },
+    { "label": "change: the sphere has filled -- particle count grew from the empty start", "command": "GetParticleCount", "expect_prefix": "Count:", "store_as": "count_final", "strip_prefix": "Count:" },
+    { "label": "invariant: didn't stay empty", "command": "GetParticleCount", "expect_not": "Count:0" }
+  ],
+  "post_assert": "count_final > count_start"
+}

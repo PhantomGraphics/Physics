@@ -1,0 +1,17 @@
+{
+  "name": "21_rigid_box_drop",
+  "steps": [
+    { "label": "Set BoxDrop preset", "command": "SetPreset:BoxDrop", "expect": "OK" },
+    { "label": "Precondition: 2 bodies (floor, box)", "command": "GetBodyCount", "expect": "Count:2" },
+    { "label": "Precondition: box (body 1) starts at drop height y=3", "command": "GetBodyPositionY:1", "expect": "3.000000", "store_as": "y0" },
+    { "label": "Fall and land (~1.3s)", "command": "Step:80", "expect": "OK" },
+    { "label": "Change: box actually fell", "command": "GetBodyPositionY:1", "store_as": "y1" },
+    { "label": "Invariant: box rests near the floor (half-extent 0.5, floor at y=0)", "command": "GetBodyPositionY:1", "expect_range": "0.3,0.7" },
+    { "label": "Invariant: contact reported (resting on the floor)", "command": "GetContactCount", "expect_prefix": "Contacts:" },
+    { "label": "Invariant: body count stable", "command": "GetBodyCount", "expect": "Count:2" },
+    { "label": "Reset restores initial state", "command": "Reset", "expect": "OK" },
+    { "label": "Body count after reset", "command": "GetBodyCount", "expect": "Count:2" },
+    { "label": "Drop height restored by reset", "command": "GetBodyPositionY:1", "expect": "${y0}" }
+  ],
+  "post_assert": "y1 < y0"
+}

@@ -1,0 +1,43 @@
+{
+  "name": "showcase_sheet_impact",
+  "_comment": [
+    "Native PhysicsView port of the Blender crystal_sph_addon preset SHOWCASE_SHEET_IMPACT",
+    "(CGApp/blender/PyFluid/crystal_sph_addon/presets.py, docs/todo/PLAN_sph_showcase_sheet_impact.md):",
+    "a thin 15mm water sheet plus 5 falling drops of differing size/height/plan position",
+    "(so they land at staggered times), ~400k particles. Same axis conversion as",
+    "showcase_dam_break.json (Blender Z-up (Bx,By,Bz) -> PhysicsView Y-up (Bx,Bz,By)).",
+    "Uses AddFluidSourceBox/AddFluidSourceSphere (6 regions total: 1 sheet + 5 drops) --",
+    "the single-box SetFluidBounds can't express this. Not run by run_physics_scenarios.ps1's",
+    "default sweep (subdirectory, not globbed) -- this is a multi-minute bake:",
+    "  PhysicsView.exe --run-scenario scenarios/showcase/showcase_sheet_impact.json"
+  ],
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "WCSPH", "command": "SetSimulationType:WCSPH", "expect": "OK" },
+    { "label": "particle_radius=0.0015", "command": "SetFluidRadius:0.0015", "expect": "OK" },
+    { "label": "effect_length_factor=4.0 -> effectLength=4*radius=0.006", "command": "SetFluidEffectLength:0.006", "expect": "OK" },
+    { "label": "rest_density=1000 kg/m^3", "command": "SetFluidDensity:1000", "expect": "OK" },
+    { "label": "viscosity_coe=0.003", "command": "SetFluidViscosity:0.003", "expect": "OK" },
+    { "label": "tension_coe=0.0", "command": "SetFluidTension:0.0", "expect": "OK" },
+    { "label": "preset doesn't override pressure_coe_scale -> addon default 1.96", "command": "SetFluidPressureCoeScale:1.96", "expect": "OK" },
+    { "label": "time_step=0.00015", "command": "SetFluidTimeStep:0.00015", "expect": "OK" },
+    { "label": "gravity (0,0,-9.8) Blender -> (0,-9.8,0) native", "command": "SetFluidGravity:0:-9.8:0", "expect": "OK" },
+    { "label": "boundary_min/max (-0.45,-0.30,-0.0165)/(0.45,0.30,0.55) Blender -> native", "command": "SetFluidBoundary:-0.45:-0.0165:-0.3:0.45:0.55:0.3", "expect": "OK" },
+    { "label": "no default single-box seed -- all seeding comes from AddFluidSourceBox/Sphere below", "command": "SetFluidBounds:1:1:1:0:0:0", "expect": "OK" },
+    { "label": "clear any previous source regions", "command": "ClearFluidSources", "expect": "OK" },
+    { "label": "Sheet: source_min/max (-0.435,-0.285,-0.015)/(0.4365,0.2865,0.0015) Blender -> native box", "command": "AddFluidSourceBox:-0.435,-0.015,-0.285,0.4365,0.0015,0.2865", "expect": "OK" },
+    { "label": "Drop A: center (-0.16,-0.06,0.24) r=0.055 Blender -> native", "command": "AddFluidSourceSphere:-0.16,0.24,-0.06,0.055", "expect": "OK" },
+    { "label": "Drop B: center (0.12,0.08,0.30) r=0.045 Blender -> native", "command": "AddFluidSourceSphere:0.12,0.3,0.08,0.045", "expect": "OK" },
+    { "label": "Drop C: center (-0.02,0.19,0.37) r=0.050 Blender -> native", "command": "AddFluidSourceSphere:-0.02,0.37,0.19,0.05", "expect": "OK" },
+    { "label": "Drop D: center (0.28,-0.14,0.44) r=0.038 Blender -> native", "command": "AddFluidSourceSphere:0.28,0.44,-0.14,0.038", "expect": "OK" },
+    { "label": "Drop E: center (-0.30,0.02,0.50) r=0.030 Blender -> native", "command": "AddFluidSourceSphere:-0.3,0.5,0.02,0.03", "expect": "OK" },
+    { "label": "6 regions registered (1 sheet + 5 drops)", "command": "GetFluidSourceRegionCount", "expect": "6" },
+    { "label": "no sphere boundary in this preset", "command": "ClearBoundarySpheres", "expect": "OK" },
+    { "label": "rebuild fluid: source regions above are sampled into the initial particle set here", "command": "Reset", "expect": "OK" },
+    { "label": "precondition: ~400k particles (sheet + 5 drops)", "command": "GetParticleCount", "expect_prefix": "Count:", "store_as": "count0", "strip_prefix": "Count:" },
+    { "label": "PLY sequence output directory (gitignored screenshots/)", "command": "SetPLYOutputDir:${repo_root}/screenshots/showcase_sheet_impact_ply", "expect": "OK" },
+    { "label": "bake 240 frames x 33 substeps = 7920 physics steps (1 frame = 33*1.5e-4 = 4.95ms physical time), one PLY per frame", "command": "StepFrameAndSavePLY:33", "expect": "OK", "repeat": 240 },
+    { "label": "invariant: particle count conserved (no emitter/outflow in this preset)", "command": "GetParticleCount", "expect": "Count:${count0}" },
+    { "label": "invariant: no NaN/explosion", "command": "GetMaxParticleSpeed", "expect_range": "0,1000" }
+  ]
+}

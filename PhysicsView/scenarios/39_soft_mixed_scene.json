@@ -1,0 +1,17 @@
+{
+  "name": "39_soft_mixed_scene",
+  "steps": [
+    { "label": "Set Mixed preset (cloth + rope + jelly together)", "command": "SetPreset:Mixed", "expect": "OK" },
+    { "label": "Precondition: 3 bodies (cloth, rope, jelly)", "command": "GetSoftBodyCount", "expect": "Count:3" },
+    { "label": "Precondition: 106 particles total (8x8 cloth=64 + 15-particle rope + 2x2x2 jelly=8... plus pin/shared bookkeeping, matches the preset's fixed construction)", "command": "GetSoftParticleCount", "expect": "Particles:106" },
+    { "label": "Precondition: highest body starts at y=2.1 (the jelly cube)", "command": "GetSoftMaxPositionY", "expect": "2.100000", "store_as": "max_y_before" },
+    { "label": "All three bodies fall/settle together (~2.4s)", "command": "Step:150", "expect": "OK" },
+    { "label": "Change: the tallest starting point has fallen -- max Y after settling is measurably lower", "command": "GetSoftMaxPositionY", "store_as": "max_y_after" },
+    { "label": "Invariant: body count stable", "command": "GetSoftBodyCount", "expect": "Count:3" },
+    { "label": "Invariant: particle count stable", "command": "GetSoftParticleCount", "expect": "Particles:106" },
+    { "label": "Invariant: no velocity explosion", "command": "GetMaxSpeed", "expect_range": "0.0,20.0" },
+    { "label": "Reset restores scene", "command": "Reset", "expect": "OK" },
+    { "label": "Body count after reset", "command": "GetSoftBodyCount", "expect": "Count:3" }
+  ],
+  "post_assert": "max_y_after < max_y_before"
+}

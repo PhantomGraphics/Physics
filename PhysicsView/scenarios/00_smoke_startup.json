@@ -1,0 +1,11 @@
+{
+  "name": "00_smoke_startup",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "Not running by default", "command": "IsRunning", "expect": "No" },
+    { "label": "Start the auto-advance loop", "command": "SetRunning:true", "expect": "OK" },
+    { "label": "IsRunning should now report OK", "command": "IsRunning", "expect": "OK" },
+    { "label": "Stop the auto-advance loop", "command": "SetRunning:false", "expect": "OK" },
+    { "label": "IsRunning reports stopped again", "command": "IsRunning", "expect": "No" }
+  ]
+}

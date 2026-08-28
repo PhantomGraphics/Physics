@@ -1,0 +1,25 @@
+{
+  "name": "15_fluid_pbsph_dam_break",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "PBSPH (validated stable regime)", "command": "SetSimulationType:PBSPH", "expect": "OK" },
+    { "label": "Small effect length", "command": "SetFluidEffectLength:1.0", "expect": "OK" },
+    { "label": "Low stiffness", "command": "SetFluidStiffness:0.001", "expect": "OK" },
+    { "label": "Rest density", "command": "SetFluidDensity:1.0", "expect": "OK" },
+    { "label": "Particle radius", "command": "SetFluidRadius:0.15", "expect": "OK" },
+    { "label": "No viscosity (FluidWorld::Params defaults viscosity to 5.0; combined with this scenario's large effectLength:1.0/small radius:0.15 that blows the artificial-viscosity term up to NaN within a handful of Step calls -- see docs/issue/CODEBASE_ISSUES.md 1.5)", "command": "SetFluidViscosity:0.0", "expect": "OK" },
+    { "label": "Small time step", "command": "SetFluidTimeStep:0.005", "expect": "OK" },
+    { "label": "Tall column flush against the left wall (the 'dam')", "command": "SetFluidBounds:-2.85:-2.85:-0.3:-2.25:-0.15:0.3", "expect": "OK" },
+    { "label": "Container walls", "command": "SetFluidBoundary:-3:-3:-3:3:3:3", "expect": "OK" },
+    { "label": "Rebuild fluid", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: sane, non-zero seed count", "command": "GetParticleCount", "expect_prefix": "Count:", "store_as": "count0", "strip_prefix": "Count:" },
+    { "label": "Precondition: column starts tall and narrow against the left wall (top at y=-0.15)", "command": "GetMaxParticlePositionY", "expect_range": "-0.2,-0.1", "store_as": "max_y_before" },
+    { "label": "Dam break collapses under gravity (~1.5s)", "command": "Step", "expect": "OK", "repeat": 300 },
+    { "label": "Change: the column has collapsed -- max Y after the break is measurably lower than the standing column's top", "command": "GetMaxParticlePositionY", "store_as": "max_y_after" },
+    { "label": "Invariant: particle count conserved", "command": "GetParticleCount", "expect": "Count:${count0}" },
+    { "label": "Invariant: stays inside the container (upper wall)", "command": "GetMaxParticlePositionY", "expect_range": "-3.1,3.1" },
+    { "label": "Invariant: stays inside the container (lower wall)", "command": "GetMinParticlePositionY", "expect_range": "-3.1,3.1" },
+    { "label": "Invariant: no velocity explosion", "command": "GetMaxParticleSpeed", "expect_range": "0,100" }
+  ],
+  "post_assert": "max_y_after < max_y_before"
+}

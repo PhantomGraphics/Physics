@@ -1,0 +1,42 @@
+{
+  "name": "showcase_dam_break",
+  "_comment": [
+    "Native PhysicsView port of the Blender crystal_sph_addon preset SHOWCASE_DAM_BREAK",
+    "(CGApp/blender/PyFluid/crystal_sph_addon/presets.py). Same WCSPH physics values,",
+    "converted from Blender's Z-up world space to PhysicsView's Y-up convention via",
+    "(Bx,By,Bz) -> (Bx,Bz,By) (gravity (0,0,-9.8) -> (0,-9.8,0), matching PhysicsView's",
+    "own default). Not run by run_physics_scenarios.ps1's default sweep -- it only",
+    "globs scenarios/*.json directly, not subdirectories -- because this is an 800k-",
+    "particle, 4800-physics-step bake (minutes, not the seconds a regression scenario",
+    "should take), not a fast pass/fail check. Run explicitly:",
+    "  PhysicsView.exe --run-scenario scenarios/showcase/showcase_dam_break.json",
+    "Known simplification vs. the addon preset: the two pillar/step obstacles that",
+    "split the collapsing column into three jets are NOT ported. The addon represents",
+    "them as extra is_static=true SPH particles baked into the same fluid, a Python-",
+    "side technique with no equivalent on the native FluidWorld/WCSPHFluid model (a",
+    "single fluid, single particle set). The dam-break collapse itself -- this scene's",
+    "actual physics content -- is otherwise a faithful port."
+  ],
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "WCSPH (only solver the showcase presets use)", "command": "SetSimulationType:WCSPH", "expect": "OK" },
+    { "label": "particle_radius=0.0025", "command": "SetFluidRadius:0.0025", "expect": "OK" },
+    { "label": "effect_length_factor=4.0 -> effectLength=4*radius=0.01", "command": "SetFluidEffectLength:0.01", "expect": "OK" },
+    { "label": "rest_density=1000 kg/m^3", "command": "SetFluidDensity:1000", "expect": "OK" },
+    { "label": "viscosity_coe=0.005", "command": "SetFluidViscosity:0.005", "expect": "OK" },
+    { "label": "no surface tension", "command": "SetFluidTension:0.0", "expect": "OK" },
+    { "label": "preset doesn't override pressure_coe_scale -> addon default 1.96", "command": "SetFluidPressureCoeScale:1.96", "expect": "OK" },
+    { "label": "time_step=0.00025", "command": "SetFluidTimeStep:0.00025", "expect": "OK" },
+    { "label": "gravity (0,0,-9.8) Blender -> (0,-9.8,0) native", "command": "SetFluidGravity:0:-9.8:0", "expect": "OK" },
+    { "label": "boundary_min/max (-0.6,-0.3,-0.25)/(0.6,0.3,0.35) Blender -> native xmin,ymin,zmin,xmax,ymax,zmax", "command": "SetFluidBoundary:-0.6:-0.25:-0.3:0.6:0.35:0.3", "expect": "OK" },
+    { "label": "water column source_min/max (-0.58,-0.28,-0.23)/(-0.22,0.28,0.25) Blender -> native", "command": "SetFluidBounds:-0.58:-0.23:-0.28:-0.22:0.25:0.28", "expect": "OK" },
+    { "label": "no extra source regions (single box via SetFluidBounds above is enough for this preset)", "command": "ClearFluidSources", "expect": "OK" },
+    { "label": "no sphere boundary in this preset", "command": "ClearBoundarySpheres", "expect": "OK" },
+    { "label": "rebuild fluid with the above params", "command": "Reset", "expect": "OK" },
+    { "label": "precondition: ~800k particles from the 0.36x0.56x0.48m column at 5mm spacing", "command": "GetParticleCount", "expect_prefix": "Count:", "store_as": "count0", "strip_prefix": "Count:" },
+    { "label": "PLY sequence output directory (gitignored screenshots/)", "command": "SetPLYOutputDir:${repo_root}/screenshots/showcase_dam_break_ply", "expect": "OK" },
+    { "label": "bake 240 frames x 20 substeps = 4800 physics steps (1 frame = 20*2.5e-4 = 5ms physical time), one PLY per frame", "command": "StepFrameAndSavePLY:20", "expect": "OK", "repeat": 240 },
+    { "label": "invariant: particle count conserved (no emitter/outflow in this preset)", "command": "GetParticleCount", "expect": "Count:${count0}" },
+    { "label": "invariant: no NaN/explosion", "command": "GetMaxParticleSpeed", "expect_range": "0,1000" }
+  ]
+}

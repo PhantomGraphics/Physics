@@ -1,0 +1,18 @@
+{
+  "name": "41_soft_cross_body_collision",
+  "steps": [
+    { "label": "Set TwoJelliesStacked preset (two overlapping 0.6-cube jellies)", "command": "SetPreset:TwoJelliesStacked", "expect": "OK" },
+    { "label": "Precondition: 2 bodies", "command": "GetSoftBodyCount", "expect": "Count:2" },
+    { "label": "Baseline: cross-body collision disabled (the preset's default)", "command": "SetCrossBodyCollisionEnabled:false", "expect": "OK" },
+    { "label": "Fall through each other, uncorrected (~5s)", "command": "Step:300", "expect": "OK" },
+    { "label": "Bodies allowed to interpenetrate: min inter-body distance stays small", "command": "GetSoftMinInterBodyDistance:0:1", "expect_range": "0,0.05", "store_as": "dist_disabled" },
+
+    { "label": "Rebuild the same scene from scratch", "command": "SetPreset:TwoJelliesStacked", "expect": "OK" },
+    { "label": "Enable cross-body collision", "command": "SetCrossBodyCollisionEnabled:true", "expect": "OK" },
+    { "label": "Fall + push apart, same duration (~5s)", "command": "Step:300", "expect": "OK" },
+    { "label": "Change: with cross-body collision on, the two bodies are pushed measurably farther apart than the uncorrected baseline", "command": "GetSoftMinInterBodyDistance:0:1", "expect_range": "0.03,100", "store_as": "dist_enabled" },
+    { "label": "Invariant: body count stable", "command": "GetSoftBodyCount", "expect": "Count:2" },
+    { "label": "Invariant: no velocity explosion", "command": "GetMaxSpeed", "expect_range": "0.0,20.0" }
+  ],
+  "post_assert": "dist_enabled > dist_disabled"
+}

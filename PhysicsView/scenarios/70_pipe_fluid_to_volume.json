@@ -1,0 +1,28 @@
+{
+  "name": "70_pipe_fluid_to_volume",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "DFSPH", "command": "SetSimulationType:DFSPH", "expect": "OK" },
+    { "label": "Small effect length", "command": "SetFluidEffectLength:0.1", "expect": "OK" },
+    { "label": "Particle radius 0.025 (spacing 0.05)", "command": "SetFluidRadius:0.025", "expect": "OK" },
+    { "label": "Resting 3x3x3 block, x/z in [-0.05,0.05], y in [0.3,0.4]", "command": "SetFluidBounds:-0.05:0.3:-0.05:0.05:0.4:0.05", "expect": "OK" },
+    { "label": "Container walls", "command": "SetFluidBoundary:-0.5:-0.5:-0.5:0.5:0.5:0.5", "expect": "OK" },
+    { "label": "Rebuild fluid", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: particle count sane", "command": "GetParticleCount", "expect_prefix": "Count:" },
+    { "label": "Precondition: no volume before the first ConvertToVolume", "command": "GetVolumeVoxelCount", "expect": "Count:0" },
+
+    { "label": "Conversion radius matches particle spacing", "command": "SetVolumeParticleRadius:0.025", "expect": "OK" },
+    { "label": "Conversion cell length matches particle spacing", "command": "SetVolumeCellLength:0.05", "expect": "OK" },
+    { "label": "Isotropic kernel", "command": "SetVolumeKernel:Isotropic", "expect": "OK" },
+    { "label": "Named grid for the isotropic conversion (previously unexercised by any scenario)", "command": "SetVolumeGridName:physics_fluid_isotropic", "expect": "OK" },
+    { "label": "Convert the live particle set to a SparseVolume", "command": "ConvertToVolume", "expect": "OK" },
+    { "label": "Change: isotropic conversion produced active voxels", "command": "GetVolumeVoxelCount", "expect_prefix": "Count:", "expect_not": "Count:0" },
+    { "label": "Save the isotropic volume as a .vdb file (under the named grid)", "command": "SaveVolumeToVdb:testdata/fluid_to_sparse_volume/isotropic.vdb", "expect": "OK" },
+
+    { "label": "Anisotropic kernel", "command": "SetVolumeKernel:Anisotropic", "expect": "OK" },
+    { "label": "Named grid for the anisotropic conversion", "command": "SetVolumeGridName:physics_fluid_anisotropic", "expect": "OK" },
+    { "label": "Re-convert with the anisotropic kernel", "command": "ConvertToVolume", "expect": "OK" },
+    { "label": "Change: anisotropic conversion also produced active voxels", "command": "GetVolumeVoxelCount", "expect_prefix": "Count:", "expect_not": "Count:0" },
+    { "label": "Save the anisotropic volume as a .vdb file", "command": "SaveVolumeToVdb:testdata/fluid_to_sparse_volume/anisotropic.vdb", "expect": "OK" }
+  ]
+}

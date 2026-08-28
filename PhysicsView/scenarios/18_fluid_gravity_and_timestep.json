@@ -1,0 +1,29 @@
+{
+  "name": "18_fluid_gravity_and_timestep",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "DFSPH at default scale", "command": "SetSimulationType:DFSPH", "expect": "OK" },
+    { "label": "Resting 3x3x3 block, y in [8,12]", "command": "SetFluidBounds:-2:8:-2:2:12:2", "expect": "OK" },
+    { "label": "Container walls", "command": "SetFluidBoundary:-8:-8:-8:8:14:8", "expect": "OK" },
+
+    { "label": "Zero gravity", "command": "SetFluidGravity:0:0:0", "expect": "OK" },
+    { "label": "Rebuild fluid (zero gravity)", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: block starts at y in [8,12]", "command": "GetMinParticlePositionY", "expect_range": "7.9,8.1", "store_as": "min_y_zero_g_before" },
+    { "label": "Run under zero gravity (~1s)", "command": "Step", "expect": "OK", "repeat": 100 },
+    { "label": "Change (negative control): with zero gravity, the block does not fall -- min Y stays where it started", "command": "GetMinParticlePositionY", "expect_range": "7.85,8.15", "store_as": "min_y_zero_g_after" },
+
+    { "label": "Restore default downward gravity", "command": "SetFluidGravity:0:-9.8:0", "expect": "OK" },
+    { "label": "Rebuild fluid (gravity restored, same initial block)", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: block starts at y in [8,12] again", "command": "GetMinParticlePositionY", "expect_range": "7.9,8.1", "store_as": "min_y_gravity_before" },
+    { "label": "Run under normal gravity, same duration (~1s)", "command": "Step", "expect": "OK", "repeat": 100 },
+    { "label": "Change: with gravity restored, the block actually falls", "command": "GetMinParticlePositionY", "store_as": "min_y_gravity_after" },
+    { "label": "Invariant: stays inside the container (upper bound)", "command": "GetMaxParticlePositionY", "expect_range": "-8.5,14.5" },
+    { "label": "Invariant: stays inside the container (lower bound)", "command": "GetMinParticlePositionY", "expect_range": "-8.5,14.5" },
+
+    { "label": "SetFluidTimeStep is exposed and accepted (no scenario had exercised it as a live knob rather than an incidental setup step before this)", "command": "SetFluidTimeStep:0.02", "expect": "OK" },
+    { "label": "Rebuild fluid with the larger time step", "command": "Reset", "expect": "OK" },
+    { "label": "Particle count still sane with the new time step", "command": "GetParticleCount", "expect_prefix": "Count:" },
+    { "label": "A few steps at the larger time step run without erroring", "command": "Step", "expect": "OK", "repeat": 20 }
+  ],
+  "post_assert": "min_y_gravity_after < min_y_zero_g_after"
+}

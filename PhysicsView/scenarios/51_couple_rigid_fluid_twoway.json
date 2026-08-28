@@ -1,0 +1,28 @@
+{
+  "name": "51_couple_rigid_fluid_twoway",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "DFSPH (Two-Way/Track B capable, see Physics/CLAUDE.md 'Two-Way 系は DFSPH/PBSPH/WCSPH が実装')", "command": "SetSimulationType:DFSPH", "expect": "OK" },
+    { "label": "Effect length (same regime validated stable for sustained contact by 53_couple_soft_fluid.json)", "command": "SetFluidEffectLength:0.6", "expect": "OK" },
+    { "label": "Boundary stiffness for the Two-Way Akinci force (WCSPHFluid::estimatePressureCoe(0.6, 98.0) = 58.8; FluidWorld::createDFSPH derives DFSPHFluid::pressureCoe from it). This is a plain pressureCoe/effectLength scale, so larger = stiffer. The suite used to pass a target-relative-density-error ratio of 235.2 here (equivalent to a scale of ~0.083), which only looked reasonable against the mis-normalized cubic-spline kernel that docs/issue/CODEBASE_ISSUES.md 1.6 fixed -- at the corrected density scale it leaves the boundary force ~86x too soft to buoy anything.", "command": "SetFluidPressureCoeScale:98.0", "expect": "OK" },
+    { "label": "Rest density", "command": "SetFluidDensity:1.0", "expect": "OK" },
+    { "label": "Particle radius (spacing 0.6)", "command": "SetFluidRadius:0.3", "expect": "OK" },
+    { "label": "Shallow pool just below ScenePreset::SphereDrop's fixed y=3/r=0.5 spawn (bottom of the sphere starts at y=2.5, clear of the pool's y=2.2 top)", "command": "SetFluidBounds:-1.2:1.6:-1.2:1.2:2.2:1.2", "expect": "OK" },
+    { "label": "Domain floor at y=0; x/z open", "command": "SetFluidBoundary:-1000:0:-1000:1000:1000:1000", "expect": "OK" },
+    { "label": "Floor + sphere dropping from y=3", "command": "SetPreset:SphereDrop", "expect": "OK" },
+    { "label": "Precondition: 2 bodies (floor, sphere)", "command": "GetBodyCount", "expect": "Count:2" },
+    { "label": "Enable Rigid-Fluid coupling", "command": "SetCouplingEnabled:true", "expect": "OK" },
+    { "label": "Two-Way requested. The floor is a static Plane and always falls back to One-Way regardless (FluidWorld::refreshCoupling()), but the dropped sphere is a dynamic non-Plane shape on a Track B-capable solver -- this is the first scenario in the suite where a TwoWay request actually stays TwoWay end to end.", "command": "SetCouplingMode:TwoWay", "expect": "OK" },
+    { "label": "Rebuild fluid+rigid+bindings", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: coupling reports enabled", "command": "IsCouplingEnabled", "expect": "OK" },
+    { "label": "Precondition: effective mode is really Two-Way, not silently downgraded to One-Way", "command": "GetActiveCouplingMode", "expect": "TwoWay" },
+    { "label": "Precondition: sphere starts at its fixed ScenePreset::SphereDrop height", "command": "GetBodyPositionY:1", "expect": "3.000000", "store_as": "sphere_y_before" },
+    { "label": "Sphere free-falls, reaches, and enters the pool while still in transit (~0.4s; sustained rest-on-floor contact under Two-Way is a separately-flagged risk, see 52_couple_buoyancy_compare.json -- this samples the entry/mid-fall regime instead)", "command": "Step", "expect": "OK", "repeat": 40 },
+    { "label": "Change: the sphere has fallen from its drop height, but not as far as free fall would take it. Reference is the *discrete* semi-implicit-Euler free fall the rigid integrator actually performs, not the analytic one: dy = g dt^2 n(n+1)/2 = 9.8*0.01^2*40*41/2 = 0.8036, i.e. y = 2.1964. Two-Way reaction is the only thing that can hold it above that.", "command": "GetBodyPositionY:1", "expect_range": "2.1964,2.99", "store_as": "sphere_y_after" },
+    { "label": "Contract: the reaction can only ever oppose the sphere's motion through the fluid, so it must be falling *slower* than the discrete free-fall velocity -g*dt*n = -3.92 (this read -27 while docs/issue/CODEBASE_ISSUES.md 1.6 was open)", "command": "GetBodyVelocityY:1", "expect_range": "-3.92,-2.0" },
+    { "label": "Invariant: fluid stays bounded (no explosion)", "command": "GetMaxParticlePositionY", "expect_range": "-0.1,3.6" },
+    { "label": "Invariant: fluid rests near the pool (no penetration beyond numerical slop)", "command": "GetMinParticlePositionY", "expect_range": "-0.1,2.2" },
+    { "label": "Invariant: bodies unchanged", "command": "GetBodyCount", "expect": "Count:2" }
+  ],
+  "post_assert": "sphere_y_after < sphere_y_before"
+}

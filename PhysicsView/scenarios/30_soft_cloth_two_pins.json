@@ -1,0 +1,19 @@
+{
+  "name": "30_soft_cloth_two_pins",
+  "steps": [
+    { "label": "Set ClothTwoPin preset", "command": "SetPreset:ClothTwoPin", "expect": "OK" },
+    { "label": "Precondition: 1 body", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Precondition: 400 particles (20x20)", "command": "GetSoftParticleCount", "expect": "Particles:400" },
+    { "label": "Precondition: top-left corner (particle 0, pinned) starts at y=0", "command": "GetSoftParticlePositionY:0:0", "expect": "0.000000", "store_as": "top_left_y" },
+    { "label": "Precondition: top-right corner (particle 19, pinned) starts at y=0", "command": "GetSoftParticlePositionY:0:19", "expect": "0.000000", "store_as": "top_right_y" },
+    { "label": "Precondition: this preset spawns already flush against the always-on floor collider (y=0), unlike ClothWithSphere/ClothOnBox which spawn elevated -- there is no vertical room for it to fall, so unlike most of this group there is no falling 'change' to observe here (see 33_soft_cloth_sphere.json/32_soft_cloth_on_box.json for that)", "command": "GetSoftMaxPositionY", "expect": "0.000000" },
+    { "label": "Simulate 100 steps", "command": "Step:100", "expect": "OK" },
+    { "label": "Change: the resting configuration is a genuine stable fixed point, not merely momentarily static -- continuing to simulate another 100 steps produces the exact same extent (a regression that introduced drift/jitter in the pin or floor constraint would move this)", "command": "Step:100", "expect": "OK" },
+    { "label": "Max Y after 200 total steps", "command": "GetSoftMaxPositionY", "expect": "0.000000", "store_as": "max_y_200" },
+    { "label": "Invariant: pinned top-left corner did not move", "command": "GetSoftParticlePositionY:0:0", "expect": "${top_left_y}" },
+    { "label": "Invariant: pinned top-right corner did not move", "command": "GetSoftParticlePositionY:0:19", "expect": "${top_right_y}" },
+    { "label": "Invariant: unpinned particles also stay resting on the floor, not sinking through it", "command": "GetSoftMinPositionY", "expect": "0.000000" },
+    { "label": "Invariant: body/particle counts stable", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Invariant: no velocity explosion", "command": "GetMaxSpeed", "expect_range": "0.0,20.0" }
+  ]
+}

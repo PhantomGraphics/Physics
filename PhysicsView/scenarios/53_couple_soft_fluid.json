@@ -1,0 +1,35 @@
+{
+  "name": "53_couple_soft_fluid",
+  "steps": [
+    { "label": "Liveness check",                     "command": "GetStatus",                     "expect": "OK" },
+    { "label": "DFSPH (Two-Way/Track B capable)",    "command": "SetSimulationType:DFSPH",       "expect": "OK" },
+    { "label": "Effect length (also bounds neighbor-overlap density near the always-present hard floor; too small a ratio vs. radius destabilizes sustained contact)", "command": "SetFluidEffectLength:0.6", "expect": "OK" },
+    { "label": "Low stiffness (scale-invariant equivalent of the old raw DFSPHFluid::pressureCoe=0.05 -- see FluidWorld::createDFSPH; WCSPHFluid::estimatePressureCoe(0.6, 0.0833333) = 0.05)", "command": "SetFluidPressureCoeScale:0.0833333", "expect": "OK" },
+    { "label": "Rest density",                       "command": "SetFluidDensity:1.0",           "expect": "OK" },
+    { "label": "Particle radius (spacing 0.6; default radius=1.0 seeds only 4 sparse particles into this shallow pool -- too few to build any coupling pressure)", "command": "SetFluidRadius:0.3", "expect": "OK" },
+    { "label": "Shallow pool under the jelly's drop point (0,1.5,0)", "command": "SetFluidBounds:-1.2:0:-1.2:1.2:0.6:1.2", "expect": "OK" },
+    { "label": "Domain floor at y=0; x/z open",      "command": "SetFluidBoundary:-1000:0:-1000:1000:1000:1000", "expect": "OK" },
+    { "label": "Jelly cube dropping from y=1.5",     "command": "SetPreset:JellyDrop",           "expect": "OK" },
+    { "label": "Precondition: body count = 1",       "command": "GetSoftBodyCount",              "expect": "Count:1" },
+    { "label": "Precondition: particle count = 64",  "command": "GetSoftParticleCount",          "expect": "Particles:64" },
+
+    { "label": "Baseline: SoftBody-Fluid coupling disabled", "command": "SetSoftFluidCouplingEnabled:false", "expect": "OK" },
+    { "label": "Rebuild fluid+soft (uncoupled)",     "command": "Reset",                         "expect": "OK" },
+    { "label": "Precondition: coupling reports disabled", "command": "IsSoftFluidCouplingEnabled", "expect": "No" },
+    { "label": "Jelly free-falls through the pool while still in transit (~0.4s; sustained rest-on-floor contact with Two-Way coupling active is a known-unstable regime, see 51_couple_rigid_fluid_twoway.json/52_couple_buoyancy_compare.json -- this samples the mid-fall buoyancy effect instead)", "command": "Step", "expect": "OK", "repeat": 40 },
+    { "label": "Baseline min Y (still descending, unimpeded)", "command": "GetSoftMinPositionY", "store_as": "baseline_min_y" },
+
+    { "label": "Enable SoftBody-Fluid coupling",     "command": "SetSoftFluidCouplingEnabled:true", "expect": "OK" },
+    { "label": "Coupling reports enabled",           "command": "IsSoftFluidCouplingEnabled",    "expect": "OK" },
+    { "label": "Rebuild fluid+soft+bindings",        "command": "Reset",                         "expect": "OK" },
+    { "label": "Jelly falls into the coupled pool, buoyancy/drag should slow its descent (~0.4s)", "command": "Step", "expect": "OK", "repeat": 40 },
+    { "label": "Change: coupled min Y",              "command": "GetSoftMinPositionY",           "store_as": "coupled_min_y" },
+
+    { "label": "Invariant: body/particle counts unchanged by coupling", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Invariant: particle count unchanged", "command": "GetSoftParticleCount",          "expect": "Particles:64" },
+    { "label": "Invariant: no velocity explosion",   "command": "GetMaxSpeed",                   "expect_range": "0.0,20.0" },
+    { "label": "Invariant: fluid stays bounded (no explosion)", "command": "GetMaxParticlePositionY", "expect_range": "-0.1,3.0" },
+    { "label": "Invariant: fluid rests near the floor (no penetration beyond numerical slop)", "command": "GetMinParticlePositionY", "expect_range": "-0.1,0.6" }
+  ],
+  "post_assert": "coupled_min_y > baseline_min_y"
+}

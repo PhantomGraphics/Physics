@@ -1,0 +1,14 @@
+{
+  "name": "02_smoke_rigid_reset",
+  "steps": [
+    { "label": "Set SphereDrop preset", "command": "SetPreset:SphereDrop", "expect": "OK" },
+    { "label": "Body count = 2 (floor, sphere)", "command": "GetBodyCount", "expect": "Count:2" },
+    { "label": "Record sphere (body 1) initial drop height", "command": "GetBodyPositionY:1", "store_as": "y0" },
+    { "label": "Initial drop height is the preset's documented y=3", "command": "GetBodyPositionY:1", "expect": "3.000000" },
+    { "label": "Fall partway (not yet landed)", "command": "Step:20", "expect": "OK" },
+    { "label": "Sphere actually fell", "command": "GetBodyPositionY:1", "expect_range": "-100,2.999" },
+    { "label": "Reset restores the preset's initial state", "command": "Reset", "expect": "OK" },
+    { "label": "Body count unchanged by reset", "command": "GetBodyCount", "expect": "Count:2" },
+    { "label": "Sphere height restored to the drop point", "command": "GetBodyPositionY:1", "expect": "${y0}" }
+  ]
+}

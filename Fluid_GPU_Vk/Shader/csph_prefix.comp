@@ -1,0 +1,24 @@
+#version 450
+
+// Execute as a single workgroup: vkCmdDispatch(1, 1, 1)
+// local_size_x must be >= numCells for this single-pass approach.
+// We use 1 thread per cell sequentially in thread 0 as a simple fallback
+// that works for any numCells without subgroup extension requirements.
+layout(local_size_x = 1) in;
+
+layout(set = 0, binding = 3, std430) buffer CellCount { int cellCount[]; };
+layout(set = 0, binding = 4, std430) buffer CellStart { int cellStart[]; };
+
+layout(push_constant) uniform PC {
+    uint numCells;
+} pc;
+
+void main()
+{
+    int acc = 0;
+    for (uint i = 0; i < pc.numCells; ++i) {
+        cellStart[i] = acc;
+        acc += cellCount[i];
+        cellCount[i] = 0;  // reset so scatter can recount from 0
+    }
+}

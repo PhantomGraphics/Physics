@@ -1,0 +1,35 @@
+{
+  "name": "60_bound_mesh_floor",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "Load a closed thin-slab STL (12 triangles) as a static mesh fluid boundary (top surface at y=-1, spanning x,z in [-5,5]) -- must be closed/watertight, not an open sheet, for LevelSet's ray-parity inside/outside test to be well-defined",
+      "command": "LoadMeshBoundary:${repo_root}/Physics/PhysicsView/scenarios/models/mesh_boundary_plate.stl",
+      "expect": "OK" },
+    { "label": "Precondition: mesh boundary loaded with the expected triangle count", "command": "GetMeshBoundaryTriangleCount", "expect": "12" },
+    { "label": "PBSPH", "command": "SetSimulationType:PBSPH", "expect": "OK" },
+    { "label": "Small effect length", "command": "SetFluidEffectLength:1.0", "expect": "OK" },
+    { "label": "Low stiffness", "command": "SetFluidStiffness:0.001", "expect": "OK" },
+    { "label": "Rest density", "command": "SetFluidDensity:1.0", "expect": "OK" },
+    { "label": "Particle radius", "command": "SetFluidRadius:0.15", "expect": "OK" },
+    { "label": "Small time step", "command": "SetFluidTimeStep:0.005", "expect": "OK" },
+    { "label": "Zero gravity -- isolates the mesh boundary's SDF penalty force from gravity/multi-particle pressure dynamics (broader PBSPH multi-step settling stability is a separate, pre-existing concern -- see 15_fluid_pbsph_dam_break.json)",
+      "command": "SetFluidGravity:0:0:0", "expect": "OK" },
+    { "label": "Single particle seeded 0.05 below the mesh floor's top surface (y=-1), i.e. already penetrating",
+      "command": "SetFluidBounds:0:-1.05:0:0:-1.05:0", "expect": "OK" },
+    { "label": "Domain container walls, far enough away to never interfere",
+      "command": "SetFluidBoundary:-5:-3:-5:5:5:5", "expect": "OK" },
+    { "label": "Rebuild fluid (also re-registers the mesh boundary on the fresh solver)", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: exactly one particle seeded", "command": "GetParticleCount", "expect": "Count:1" },
+    { "label": "Precondition: starts penetrating the floor", "command": "GetMinParticlePositionY", "expect_range": "-1.06,-1.04" },
+    { "label": "Change: mesh boundary's SDF penalty pushes the penetrating particle back out", "command": "Step", "expect": "OK", "repeat": 5 },
+    { "label": "Pushed back above its start depth, without exploding", "command": "GetMaxParticlePositionY", "expect_range": "-1.03,0.5", "store_as": "y_with_boundary" },
+
+    { "label": "Clear the mesh boundary", "command": "ClearMeshBoundary", "expect": "OK" },
+    { "label": "Triangle count drops to 0", "command": "GetMeshBoundaryTriangleCount", "expect": "0" },
+    { "label": "Rebuild fluid (reregisterMeshBoundary() is a no-op once the boundary shape is cleared -- see FluidWorld.h)", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: re-seeded at the same penetrating depth", "command": "GetMinParticlePositionY", "expect_range": "-1.06,-1.04" },
+    { "label": "Same duration, but with no boundary left to push back", "command": "Step", "expect": "OK", "repeat": 5 },
+    { "label": "Invariant: with zero gravity and no boundary, an isolated particle has no force acting on it at all -- it does not move", "command": "GetMaxParticlePositionY", "expect_range": "-1.06,-1.04", "store_as": "y_without_boundary" }
+  ],
+  "post_assert": "y_with_boundary > y_without_boundary"
+}

@@ -1,0 +1,21 @@
+{
+  "name": "40_soft_self_collision",
+  "steps": [
+    { "label": "Set JellySelfOverlap preset (a normal JellyDrop cube plus two extra marker particles appended 0.001 apart and connected to nothing -- the exact setup SelfCollisionTest.XPBDSolver_SelfCollisionEnabled_PreventsOverlap already validates at the unit level, see SoftBodyWorld::applyPreset())", "command": "SetPreset:JellySelfOverlap", "expect": "OK" },
+    { "label": "Precondition: 1 body", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Precondition: 66 particles (4x4x4=64 jelly vertices + 2 markers)", "command": "GetSoftParticleCount", "expect": "Particles:66" },
+    { "label": "Baseline: self-collision disabled (the preset's default -- see SoftBodyWorld::applyPreset())", "command": "SetSelfCollision:false", "expect": "OK" },
+    { "label": "Both markers fall together under identical gravity/floor/damping (~1s) -- nothing but self-collision could change their mutual separation", "command": "Step:60", "expect": "OK" },
+    { "label": "Minimum distance between non-edge-connected particles, uncorrected -- the two markers were never pushed apart, so this stays near their 0.001 starting gap", "command": "GetSoftMinNonEdgeDistance:0", "store_as": "min_dist_disabled" },
+    { "label": "Invariant: no velocity explosion", "command": "GetMaxSpeed", "expect_range": "0.0,20.0" },
+
+    { "label": "Rebuild the same scene from scratch", "command": "SetPreset:JellySelfOverlap", "expect": "OK" },
+    { "label": "Enable self-collision", "command": "SetSelfCollision:true", "expect": "OK" },
+    { "label": "Same fall, same duration, self-collision now resolving the 0.001 initial overlap (~1s)", "command": "Step:60", "expect": "OK" },
+    { "label": "Change: with self-collision on, the two markers are kept measurably farther apart than the uncorrected baseline", "command": "GetSoftMinNonEdgeDistance:0", "store_as": "min_dist_enabled" },
+    { "label": "Invariant: body/particle counts stable", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Invariant: particle count stable", "command": "GetSoftParticleCount", "expect": "Particles:66" },
+    { "label": "Invariant: no velocity explosion", "command": "GetMaxSpeed", "expect_range": "0.0,20.0" }
+  ],
+  "post_assert": "min_dist_enabled > min_dist_disabled"
+}

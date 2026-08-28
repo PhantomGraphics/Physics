@@ -1,0 +1,17 @@
+{
+  "name": "24_rigid_newtons_cradle",
+  "steps": [
+    { "label": "Set NewtonsCradle preset (5 spheres, restitution 1.0/friction 0.0, one pulled back with initial velocity)", "command": "SetPreset:NewtonsCradle", "expect": "OK" },
+    { "label": "Precondition: 6 bodies (floor + 5 spheres)", "command": "GetBodyCount", "expect": "Count:6" },
+    { "label": "Precondition: spheres start at rest height y=0.5 (body 1, one of the 5)", "command": "GetBodyPositionY:1", "expect": "0.500000" },
+    { "label": "Precondition: another sphere also at rest height (body 5, the pulled-back one)", "command": "GetBodyPositionY:5", "expect": "0.500000" },
+    { "label": "Precondition: no contacts before the pulled-back sphere swings in (this dispatcher exposes no X getter, so the swing itself isn't directly observable -- only its consequence, contact events)", "command": "GetContactCount", "expect": "Contacts:0" },
+    { "label": "Pulled-back sphere swings in and strikes the row (spacing 1.02, gap 0.02, moving at 5 m/s -- closes within a few steps)", "command": "Step:5", "expect": "OK" },
+    { "label": "Change: the strike produced contacts", "command": "GetContactCount", "expect_not": "Contacts:0" },
+    { "label": "Let the momentum cascade finish propagating (~1s total)", "command": "Step:55", "expect": "OK" },
+    { "label": "Invariant: all 6 bodies remain", "command": "GetBodyCount", "expect": "Count:6" },
+    { "label": "Invariant: sphere stays at cradle height, not launched into the air or through the floor", "command": "GetBodyPositionY:1", "expect_range": "0.3,0.7" },
+    { "label": "Invariant: pulled-back sphere also stays at cradle height", "command": "GetBodyPositionY:5", "expect_range": "0.3,0.7" },
+    { "label": "Invariant: velocity bounded (not exploding)", "command": "GetBodyVelocityY:1", "expect_range": "-10,10" }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "25_rigid_sphere_box_collision",
+  "steps": [
+    { "label": "Set SphereBoxCollision preset (box at rest, sphere incoming)", "command": "SetPreset:SphereBoxCollision", "expect": "OK" },
+    { "label": "Precondition: 3 bodies (floor, box, sphere)", "command": "GetBodyCount", "expect": "Count:3" },
+    { "label": "Precondition: no contacts before the sphere reaches the box", "command": "GetContactCount", "expect": "Contacts:0" },
+    { "label": "Precondition: box (body 1) starts at rest height y=0.5", "command": "GetBodyPositionY:1", "expect": "0.500000" },
+    { "label": "Sphere crosses the gap and strikes the box (~0.8s)", "command": "Step:50", "expect": "OK" },
+    { "label": "Change: the strike produced contacts", "command": "GetContactCount", "expect_not": "Contacts:0" },
+    { "label": "Invariant: bodies remain after the strike", "command": "GetBodyCount", "expect": "Count:3" },
+    { "label": "Let the scene continue to settle (~0.8s more)", "command": "Step:50", "expect": "OK" },
+    { "label": "Invariant: bodies still intact", "command": "GetBodyCount", "expect": "Count:3" },
+    { "label": "Invariant: box stays near table height", "command": "GetBodyPositionY:1", "expect_range": "-0.1,3.0" },
+    { "label": "Invariant: sphere stays near table height", "command": "GetBodyPositionY:2", "expect_range": "-0.1,3.0" }
+  ]
+}

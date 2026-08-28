@@ -1,0 +1,18 @@
+{
+  "name": "36_soft_rope_both_ends_pinned",
+  "steps": [
+    { "label": "Set RopeBothEndsPinned preset (8-particle chain, both ends pinned, slack in the middle)", "command": "SetPreset:RopeBothEndsPinned", "expect": "OK" },
+    { "label": "Precondition: 1 body", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Precondition: 8 particles", "command": "GetSoftParticleCount", "expect": "Particles:8" },
+    { "label": "Precondition: start (particle 0) at y=0", "command": "GetSoftParticlePositionY:0:0", "expect": "0.000000", "store_as": "start_y" },
+    { "label": "Precondition: end (particle 7) at y=-2 (straight taut vertical line from the start pin down to the end pin, length 2)", "command": "GetSoftParticlePositionY:0:7", "expect": "-2.000000", "store_as": "end_y" },
+    { "label": "Precondition: chain starts as a perfectly straight vertical line, no bulge above the top pin", "command": "GetSoftMaxPositionY", "expect": "0.000000", "store_as": "max_y_before" },
+    { "label": "With both ends position-fixed and gravity compressing the taut vertical chain against its own fixed bottom anchor, the middle buckles sideways/up (~1.6s)", "command": "Step:100", "expect": "OK" },
+    { "label": "Change: a middle particle has buckled above the top pin's height (XPBD distance constraints resist compression, not just stretching -- a vertically taut chain pinned at both ends buckles rather than staying perfectly straight)", "command": "GetSoftMaxPositionY", "store_as": "max_y_after" },
+    { "label": "Invariant: pinned start did not move", "command": "GetSoftParticlePositionY:0:0", "expect": "${start_y}" },
+    { "label": "Invariant: pinned end did not move", "command": "GetSoftParticlePositionY:0:7", "expect": "${end_y}" },
+    { "label": "Invariant: body/particle counts stable", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Invariant: no velocity explosion (wider bound than the other soft-body presets in this group: the compression-buckling snap here is a legitimately faster transient than a gentle cloth drape or jelly drop, not divergence)", "command": "GetMaxSpeed", "expect_range": "0.0,200.0" }
+  ],
+  "post_assert": "max_y_after != max_y_before"
+}

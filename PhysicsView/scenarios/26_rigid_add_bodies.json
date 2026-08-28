@@ -1,0 +1,25 @@
+{
+  "name": "26_rigid_add_bodies",
+  "steps": [
+    { "label": "Clear to an explicit, empty Custom scene (Custom is a real named preset, not a typo fallback -- see 91_neg_unknown_preset.json)", "command": "SetPreset:Custom", "expect": "OK" },
+    { "label": "Custom starts with just its own floor", "command": "GetBodyCount", "expect": "Count:1" },
+    { "label": "Add a second floor plane at y=-10 (exercises AddFloor with an explicit height, previously unused by any scenario -- placed below the original y=0 floor, not above the spawn stack, because PlaneBoundary's valid/free region is y >= offset (see PlaneBoundary.h): a floor at y=10 would make everything spawned below it, at y in [5,9], already-embedded solid and get violently ejected upward by the penalty force, not 'fall past' it)", "command": "AddFloor:-10", "expect": "OK" },
+    { "label": "Body count reflects the extra floor", "command": "GetBodyCount", "expect": "Count:2" },
+    { "label": "Add sphere 1", "command": "AddSphere:0:5:0:0.5:1", "expect": "OK" },
+    { "label": "Add sphere 2", "command": "AddSphere:1:6:0:0.5:1", "expect": "OK" },
+    { "label": "Add sphere 3", "command": "AddSphere:-1:7:0:0.5:1", "expect": "OK" },
+    { "label": "Add box 1", "command": "AddBox:0:8:0:0.5:0.5:0.5:1", "expect": "OK" },
+    { "label": "Add box 2", "command": "AddBox:1.5:9:0:0.5:0.5:0.5:1", "expect": "OK" },
+    { "label": "Precondition: 7 bodies (2 floors + 3 spheres + 2 boxes)", "command": "GetBodyCount", "expect": "Count:7" },
+    { "label": "Precondition: sphere 1 (body 2) starts at its added height", "command": "GetBodyPositionY:2", "expect": "5.000000", "store_as": "y0" },
+    { "label": "Run: the y=-10 floor is below everything, so it's irrelevant -- all 3 spheres/2 boxes fall and land on the original Custom floor at y=0 (~3.2s)", "command": "Step:200", "expect": "OK" },
+    { "label": "Change: sphere 1 has fallen", "command": "GetBodyPositionY:2", "store_as": "y1" },
+    { "label": "Invariant: all 7 bodies remain (AddFloor/AddSphere/AddBox bodies are never dropped by stepping)", "command": "GetBodyCount", "expect": "Count:7" },
+    { "label": "Invariant: contacts reported without erroring", "command": "GetContactCount", "expect_prefix": "Contacts:" },
+    { "label": "Reset restores the Custom scene exactly as built", "command": "Reset", "expect": "OK" },
+    { "label": "Body count after reset", "command": "GetBodyCount", "expect": "Count:7" },
+    { "label": "Sphere 1's position IS restored by Reset (regression check: AddSphere/AddBox/AddFloor each re-snapshot, see docs/issue/CODEBASE_ISSUES.md 1.4 history)",
+      "command": "GetBodyPositionY:2", "expect": "${y0}" }
+  ],
+  "post_assert": "y1 < y0"
+}

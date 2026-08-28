@@ -1,0 +1,19 @@
+{
+  "name": "10_fluid_dfsph_pool_settle",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "DFSPH at FluidWorld::Params defaults (radius 1.0/effectLength 2.25/density 1.0/stiffness 20/viscosity 5.0/dt 0.01 -- known-stable scale, see docs/todo/PLAN_physics_scenario_test_rebuild.md 1.5)", "command": "SetSimulationType:DFSPH", "expect": "OK" },
+    { "label": "Resting 3x3x3 block at the default radius (spacing 2.0), y in [8,12]", "command": "SetFluidBounds:-2:8:-2:2:12:2", "expect": "OK" },
+    { "label": "Container walls sized for the default-scale block", "command": "SetFluidBoundary:-8:-8:-8:8:14:8", "expect": "OK" },
+    { "label": "Rebuild fluid", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: sane, non-zero seed count", "command": "GetParticleCount", "expect_prefix": "Count:", "store_as": "count0", "strip_prefix": "Count:" },
+    { "label": "Precondition: block starts resting at y in [8,12] -- record min Y before any settling", "command": "GetMinParticlePositionY", "expect_range": "7.9,8.1", "store_as": "min_y_before" },
+    { "label": "Block falls and settles under gravity (~2s)", "command": "Step", "expect": "OK", "repeat": 200 },
+    { "label": "Change: the block has fallen -- min Y after settling is measurably lower than the pre-drop min Y", "command": "GetMinParticlePositionY", "store_as": "min_y_after" },
+    { "label": "Invariant: particle count conserved (no births/deaths in plain DFSPH)", "command": "GetParticleCount", "expect": "Count:${count0}" },
+    { "label": "Invariant: stays inside the container (upper bound)", "command": "GetMaxParticlePositionY", "expect_range": "-8.5,14.5" },
+    { "label": "Invariant: stays inside the container (lower bound)", "command": "GetMinParticlePositionY", "expect_range": "-8.5,14.5" },
+    { "label": "Invariant: no velocity explosion", "command": "GetMaxParticleSpeed", "expect_range": "0,100" }
+  ],
+  "post_assert": "min_y_after < min_y_before"
+}

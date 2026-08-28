@@ -1,0 +1,25 @@
+{
+  "name": "11_fluid_pbsph_pool_settle",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "PBSPH (validated stable regime, same params as 15_fluid_pbsph_dam_break)", "command": "SetSimulationType:PBSPH", "expect": "OK" },
+    { "label": "Rest density", "command": "SetFluidDensity:1.0", "expect": "OK" },
+    { "label": "Low stiffness", "command": "SetFluidStiffness:0.001", "expect": "OK" },
+    { "label": "No viscosity", "command": "SetFluidViscosity:0.0", "expect": "OK" },
+    { "label": "Effect length", "command": "SetFluidEffectLength:1.0", "expect": "OK" },
+    { "label": "Particle radius 0.15 (spacing 0.3, matches a 3x3x3 resting block)", "command": "SetFluidRadius:0.15", "expect": "OK" },
+    { "label": "Small time step", "command": "SetFluidTimeStep:0.005", "expect": "OK" },
+    { "label": "Resting 3x3x3 block, x/z in [-0.3,0.3], y in [0.6,1.2]", "command": "SetFluidBounds:-0.3:0.6:-0.3:0.3:1.2:0.3", "expect": "OK" },
+    { "label": "Roomy container walls", "command": "SetFluidBoundary:-3:-3:-3:3:3:3", "expect": "OK" },
+    { "label": "Rebuild fluid", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: sane, non-zero seed count", "command": "GetParticleCount", "expect_prefix": "Count:", "store_as": "count0", "strip_prefix": "Count:" },
+    { "label": "Precondition: block starts resting at y in [0.6,1.2]", "command": "GetMinParticlePositionY", "expect_range": "0.55,0.65", "store_as": "min_y_before" },
+    { "label": "Pool settles under gravity (~1s)", "command": "Step", "expect": "OK", "repeat": 200 },
+    { "label": "Change: min Y after settling is measurably lower than the pre-drop min Y", "command": "GetMinParticlePositionY", "store_as": "min_y_after" },
+    { "label": "Invariant: particle count conserved", "command": "GetParticleCount", "expect": "Count:${count0}" },
+    { "label": "Invariant: stays inside the container (upper bound)", "command": "GetMaxParticlePositionY", "expect_range": "-3.1,3.1" },
+    { "label": "Invariant: stays inside the container (lower bound)", "command": "GetMinParticlePositionY", "expect_range": "-3.1,3.1" },
+    { "label": "Invariant: no velocity explosion", "command": "GetMaxParticleSpeed", "expect_range": "0,100" }
+  ],
+  "post_assert": "min_y_after < min_y_before"
+}
