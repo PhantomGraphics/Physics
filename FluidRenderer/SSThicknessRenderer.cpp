@@ -80,14 +80,16 @@ void SSThicknessRenderer::render(
     SSFROffscreenSet& targets,
     const glm::mat4& proj,
     const glm::mat4& modelView,
-    float pointSize,
+    float particleRadius,
+    float viewportHeight,
     float thicknessScale)
 {
     UBO ubo{};
     ubo.proj           = proj;
     ubo.modelView      = modelView;
-    ubo.pointSize      = pointSize;
+    ubo.pointSize      = particleRadius;
     ubo.thicknessScale = thicknessScale;
+    ubo._pad[0]        = viewportHeight;
 
     SSFRPipeline& activePipeline = useExternal_ ? pipelineVec4_ : pipeline_;
     activePipeline.updateUBO(frameIndex, &ubo, sizeof(ubo));

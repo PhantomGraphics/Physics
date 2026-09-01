@@ -61,7 +61,8 @@ public:
                 SSFROffscreenSet& targets,
                 const glm::mat4& proj,
                 const glm::mat4& modelView,
-                float pointSize = 8.0f);
+                float particleRadius,
+                float viewportHeight);
 
     bool isValid() const { return pipeline_.isValid(); }
 

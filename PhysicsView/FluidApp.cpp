@@ -92,6 +92,7 @@ void FluidApp::onInit()
 
     fluidRenderer_.setExtent(getExtent());
     ssfrRenderer_.setExtent(getExtent());
+    ssfrRenderer_.setParticleRadius(world_.params().radius);
     rigidRenderer_.setExtent(getExtent());
     softRenderer_.setExtent(getExtent());
 
@@ -179,6 +180,7 @@ void FluidApp::onSwapChainCreated()
 void FluidApp::onUpdate(uint32_t frameIndex)
 {
     dispatcher_.processQueue();
+    ssfrRenderer_.setParticleRadius(world_.params().radius);
 
     const bool testActive = ssfrTestPanel_.isActive();
 

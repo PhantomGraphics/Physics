@@ -33,7 +33,8 @@ public:
     void render(const Phantom::VKG::VulkanContext& ctx,
                 VkCommandBuffer cmd,
                 uint32_t frameIndex,
-                SSFROffscreenSet& targets);
+                SSFROffscreenSet& targets,
+                VkImageView depthView);
 
     bool isValid() const { return pipeline_.isValid(); }
 

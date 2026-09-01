@@ -366,8 +366,12 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
         return;
     }
 
-    depthPass_.render(cmd, frameIndex, targets_, proj_, view_);
-    thicknessPass_.render(cmd, frameIndex, targets_, proj_, view_);
+    const float surfaceRadius = particleRadius_ * 1.35f;
+    const float viewportHeight = static_cast<float>(extent_.height);
+    depthPass_.render(cmd, frameIndex, targets_, proj_, view_,
+                      surfaceRadius, viewportHeight);
+    thicknessPass_.render(cmd, frameIndex, targets_, proj_, view_,
+                          surfaceRadius, viewportHeight);
 
     bilateralPass_.setParams(bilateralSigmaS_, bilateralSigmaR_,
                              bilateralUseAnisotropic_,
@@ -397,9 +401,11 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
                            glm::mat4(glm::transpose(glm::mat3(view_))),
                            envView, envSampler, hasEnvMap_);
 
-    refractionPass_.render(*ctx_, cmd, frameIndex, targets_);
-    sprayPass_.render(cmd, frameIndex, targets_, proj_, view_, 5.0f, 0.5f);
-    foamPass_.render(cmd, frameIndex, targets_, proj_, view_, 9.0f, 0.35f);
+    refractionPass_.render(*ctx_, cmd, frameIndex, targets_, depthForNormals);
+    sprayPass_.render(cmd, frameIndex, targets_, proj_, view_,
+                      particleRadius_ * 0.55f, viewportHeight, 0.5f);
+    foamPass_.render(cmd, frameIndex, targets_, proj_, view_,
+                     particleRadius_ * 0.9f, viewportHeight, 0.35f);
 }
 
 void SSFluidRenderer::onRender(VkCommandBuffer cmd, uint32_t frameIndex)

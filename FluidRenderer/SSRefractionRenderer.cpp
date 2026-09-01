@@ -49,13 +49,14 @@ void SSRefractionRenderer::destroy(VkDevice device)
 void SSRefractionRenderer::render(const Phantom::VKG::VulkanContext& ctx,
                                     VkCommandBuffer cmd,
                                     uint32_t frameIndex,
-                                    SSFROffscreenSet& targets)
+                                    SSFROffscreenSet& targets,
+                                    VkImageView depthView)
 {
     pipeline_.updateUBO(frameIndex, &ubo_, sizeof(ubo_));
 
     VkDescriptorImageInfo depthInfo{};
     depthInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    depthInfo.imageView   = targets.depth().getColorImageView();
+    depthInfo.imageView   = depthView;
     depthInfo.sampler     = targets.getSampler();
 
     VkDescriptorImageInfo thickInfo{};

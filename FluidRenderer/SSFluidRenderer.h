@@ -118,6 +118,8 @@ public:
     float getFoamOpacity() const { return foamOpacity_; }
 
     void setCamera(const glm::mat4& proj, const glm::mat4& view);
+    void setParticleRadius(float radius) { particleRadius_ = glm::max(radius, 0.001f); }
+    float getParticleRadius() const { return particleRadius_; }
 
     /// @brief Load environment map. Call after onInit.
     /// @param facePaths {right, left, top, bottom, front, back}
@@ -176,6 +178,7 @@ private:
     float foamOpacity_ = 0.8f;
     bool  showSpray_ = true;
     bool  showFoam_ = true;
+    float particleRadius_ = 1.0f;
 
     // Environment map / skybox
     GlobalVulkanCubeMap                                envMap_;

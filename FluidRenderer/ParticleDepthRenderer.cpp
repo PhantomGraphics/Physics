@@ -83,12 +83,14 @@ void ParticleDepthRenderer::render(
     SSFROffscreenSet& targets,
     const glm::mat4& proj,
     const glm::mat4& modelView,
-    float pointSize)
+    float particleRadius,
+    float viewportHeight)
 {
     UBO ubo{};
     ubo.proj      = proj;
     ubo.modelView = modelView;
-    ubo.pointSize = pointSize;
+    ubo.pointSize = particleRadius;
+    ubo._pad[0]   = viewportHeight;
 
     // Switch between external buffer (GPU_CSPH vec4 stride) and internal CPU buffer (vec3 stride).
     SSFRPipeline& activePipeline = useExternal_ ? pipelineVec4_ : pipeline_;
