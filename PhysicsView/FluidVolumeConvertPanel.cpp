@@ -81,13 +81,13 @@ void FluidVolumeConvertPanel::initWidgets()
 
 void FluidVolumeConvertPanel::onImGui()
 {
-    if (!world_ || !converter_) return;
+    if (!world_ || !converter_ || !visible_) return;
 
     initWidgets();
 
     ImGui::SetNextWindowPos(ImVec2(1010.f, 35.f), ImGuiCond_Once);
     ImGui::SetNextWindowSize(ImVec2(280.f, 520.f), ImGuiCond_Once);
-    if (!ImGui::Begin("Volume Conversion")) {
+    if (!ImGui::Begin("Volume Conversion", &visible_)) {
         ImGui::End();
         return;
     }

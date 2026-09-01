@@ -296,10 +296,24 @@ void FluidApp::onImGui()
             ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("SSFR")) {
-            const bool vis = ssfrTestPanel_.isVisible();
-            if (ImGui::MenuItem("Test Panel", nullptr, vis))
-                ssfrTestPanel_.setVisible(!vis);
+        if (ImGui::BeginMenu("View")) {
+            if (ImGui::MenuItem("Fluid Control", nullptr, controlPanel_.isVisible()))
+                controlPanel_.setVisible(!controlPanel_.isVisible());
+            if (ImGui::MenuItem("Fluid Renderer", nullptr, fluidRenderer_.isSettingsVisible()))
+                fluidRenderer_.setSettingsVisible(!fluidRenderer_.isSettingsVisible());
+            if (ImGui::MenuItem("SSFR Control", nullptr, ssfrPanel_.isVisible()))
+                ssfrPanel_.setVisible(!ssfrPanel_.isVisible());
+            if (ImGui::MenuItem("SSFR Test", nullptr, ssfrTestPanel_.isVisible()))
+                ssfrTestPanel_.setVisible(!ssfrTestPanel_.isVisible());
+            ImGui::Separator();
+            if (ImGui::MenuItem("Rigid Body Control", nullptr, rigidControlPanel_.isVisible()))
+                rigidControlPanel_.setVisible(!rigidControlPanel_.isVisible());
+            if (ImGui::MenuItem("Soft Body Control", nullptr, softControlPanel_.isVisible()))
+                softControlPanel_.setVisible(!softControlPanel_.isVisible());
+            if (ImGui::MenuItem("Volume Conversion", nullptr, volumeConvertPanel_.isVisible()))
+                volumeConvertPanel_.setVisible(!volumeConvertPanel_.isVisible());
+            if (ImGui::MenuItem("Scenario Browser", nullptr, scenarioBrowser_.isVisible()))
+                scenarioBrowser_.setVisible(!scenarioBrowser_.isVisible());
             ImGui::EndMenu();
         }
 

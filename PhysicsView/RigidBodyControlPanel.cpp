@@ -46,12 +46,12 @@ void RigidBodyControlPanel::initWidgets() {
 }
 
 void RigidBodyControlPanel::onImGui() {
-    if (!world_) return;
+    if (!world_ || !visible_) return;
     initWidgets();
 
     ImGui::SetNextWindowPos(ImVec2(700.f, 35.f), ImGuiCond_Once);
     ImGui::SetNextWindowSize(ImVec2(300.f, 640.f), ImGuiCond_Once);
-    if (!ImGui::Begin("Rigid Body Control")) { ImGui::End(); return; }
+    if (!ImGui::Begin("Rigid Body Control", &visible_)) { ImGui::End(); return; }
 
     {
         int cur = static_cast<int>(world_->currentPreset());

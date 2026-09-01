@@ -22,11 +22,12 @@ void SSFRPanel::initWidgets()
 
 void SSFRPanel::onImGui()
 {
+    if (!visible_) return;
     initWidgets();
 
     ImGui::SetNextWindowPos(ImVec2(10.f, 500.f), ImGuiCond_Once);
     ImGui::SetNextWindowSize(ImVec2(360.f, 480.f), ImGuiCond_Once);
-    if (!ImGui::Begin("SSFR Control")) {
+    if (!ImGui::Begin("SSFR Control", &visible_)) {
         ImGui::End();
         return;
     }

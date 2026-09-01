@@ -16,12 +16,15 @@ public:
     explicit SoftBodyControlPanel(SoftBodyWorld* w) : world_(w) {}
 
     void setOnWorldChanged(std::function<void()> fn) { onWorldChanged_ = std::move(fn); }
+    void setVisible(bool visible) { visible_ = visible; }
+    bool isVisible() const { return visible_; }
 
     void onImGui() override;
 
 private:
     SoftBodyWorld*    world_ = nullptr;
     std::function<void()>  onWorldChanged_;
+    bool visible_ = true;
 
     bool widgetsInitialized_ = false;
     void initWidgets();

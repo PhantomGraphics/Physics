@@ -16,12 +16,15 @@ public:
     explicit ControlPanel(FluidWorld* world) : world_(world) {}
 
     void setOnWorldChanged(std::function<void()> fn) { onWorldChanged_ = std::move(fn); }
+    void setVisible(bool visible) { visible_ = visible; }
+    bool isVisible() const { return visible_; }
 
     void onImGui() override;
 
 private:
     FluidWorld* world_ = nullptr;
     std::function<void()> onWorldChanged_;
+    bool visible_ = true;
 
     Phantom::UI::ComboBox methodCombo_   { "Method"   };
     Phantom::UI::Button   runButton_     { "Run/Pause" };

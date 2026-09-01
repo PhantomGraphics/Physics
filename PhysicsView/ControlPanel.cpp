@@ -29,7 +29,7 @@ void ControlPanel::initWidgets()
 
 void ControlPanel::onImGui()
 {
-    if (!world_) return;
+    if (!world_ || !visible_) return;
 
     initWidgets();
 
@@ -37,7 +37,7 @@ void ControlPanel::onImGui()
 
     ImGui::SetNextWindowPos(ImVec2(10.f, 35.f), ImGuiCond_Once);
     ImGui::SetNextWindowSize(ImVec2(360.f, 460.f), ImGuiCond_Once);
-    if (!ImGui::Begin("Control")) {
+    if (!ImGui::Begin("Control", &visible_)) {
         ImGui::End();
         return;
     }

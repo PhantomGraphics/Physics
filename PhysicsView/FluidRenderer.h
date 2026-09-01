@@ -32,6 +32,8 @@ public:
     void setExtent(VkExtent2D ext) { extent_ = ext; }
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
+    void setSettingsVisible(bool visible) { settingsVisible_ = visible; }
+    bool isSettingsVisible() const { return settingsVisible_; }
 
     glm::mat4 getViewMatrix() const;
     glm::mat4 getProjMatrix() const;
@@ -73,6 +75,7 @@ private:
     glm::vec2 lastMouse_{ 0.f, 0.f };
     bool mouseDown_ = false;
     bool enabled_ = true;
+    bool settingsVisible_ = true;
     VkExtent2D extent_ = { 1280, 720 };
 
     glm::mat4 computeMVP() const;

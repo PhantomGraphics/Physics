@@ -168,6 +168,11 @@ void FluidRenderer::onCleanup(VkDevice device)
 
 void FluidRenderer::onImGui()
 {
+    if (!settingsVisible_) return;
+    if (!ImGui::Begin("Fluid Renderer", &settingsVisible_)) {
+        ImGui::End();
+        return;
+    }
     if (ImGui::CollapsingHeader("Camera")) {
         ImGui::SliderFloat("Yaw", &yaw_, -3.14159f, 3.14159f);
         ImGui::SliderFloat("Pitch", &pitch_, 0.05f, 3.09f);
@@ -180,6 +185,7 @@ void FluidRenderer::onImGui()
         ImGui::SliderFloat("Density Max", &densityRangeMax_, 0.5f, 1.5f, "%.3f");
         densityRangeMax_ = std::max(densityRangeMax_, densityRangeMin_ + 0.001f);
     }
+    ImGui::End();
 }
 
 void FluidRenderer::uploadVertices(const std::vector<glm::vec3>& pts,

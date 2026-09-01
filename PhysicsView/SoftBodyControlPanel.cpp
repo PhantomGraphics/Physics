@@ -40,12 +40,12 @@ void SoftBodyControlPanel::initWidgets() {
 }
 
 void SoftBodyControlPanel::onImGui() {
-    if (!world_) return;
+    if (!world_ || !visible_) return;
     initWidgets();
 
     ImGui::SetNextWindowPos(ImVec2(10.f, 35.f), ImGuiCond_Once);
     ImGui::SetNextWindowSize(ImVec2(300.f, 560.f), ImGuiCond_Once);
-    if (!ImGui::Begin("Soft Body Control")) { ImGui::End(); return; }
+    if (!ImGui::Begin("Soft Body Control", &visible_)) { ImGui::End(); return; }
 
     {
         int cur = static_cast<int>(world_->currentPreset());

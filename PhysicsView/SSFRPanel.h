@@ -16,6 +16,8 @@ public:
 
     bool isEnabled() const { return enabled_; }
     int  getModeIndex() const { return modeIndex_; }
+    void setVisible(bool visible) { visible_ = visible; }
+    bool isVisible() const { return visible_; }
 
     void onImGui() override;
 
@@ -24,6 +26,7 @@ private:
     FluidWorld* world_ = nullptr;
 
     bool enabled_ = false;
+    bool visible_ = true;
     int modeIndex_ = 5;
 
     Phantom::UI::BoolView  enableCheck_      { "SSFR" };

@@ -38,6 +38,8 @@ public:
     // owns the Vulkan context/camera, which this panel does not).
     void setOnVolumeChanged(std::function<void()> fn) { onVolumeChanged_ = std::move(fn); }
     void setOnMeshChanged(std::function<void()> fn) { onMeshChanged_ = std::move(fn); }
+    void setVisible(bool visible) { visible_ = visible; }
+    bool isVisible() const { return visible_; }
 
     void onImGui() override;
 
@@ -49,6 +51,7 @@ private:
     FluidMeshRenderer* meshRenderer_ = nullptr;
     std::function<void()> onVolumeChanged_;
     std::function<void()> onMeshChanged_;
+    bool visible_ = true;
 
     Phantom::UI::FloatView    particleRadiusView_ { "Particle Radius", 0.025f };
     Phantom::UI::FloatView    cellLengthView_     { "Cell Length",     0.05f  };
