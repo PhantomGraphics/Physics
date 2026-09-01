@@ -137,6 +137,46 @@ phantom_find_glfw_loader()
 
 if(PHANTOM_VULKAN_LIBRARY AND PHANTOM_GLFW_LIBRARY)
 
+# Build runtime SPIR-V assets from their GLSL sources. The .spv files are
+# intentionally ignored by Git, so copying the source shader directories is
+# insufficient on a clean checkout (and leads to zero-sized shader modules at
+# runtime). Vulkan SDK installations expose glslc in Bin/.
+find_program(PHANTOM_GLSLC_EXECUTABLE
+    NAMES glslc glslc.exe
+    HINTS "$ENV{VULKAN_SDK}/Bin" "$ENV{VULKAN_SDK}/bin")
+if(NOT PHANTOM_GLSLC_EXECUTABLE)
+    message(FATAL_ERROR
+        "PhysicsView/FlameView require glslc to compile runtime shaders. "
+        "Install the Vulkan SDK or set VULKAN_SDK.")
+endif()
+
+function(phantom_add_runtime_shaders target)
+    set(shader_output_dir "${CMAKE_CURRENT_BINARY_DIR}/${target}_shaders")
+    set(shader_outputs)
+    foreach(shader_dir IN LISTS ARGN)
+        file(GLOB shader_sources CONFIGURE_DEPENDS
+            "${shader_dir}/*.vert" "${shader_dir}/*.frag" "${shader_dir}/*.comp")
+        foreach(shader_source IN LISTS shader_sources)
+            get_filename_component(shader_name "${shader_source}" NAME)
+            set(shader_output "${shader_output_dir}/${shader_name}.spv")
+            add_custom_command(
+                OUTPUT "${shader_output}"
+                COMMAND ${CMAKE_COMMAND} -E make_directory "${shader_output_dir}"
+                COMMAND "${PHANTOM_GLSLC_EXECUTABLE}" "${shader_source}" -o "${shader_output}"
+                DEPENDS "${shader_source}"
+                COMMENT "Compiling ${shader_name}"
+                VERBATIM)
+            list(APPEND shader_outputs "${shader_output}")
+        endforeach()
+    endforeach()
+
+    add_custom_target(${target}Shaders DEPENDS ${shader_outputs})
+    add_dependencies(${target} ${target}Shaders)
+    add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${shader_output_dir}" "$<TARGET_FILE_DIR:${target}>/shaders")
+endfunction()
+
 phantom_add_graphics_core()
 phantom_add_file_core()
 phantom_add_vkappbase_core()
@@ -238,17 +278,10 @@ target_compile_features(PhysicsView PRIVATE cxx_std_20)
 # SSFluidRenderer is constructed unconditionally. Keep this list in sync with
 # PhysicsView's target_link_libraries above: linking another Vulkan renderer
 # library means adding its shader directory here too.
-add_custom_command(TARGET PhysicsView POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${PHYSICS_ROOT}/PhysicsView/shaders
-        $<TARGET_FILE_DIR:PhysicsView>/shaders
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${PHYSICS_ROOT}/Fluid_GPU_Vk/Shader
-        $<TARGET_FILE_DIR:PhysicsView>/shaders
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${PHYSICS_ROOT}/FluidRenderer/shaders
-        $<TARGET_FILE_DIR:PhysicsView>/shaders
-)
+phantom_add_runtime_shaders(PhysicsView
+    ${PHYSICS_ROOT}/PhysicsView/shaders
+    ${PHYSICS_ROOT}/Fluid_GPU_Vk/Shader
+    ${PHYSICS_ROOT}/FluidRenderer/shaders)
 
 # --- FlameView (FlameApp : VkAppBase) -- minimal flame-SPH standalone viewer,
 # intentionally independent of RigidBodyWorld/VkRenderer/FluidRenderer (see
@@ -278,11 +311,7 @@ endif()
 target_compile_options(FlameView PRIVATE ${PHANTOM_WARN_FLAGS})
 target_compile_features(FlameView PRIVATE cxx_std_20)
 
-add_custom_command(TARGET FlameView POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${PHYSICS_ROOT}/FlameView/shaders
-        $<TARGET_FILE_DIR:FlameView>/shaders
-)
+phantom_add_runtime_shaders(FlameView ${PHYSICS_ROOT}/FlameView/shaders)
 
 else()
     message(WARNING "Physics: Vulkan and/or GLFW loader not found -- PhysicsView/FlameView are skipped (Physics/PhysicsTest still build). Pass -DVULKAN_LIBRARY=... -DGLFW_LIBRARY=... to enable them.")
