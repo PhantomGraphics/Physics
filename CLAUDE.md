@@ -149,7 +149,7 @@ Blender 側もこの `Physics` ライブラリを直接呼んでいるため無�
 
 ## Architecture
 
-### Crystal::Physics（`Physics/Physics/`）— コアライブラリ
+### Phantom::Physics（`Physics/Physics/`）— コアライブラリ
 
 **流体（SPH）**
 - `ISPHSolver` — DFSPH/PBSPH/WCSPH の共通インターフェース。`simulate(dt, maxIter)` に加え、剛体境界（One-Way SDF: `addRigidBoundary`／Two-Way Akinci 境界粒子: `addRigidBoundaryParticles`）と SoftBody 境界粒子（`addSoftBoundaryParticles`）の登録口を持つ。Two-Way 系は DFSPH/PBSPH/WCSPH が実装（`supportsTwoWayCoupling()`）。（旧 MVCSolver は意図的に対応せず no-op を継承していたが、開発一時停止のため現在はビルド対象外 — 下記参照。）
@@ -161,7 +161,7 @@ Blender 側もこの `Physics` ライブラリを直接呼んでいるため無�
 - **Outflow Region（流出領域による粒子削除、オプション機能）**: `WCSPHFluid`/`DFSPHFluid`/`PBSPHFluid` はいずれも `addOutflowRegion()`/`getOutflowRegions()`/`clearOutflowRegions()`/`removeOutflowParticles()` を持つ（Emitter の対極——生成ではなく削除）。データ構造は `OutflowRegion.h`（`struct OutflowRegion { Math::Box3df bounds; }`、AABB のみ）。`removeOutflowParticles()` は `bounds.contains(pos, 0.0f)` が真の粒子を各 `*ParticleSoA::swapAndPop()`（`FlameParticleSoA::swapAndPop()` と同じ swap-and-pop パターン、`WCSPHParticleSoA`/`DFSPHParticleSoA`/`PBSPHParticleSoA` に追加）で削除する（順序は保持されない）。登録領域が空なら no-op——**完全にオプトイン**で、既存シーンは `addOutflowRegion()` を呼ばない限り一切影響を受けない。`Physics/PhysicsView` の `FluidWorld::stepFluidOnly()` は `fluidSolver_->simulate()` の直後に `updateOutflow()`（アクティブな `*Fluid::removeOutflowParticles()` へディスパッチ）を呼ぶ。`CommandDispatcher` の `AddOutflowRegion:minX,minY,minZ,maxX,maxY,maxZ`/`ClearOutflowRegions`/`GetOutflowRegionCount` と `ControlPanel` の「Outflow Regions」セクションから利用できる。GPU_CSPH は非対応（CPU 側 `*Fluid` を持たないため、Emitter 同様 no-op）。
 
 **剛体**
-- `RigidBody`、衝突は `BroadPhase`（`Crystal::Space::BVH` ベース）→ `NarrowPhase` → `CollisionPair`（`ContactManifold`）。
+- `RigidBody`、衝突は `BroadPhase`（`Phantom::Space::BVH` ベース）→ `NarrowPhase` → `CollisionPair`（`ContactManifold`）。
 - コライダー: `ICollisionShape`／`ISoftCollider` を実装する `SphereCollider`/`PlaneCollider`/`RigidBodyCollider`。
 - `RigidBodySolver` が積分・拘束解決を担当。`SelfCollision`/`CrossBodyCollision` は複数剛体間の追加チェック。
 
@@ -251,7 +251,7 @@ Screen Space Fluid Rendering（SSFR）パイプライン。`ParticleDepthRendere
     密度クランプと粘性を直したあと、粒子の壁へのめり込みが h の 5% しか無くなり、
     ζ を 0〜0.5 で振っても最大速度が 1% 未満しか動かなくなった（同 11.5 節）。
     ζ が効くのは「素の壁に高速の流体が当たり、その上に何も載っていない」場面に限られる。
-- **近傍探索は `Crystal::Space::CSRNeighborList` に一本化**: DFSPH/PBSPH/WCSPH/Flame いずれも `neighbors.build(positions, effectLength)` の 1 行で近傍探索と CSR 化をまとめて行う（`CGLib/Space/Space/NeighborList.h`）。内部実装は `IndexedSortBasedSearcher`（グリッド ID ソート + 前方 13 セル走査）で、返る行は「自分自身を含まない・`effectLength` 未満に距離フィルタ済み・対称（j が i の行にあれば i も j の行にある）」。**各パスは必ずペアではなく粒子でループすること**——ペアで並列化すると 1 反復が両端の粒子に書き込むため、同じ粒子を共有する 2 ペアが別スレッドに載って非アトミックな `+=` を競合させ、実行ごとに結果が変わる（`Physics/PhysicsTest/FluidDeterministicTest.cpp` が回帰確認）。行を `std::vector<int>` ではなく 2 本のフラット配列で持つのは、毎ステップ作り直す前提で粒子ごとのヒープ確保が支配的コストになるため（`docs/issue/wcsph_parallel_scaling_profile.md` 4 節）。粒子側の受け口は `Space::NeighborIndexView`（`std::vector<int>` から暗黙変換できるので、テストが手書きの近傍リストを渡す形はそのまま使える）。
+- **近傍探索は `Phantom::Space::CSRNeighborList` に一本化**: DFSPH/PBSPH/WCSPH/Flame いずれも `neighbors.build(positions, effectLength)` の 1 行で近傍探索と CSR 化をまとめて行う（`CGLib/Space/Space/NeighborList.h`）。内部実装は `IndexedSortBasedSearcher`（グリッド ID ソート + 前方 13 セル走査）で、返る行は「自分自身を含まない・`effectLength` 未満に距離フィルタ済み・対称（j が i の行にあれば i も j の行にある）」。**各パスは必ずペアではなく粒子でループすること**——ペアで並列化すると 1 反復が両端の粒子に書き込むため、同じ粒子を共有する 2 ペアが別スレッドに載って非アトミックな `+=` を競合させ、実行ごとに結果が変わる（`Physics/PhysicsTest/FluidDeterministicTest.cpp` が回帰確認）。行を `std::vector<int>` ではなく 2 本のフラット配列で持つのは、毎ステップ作り直す前提で粒子ごとのヒープ確保が支配的コストになるため（`docs/issue/wcsph_parallel_scaling_profile.md` 4 節）。粒子側の受け口は `Space::NeighborIndexView`（`std::vector<int>` から暗黙変換できるので、テストが手書きの近傍リストを渡す形はそのまま使える）。
 - **`viscosityCoe` は解像度に依存しない（＝粒子半径で振ってはいけない）**: `WCSPHParticle::solveViscosityForce()` は
   `viscosityCoe * Δv * ∇²W_visc * m_j` を力に足し `forwardTime()` が `力/ρ` にするので、教科書
   （Müller 2003 の `μ Σ m_j Δv/ρ_j ∇²W`）の `1/ρ_j` が抜けているぶん `viscosityCoe ≡ μ/ρ` ——

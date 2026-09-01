@@ -1,11 +1,11 @@
-# Cross-platform CMake build for the Physics core library (Crystal::Physics),
+# Cross-platform CMake build for the Physics core library (Phantom::Physics),
 # its GoogleTest suite (PhysicsTest), and PhysicsView/FlameView (Vulkan apps).
 #
 # This is a standalone CMake build, separate from the MSBuild/.vcxproj-based
 # Windows build (Physics/Physics/Physics.vcxproj + Physics/PhysicsTest/
 # PhysicsTest.vcxproj, driven by Phantom2026.sln). MathCore/SpaceCore/
 # VolumeCore/NumericsCore/VkAppBaseCore/etc. are now defined once in
-# ../cmake/CrystalCoreLibs.cmake and ../cmake/CrystalVulkanApp.cmake
+# ../cmake/PhantomCoreLibs.cmake and ../cmake/PhantomVulkanApp.cmake
 # (Phase 4 §5.4 item 1 dedup, docs/todo/PLAN_crossplatform_non_cgapp_build.md)
 # -- this file just calls them (PhysicsCore itself links against those
 # instead of bundling their raw sources, same behavior, cleaner) and adds
@@ -23,7 +23,7 @@
 # PhysicsView.vcxproj's real <ProjectReference> list (verified, not the plan
 # doc's dependency sketch) is: Math, VulkanGraphics, Space, VkAppBase,
 # VkRenderer, UIWidgets, FluidRenderer, Physics, Numerics, Fluid_GPU_Vk,
-# Volume, File -- no Crystal::Scene. FluidRenderer and Fluid_GPU_Vk have NO
+# Volume, File -- no Phantom::Scene. FluidRenderer and Fluid_GPU_Vk have NO
 # <ProjectReference> of their own (header-only include paths onto Math/
 # VulkanGraphics/imgui/glm/VMA) -- they're leaf static libs PhysicsView links.
 #
@@ -49,9 +49,9 @@ set(CGLIB_ROOT ${REPO_ROOT}/CGLib)
 
 if(MSVC)
     add_compile_options(/utf-8)
-    set(CRYSTAL_WARN_FLAGS /W3)
+    set(PHANTOM_WARN_FLAGS /W3)
 else()
-    set(CRYSTAL_WARN_FLAGS -Wall)
+    set(PHANTOM_WARN_FLAGS -Wall)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH ${REPO_ROOT}/cmake)
@@ -59,10 +59,10 @@ include(PhantomGTest)
 include(PhantomCoreLibs)
 include(PhantomVulkanApp)
 
-crystal_add_math_core()
-crystal_add_space_core()
-crystal_add_volume_core()
-crystal_add_numerics_core()
+phantom_add_math_core()
+phantom_add_space_core()
+phantom_add_volume_core()
+phantom_add_numerics_core()
 
 file(GLOB PHYSICS_SOURCES ${PHYSICS_ROOT}/Physics/*.cpp)
 list(FILTER PHYSICS_SOURCES EXCLUDE REGEX "pch\\.cpp$")
@@ -76,7 +76,7 @@ if(OpenMP_CXX_FOUND)
     target_link_libraries(PhysicsCore PUBLIC OpenMP::OpenMP_CXX)
 endif()
 
-target_compile_options(PhysicsCore PRIVATE ${CRYSTAL_WARN_FLAGS})
+target_compile_options(PhysicsCore PRIVATE ${PHANTOM_WARN_FLAGS})
 
 # ---------------------------------------------------------------------------
 # PhysicsTest (GoogleTest) -- PhysicsTest.vcxproj explicitly overrides
@@ -86,9 +86,9 @@ target_compile_options(PhysicsCore PRIVATE ${CRYSTAL_WARN_FLAGS})
 # globally, so PhysicsCore itself stays C++17 exactly as before.
 # ---------------------------------------------------------------------------
 
-crystal_find_gtest()
+phantom_find_gtest()
 
-if(CRYSTAL_GTEST_FOUND)
+if(PHANTOM_GTEST_FOUND)
     enable_testing()
 
     file(GLOB PHYSICSTEST_SOURCES ${PHYSICS_ROOT}/PhysicsTest/*.cpp)
@@ -112,7 +112,7 @@ if(CRYSTAL_GTEST_FOUND)
         GTest::gtest_main
     )
 
-    target_compile_options(PhysicsTest PRIVATE ${CRYSTAL_WARN_FLAGS})
+    target_compile_options(PhysicsTest PRIVATE ${PHANTOM_WARN_FLAGS})
 
     include(GoogleTest)
     gtest_discover_tests(PhysicsTest)
@@ -124,19 +124,19 @@ endif()
 # PhysicsView + FlameView (Vulkan/ImGui apps) -- Phase 2.
 # ---------------------------------------------------------------------------
 
-crystal_find_vulkan_headers()
+phantom_find_vulkan_headers()
 
-if(CRYSTAL_VULKAN_INCLUDE_DIR)
+if(PHANTOM_VULKAN_INCLUDE_DIR)
 
-crystal_find_vulkan_loader()
-crystal_find_glfw_loader()
+phantom_find_vulkan_loader()
+phantom_find_glfw_loader()
 
-if(CRYSTAL_VULKAN_LIBRARY AND CRYSTAL_GLFW_LIBRARY)
+if(PHANTOM_VULKAN_LIBRARY AND PHANTOM_GLFW_LIBRARY)
 
-crystal_add_graphics_core()
-crystal_add_file_core()
-crystal_add_vkappbase_core()
-crystal_add_vkrenderer_core()
+phantom_add_graphics_core()
+phantom_add_file_core()
+phantom_add_vkappbase_core()
+phantom_add_vkrenderer_core()
 
 # --- FluidRenderer (Screen Space Fluid Rendering) -- PhysicsView only ---
 
@@ -155,7 +155,7 @@ target_include_directories(FluidRendererCore PRIVATE
     ${CGLIB_ROOT}/ThirdParty/imgui
 )
 target_link_libraries(FluidRendererCore PRIVATE VulkanGraphicsCore)
-target_compile_options(FluidRendererCore PRIVATE ${CRYSTAL_WARN_FLAGS})
+target_compile_options(FluidRendererCore PRIVATE ${PHANTOM_WARN_FLAGS})
 target_compile_features(FluidRendererCore PRIVATE cxx_std_20)
 
 # --- Fluid_GPU_Vk (GPU Compute CSPH) -- PhysicsView only ---
@@ -170,7 +170,7 @@ add_library(FluidGPUVkCore STATIC
     ${PHYSICS_ROOT}/Fluid_GPU_Vk/CSPHSolverVk.cpp
 )
 target_link_libraries(FluidGPUVkCore PRIVATE VulkanGraphicsCore)
-target_compile_options(FluidGPUVkCore PRIVATE ${CRYSTAL_WARN_FLAGS})
+target_compile_options(FluidGPUVkCore PRIVATE ${PHANTOM_WARN_FLAGS})
 target_compile_features(FluidGPUVkCore PRIVATE cxx_std_20)
 
 # --- PhysicsView (FluidApp : VkAppBase) -- fluid/rigid/soft-body standalone viewer ---
@@ -214,13 +214,13 @@ target_link_libraries(PhysicsView PRIVATE
     FileCore
     VkAppBaseCore
     VkRendererCore
-    ${CRYSTAL_VULKAN_LIBRARY}
-    ${CRYSTAL_GLFW_LIBRARY}
+    ${PHANTOM_VULKAN_LIBRARY}
+    ${PHANTOM_GLFW_LIBRARY}
 )
 if(OpenMP_CXX_FOUND)
     target_link_libraries(PhysicsView PRIVATE OpenMP::OpenMP_CXX)
 endif()
-target_compile_options(PhysicsView PRIVATE ${CRYSTAL_WARN_FLAGS})
+target_compile_options(PhysicsView PRIVATE ${PHANTOM_WARN_FLAGS})
 target_compile_features(PhysicsView PRIVATE cxx_std_20)
 
 # PhysicsView loads shaders from three source trees, one per library it links,
@@ -265,13 +265,13 @@ target_include_directories(FlameView PRIVATE
 target_link_libraries(FlameView PRIVATE
     PhysicsCore
     VkAppBaseCore
-    ${CRYSTAL_VULKAN_LIBRARY}
-    ${CRYSTAL_GLFW_LIBRARY}
+    ${PHANTOM_VULKAN_LIBRARY}
+    ${PHANTOM_GLFW_LIBRARY}
 )
 if(OpenMP_CXX_FOUND)
     target_link_libraries(FlameView PRIVATE OpenMP::OpenMP_CXX)
 endif()
-target_compile_options(FlameView PRIVATE ${CRYSTAL_WARN_FLAGS})
+target_compile_options(FlameView PRIVATE ${PHANTOM_WARN_FLAGS})
 target_compile_features(FlameView PRIVATE cxx_std_20)
 
 add_custom_command(TARGET FlameView POST_BUILD
