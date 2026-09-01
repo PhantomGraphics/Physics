@@ -387,6 +387,9 @@ public:
 
     size_t getParticleCount() const;
     std::vector<glm::vec3> getParticlePositions() const;
+    // Current SPH density for each CPU particle, in the same order as
+    // getParticlePositions(). Empty for GPU_CSPH (no CPU readback).
+    std::vector<float> getParticleDensities() const;
     // Empty for GPU_CSPH (no CPU *Fluid instance to read velocities back
     // from -- mirrors getParticlePositions()'s own GPU_CSPH gap; scenario
     // callers see an empty read the same way GetMax/MinParticlePositionY

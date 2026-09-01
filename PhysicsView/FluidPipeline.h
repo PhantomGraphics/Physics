@@ -19,7 +19,8 @@ public:
     void create(const Phantom::VKG::VulkanContext& ctx, VkRenderPass renderPass, const Config& cfg);
     void destroy(VkDevice device);
 
-    void updateUBO(uint32_t frame, const glm::mat4& mvp);
+    void updateUBO(uint32_t frame, const glm::mat4& mvp,
+                   float densityMin, float densityMax, bool useDensity);
 
     VkPipeline       getPipeline() const                { return pipeline_.getPipeline(); }
     VkPipelineLayout getLayout() const                  { return pipeline_.getLayout(); }
@@ -32,6 +33,11 @@ private:
     std::vector<VkDescriptorSet>   descriptorSets_;
     Phantom::VKG::VulkanPipeline            pipeline_;
     std::vector<Phantom::VKG::VulkanBuffer> uniformBuffers_;
+
+    struct alignas(16) UBO {
+        glm::mat4 mvp;
+        glm::vec4 colorParams; // min, max, enabled, padding
+    };
 };
 
 } // namespace Phantom

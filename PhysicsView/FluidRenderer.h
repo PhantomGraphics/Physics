@@ -8,7 +8,9 @@
 namespace Phantom {
 
 struct VkFluidVertex {
-    glm::vec4 position;
+    // xyz = position, w = density / rest density. Keeping a vec4 also
+    // preserves the GPU_CSPH direct-buffer layout.
+    glm::vec4 positionDensity;
 
     static VkVertexInputBindingDescription getBindingDescription();
     static std::array<VkVertexInputAttributeDescription, 1> getAttributeDescriptions();
@@ -23,6 +25,8 @@ public:
 
     void setShaders(Shaders shaders) { shaders_ = std::move(shaders); }
     void setParticles(const std::vector<glm::vec3>& positions);
+    void setParticles(const std::vector<glm::vec3>& positions,
+                      const std::vector<float>& densityRatios);
     void setDirectGpuBuffer(VkBuffer buf, uint32_t count);
     void clearDirectGpuBuffer();
     void setExtent(VkExtent2D ext) { extent_ = ext; }
@@ -57,6 +61,11 @@ private:
     uint32_t pointCount_ = 0;
     std::mutex mutex_;
     bool dirty_ = false;
+    bool pendingHasDensity_ = false;
+    bool hasDensity_ = false;
+
+    float densityRangeMin_ = 0.95f;
+    float densityRangeMax_ = 1.05f;
 
     float yaw_ = 0.6f;
     float pitch_ = 0.6f;
@@ -67,7 +76,10 @@ private:
     VkExtent2D extent_ = { 1280, 720 };
 
     glm::mat4 computeMVP() const;
-    void uploadVertices(const std::vector<glm::vec3>& pts);
+    std::vector<float> pendingDensityRatios_;
+    void uploadVertices(const std::vector<glm::vec3>& pts,
+                        const std::vector<float>& densityRatios,
+                        bool hasDensity);
 };
 
 } // namespace Phantom  

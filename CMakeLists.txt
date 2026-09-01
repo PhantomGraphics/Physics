@@ -93,6 +93,10 @@ if(PHANTOM_GTEST_FOUND)
 
     file(GLOB PHYSICSTEST_SOURCES ${PHYSICS_ROOT}/PhysicsTest/*.cpp)
     list(FILTER PHYSICSTEST_SOURCES EXCLUDE REGEX "pch\\.cpp$")
+    # Long-running WCSPH scene/stability checks belong to PhysicsView's
+    # scenario suite, not the component-level GoogleTest executable.
+    list(FILTER PHYSICSTEST_SOURCES EXCLUDE REGEX
+        "(FluidPoolStabilityTest|WaterSphereEmitterStabilityTest|SPHScaleInvarianceTest)\\.cpp$")
 
     add_executable(PhysicsTest ${PHYSICSTEST_SOURCES})
     set_target_properties(PhysicsTest PROPERTIES

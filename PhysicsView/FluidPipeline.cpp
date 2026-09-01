@@ -31,7 +31,7 @@ void FluidPipeline::create(const Phantom::VKG::VulkanContext& ctx, VkRenderPass 
 
     uniformBuffers_.resize(framesInFlight_);
     for (auto& ub : uniformBuffers_) {
-        ub.createMapped(ctx, sizeof(glm::mat4), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+        ub.createMapped(ctx, sizeof(UBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     }
 
     VkDescriptorPoolSize poolSize{};
@@ -46,7 +46,7 @@ void FluidPipeline::create(const Phantom::VKG::VulkanContext& ctx, VkRenderPass 
         VkDescriptorBufferInfo bi{};
         bi.buffer = uniformBuffers_[i].get();
         bi.offset = 0;
-        bi.range = sizeof(glm::mat4);
+        bi.range = sizeof(UBO);
 
         VkWriteDescriptorSet w{};
         w.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -72,9 +72,11 @@ void FluidPipeline::destroy(VkDevice device)
     framesInFlight_ = 0;
 }
 
-void FluidPipeline::updateUBO(uint32_t frame, const glm::mat4& mvp)
+void FluidPipeline::updateUBO(uint32_t frame, const glm::mat4& mvp,
+                              float densityMin, float densityMax, bool useDensity)
 {
-    uniformBuffers_[frame].write(&mvp, sizeof(mvp));
+    const UBO ubo{ mvp, glm::vec4(densityMin, densityMax, useDensity ? 1.0f : 0.0f, 0.0f) };
+    uniformBuffers_[frame].write(&ubo, sizeof(ubo));
 }
 
 } // namespace Phantom

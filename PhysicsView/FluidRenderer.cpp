@@ -18,7 +18,7 @@ VkVertexInputBindingDescription VkFluidVertex::getBindingDescription()
 std::array<VkVertexInputAttributeDescription, 1> VkFluidVertex::getAttributeDescriptions()
 {
     std::array<VkVertexInputAttributeDescription, 1> attrs{};
-    attrs[0] = { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(VkFluidVertex, position) };
+    attrs[0] = { 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(VkFluidVertex, positionDensity) };
     return attrs;
 }
 
@@ -26,6 +26,18 @@ void FluidRenderer::setParticles(const std::vector<glm::vec3>& positions)
 {
     std::lock_guard<std::mutex> lock(mutex_);
     pendingPositions_ = positions;
+    pendingDensityRatios_.clear();
+    pendingHasDensity_ = false;
+    dirty_ = true;
+}
+
+void FluidRenderer::setParticles(const std::vector<glm::vec3>& positions,
+                                 const std::vector<float>& densityRatios)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    pendingPositions_ = positions;
+    pendingDensityRatios_ = densityRatios;
+    pendingHasDensity_ = densityRatios.size() == positions.size();
     dirty_ = true;
 }
 
@@ -34,6 +46,7 @@ void FluidRenderer::setDirectGpuBuffer(VkBuffer buf, uint32_t count)
     std::lock_guard<std::mutex> lock(mutex_);
     directVertexBuffer_ = buf;
     directPointCount_ = count;
+    hasDensity_ = false;
 }
 
 void FluidRenderer::clearDirectGpuBuffer()
@@ -90,17 +103,21 @@ void FluidRenderer::onUpdate(uint32_t frameIndex)
         if (directVertexBuffer_ != VK_NULL_HANDLE) {
             pointCount_ = directPointCount_;
             const glm::mat4 mvp = computeMVP();
-            pipeline_.updateUBO(frameIndex, mvp);
+            pipeline_.updateUBO(frameIndex, mvp, densityRangeMin_, densityRangeMax_, false);
             return;
         }
     }
 
     std::vector<glm::vec3> uploadData;
+    std::vector<float> densityData;
+    bool uploadHasDensity = false;
     bool hasNewData = false;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (dirty_) {
             uploadData = pendingPositions_;
+            densityData = pendingDensityRatios_;
+            uploadHasDensity = pendingHasDensity_;
             dirty_ = false;
             hasNewData = true;
         }
@@ -109,11 +126,11 @@ void FluidRenderer::onUpdate(uint32_t frameIndex)
     if (hasNewData) {
         vkDeviceWaitIdle(ctx_->getDevice());
         vertexBuffer_.destroy(ctx_->getDevice());
-        uploadVertices(uploadData);
+        uploadVertices(uploadData, densityData, uploadHasDensity);
     }
 
     const glm::mat4 mvp = computeMVP();
-    pipeline_.updateUBO(frameIndex, mvp);
+    pipeline_.updateUBO(frameIndex, mvp, densityRangeMin_, densityRangeMax_, hasDensity_);
 }
 
 void FluidRenderer::onRender(VkCommandBuffer cmd, uint32_t frameIndex)
@@ -156,19 +173,30 @@ void FluidRenderer::onImGui()
         ImGui::SliderFloat("Pitch", &pitch_, 0.05f, 3.09f);
         ImGui::SliderFloat("Distance", &distance_, 5.0f, 300.0f);
     }
+    if (ImGui::CollapsingHeader("Fluid Color Map")) {
+        ImGui::TextUnformatted(hasDensity_ ? "Quantity: Density / Rest Density"
+                                           : "Quantity: unavailable (fixed color)");
+        ImGui::SliderFloat("Density Min", &densityRangeMin_, 0.5f, 1.5f, "%.3f");
+        ImGui::SliderFloat("Density Max", &densityRangeMax_, 0.5f, 1.5f, "%.3f");
+        densityRangeMax_ = std::max(densityRangeMax_, densityRangeMin_ + 0.001f);
+    }
 }
 
-void FluidRenderer::uploadVertices(const std::vector<glm::vec3>& pts)
+void FluidRenderer::uploadVertices(const std::vector<glm::vec3>& pts,
+                                   const std::vector<float>& densityRatios,
+                                   bool hasDensity)
 {
     pointCount_ = static_cast<uint32_t>(pts.size());
+    hasDensity_ = hasDensity;
     if (pointCount_ == 0) {
         return;
     }
 
     std::vector<VkFluidVertex> vertices;
     vertices.reserve(pts.size());
-    for (const auto& p : pts) {
-        vertices.push_back({ glm::vec4(p, 1.0f) });
+    for (size_t i = 0; i < pts.size(); ++i) {
+        const float densityRatio = hasDensity ? densityRatios[i] : 1.0f;
+        vertices.push_back({ glm::vec4(pts[i], densityRatio) });
     }
 
     vertexBuffer_.create(*ctx_, *pool_,

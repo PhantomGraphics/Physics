@@ -422,6 +422,21 @@ std::vector<glm::vec3> FluidWorld::getParticlePositions() const
     return positions;
 }
 
+std::vector<float> FluidWorld::getParticleDensities() const
+{
+    switch (type_) {
+    case SimulationType::DFSPH:
+        return dfsphFluid_ ? dfsphFluid_->getParticles().densities : std::vector<float>{};
+    case SimulationType::PBSPH:
+        return pbsphFluid_ ? pbsphFluid_->getParticles().densities : std::vector<float>{};
+    case SimulationType::WCSPH:
+        return csphFluid_ ? csphFluid_->getParticles().densities : std::vector<float>{};
+    case SimulationType::GPU_CSPH:
+        break;
+    }
+    return {};
+}
+
 std::vector<glm::vec3> FluidWorld::getParticleVelocities() const
 {
     std::vector<glm::vec3> velocities;
