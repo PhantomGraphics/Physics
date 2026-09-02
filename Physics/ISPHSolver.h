@@ -1,12 +1,14 @@
 #pragma once
 
 #include <vector>
+#include <memory>
 
 #include "CGLib/Math/Vector3d.h"
 #include "CGLib/Math/Box3d.h"
 #include "PlaneBoundary.h"
 #include "SphereBoundary.h"
 #include "PlateBoundary.h"
+#include "IShapeBoundary.h"
 
 namespace Phantom {
 	namespace Physics {
@@ -108,6 +110,12 @@ public:
 	 * @param timeStep Ignored -- see setBoundaryPlanes().
 	 */
 	virtual void setBoundaryPlates(std::vector<PlateBoundary> plates, const float timeStep) { (void)plates; (void)timeStep; }
+
+	/** Sets arbitrary analytic boundaries through their common interface. */
+	virtual void setShapeBoundaries(std::vector<std::shared_ptr<IShapeBoundary>> boundaries,
+	                                const float timeStep) {
+		(void)boundaries; (void)timeStep;
+	}
 
 	/**
 	 * @brief Sets how much of a particle's wall-normal velocity the domain

@@ -235,7 +235,7 @@ void CSPHSolver::addBoundaryDensity(const std::vector<CSPHParticle*>& particles)
 // than by sampling the walls with Akinci boundary particles.
 void WCSPHSolver::addBoundaryDensity(std::vector<WCSPHParticle>& particles)
 {
-	if ((boundaryPlanes_.empty() && boundarySpheres_.empty() && boundaryPlates_.empty()) || particles.empty()) return;
+	if ((boundaryPlanes_.empty() && boundarySpheres_.empty() && boundaryPlates_.empty() && boundaryShapes_.empty()) || particles.empty()) return;
 
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
@@ -247,16 +247,16 @@ void WCSPHSolver::addBoundaryDensity(std::vector<WCSPHParticle>& particles)
 		const float restDensity = p.getFluid()->getDensity();
 
 		float contribution = 0.0f;
-		for (const auto& plane : boundaryPlanes_) {
-			const float d = plane.getSignedDistance(p.getPosition());
-			if (d >= effectLength) continue;
-			contribution += restDensity * poly6HalfSpaceFraction(d, effectLength);
-		}
-		for (const auto& sphere : boundarySpheres_) {
-			const float d = sphere.getSignedDistance(p.getPosition());
-			if (d >= effectLength) continue;
-			contribution += restDensity * poly6HalfSpaceFraction(d, effectLength);
-		}
+		auto addShapeDensity = [&](const IShapeBoundary& boundary) {
+			if (!boundary.isActiveAt(p.getPosition(), effectLength)) return;
+			const float d = boundary.getDensityDistance(p.getPosition());
+			if (d >= effectLength) return;
+			const float weight = boundary.getDensityWeight(p.getPosition(), effectLength);
+			if (weight > 0.0f)
+				contribution += restDensity * poly6HalfSpaceFraction(d, effectLength) * weight;
+		};
+		for (const auto& plane : boundaryPlanes_) addShapeDensity(plane);
+		for (const auto& sphere : boundarySpheres_) addShapeDensity(sphere);
 		// A finite plate contributes like a plane's half-space integral off its
 		// large (normal-facing) face, but tapered toward the rim: near an edge
 		// most of that half-space is air, not solid, so handing the particle a
@@ -265,14 +265,8 @@ void WCSPHSolver::addBoundaryDensity(std::vector<WCSPHParticle>& particles)
 		// same accumulator and subject to the one headroom clamp below, exactly
 		// like planes and spheres -- the clamp is what keeps overlapping plates
 		// at a 9-plate seam from summing past rest density.
-		for (const auto& plate : boundaryPlates_) {
-			if (!plate.isActiveAt(p.getPosition(), effectLength)) continue;
-			const float d = plate.getFaceDistance(p.getPosition());
-			if (d >= effectLength) continue;
-			const float rim = plate.getRimFraction(p.getPosition(), effectLength);
-			if (rim <= 0.0f) continue;
-			contribution += restDensity * poly6HalfSpaceFraction(d, effectLength) * rim;
-		}
+		for (const auto& plate : boundaryPlates_) addShapeDensity(plate);
+		for (const auto& shape : boundaryShapes_) if (shape) addShapeDensity(*shape);
 		// The wall stands in for the neighbors a particle is *missing* because
 		// the wall is where they would have been -- so it may only ever fill
 		// the deficit, never push the particle past rest density. Clamping to
@@ -304,7 +298,7 @@ void WCSPHSolver::addBoundaryDensity(std::vector<WCSPHParticle>& particles)
 }
 
 void WCSPHSolver::addBoundaryForce(std::vector<WCSPHParticle>& particles) {
-	if (boundaryPlanes_.empty() && boundarySpheres_.empty() && boundaryPlates_.empty()) return;
+	if (boundaryPlanes_.empty() && boundarySpheres_.empty() && boundaryPlates_.empty() && boundaryShapes_.empty()) return;
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
 		Vector3df force(0.0f, 0.0f, 0.0f);
@@ -314,18 +308,16 @@ void WCSPHSolver::addBoundaryForce(std::vector<WCSPHParticle>& particles) {
 		// spring -d/dt^2 is calibrated against the step being integrated, and
 		// simulate() has already set this to its own dt. See
 		// setBoundaryPlanes()'s doc comment in the header.
-		for (const auto& plane : boundaryPlanes_) {
-			force += plane.getBoundaryForce(pos, vel, timeStep, boundaryDampingRatio_);
-		}
-		for (const auto& sphere : boundarySpheres_) {
-			force += sphere.getBoundaryForce(pos, vel, timeStep, boundaryDampingRatio_);
-		}
+		auto addShapeForce = [&](const IShapeBoundary& boundary) {
+			if (boundary.isActiveAt(pos, 0.0f))
+				force += boundary.getBoundaryForce(pos, vel, timeStep, boundaryDampingRatio_);
+		};
+		for (const auto& plane : boundaryPlanes_) addShapeForce(plane);
+		for (const auto& sphere : boundarySpheres_) addShapeForce(sphere);
 		// isActiveAt(pos, 0) exactly bounds the plate's OBB; getBoundaryForce()
 		// still does the precise inside test, so this is only an early-out.
-		for (const auto& plate : boundaryPlates_) {
-			if (!plate.isActiveAt(pos, 0.0f)) continue;
-			force += plate.getBoundaryForce(pos, vel, timeStep, boundaryDampingRatio_);
-		}
+		for (const auto& plate : boundaryPlates_) addShapeForce(plate);
+		for (const auto& shape : boundaryShapes_) if (shape) addShapeForce(*shape);
 		particles[i].addForce(force * particles[i].getDensity());
 	}
 }

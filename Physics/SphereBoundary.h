@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BoundaryPenalty.h"
+#include "IShapeBoundary.h"
 #include "CGLib/Math/Vector3d.h"
 
 #include <limits>
@@ -16,7 +17,7 @@ namespace Phantom {
  * docs/todo/PLAN_sph_showcase_water_sphere.md section 8-A for the design
  * rationale (closed container for the "water sphere" showcase scene).
  */
-class SphereBoundary
+class SphereBoundary : public IShapeBoundary
 {
 public:
 	SphereBoundary() = default;
@@ -45,7 +46,7 @@ public:
 	 * @param pos World-space position.
 	 * @return radius - |pos - center|.
 	 */
-	float getSignedDistance(const Math::Vector3df& pos) const;
+	float getSignedDistance(const Math::Vector3df& pos) const override;
 
 	/**
 	 * @brief Whether pos is within maxPenetration of the sphere (inside, or
@@ -54,6 +55,7 @@ public:
 	 * @param pos World-space position.
 	 */
 	bool isActiveAt(const Math::Vector3df& pos) const;
+	bool isActiveAt(const Math::Vector3df& pos, const float) const override { return isActiveAt(pos); }
 
 	/**
 	 * @brief Penalty force pushing a penetrating position back toward the center.
@@ -63,7 +65,7 @@ public:
 	 * @param timeStep Time step used to scale the repulsion force.
 	 * @return Zero, or a force directed toward the center.
 	 */
-	Math::Vector3df getBoundaryForce(const Math::Vector3df& pos, const float timeStep) const;
+	Math::Vector3df getBoundaryForce(const Math::Vector3df& pos, const float timeStep) const override;
 
 	/**
 	 * @brief Same penalty force, plus a damper on the wall-normal velocity
@@ -80,14 +82,14 @@ public:
 	 * @return Zero, or a force directed toward the center.
 	 */
 	Math::Vector3df getBoundaryForce(const Math::Vector3df& pos, const Math::Vector3df& velocity,
-	                                 const float timeStep, const float dampingRatio) const;
+	                                 const float timeStep, const float dampingRatio) const override;
 
 	/**
 	 * @brief Hard position correction: projects a penetrating position back onto the sphere surface.
 	 * @param pos World-space position.
 	 * @return pos unchanged if inside the sphere; otherwise pos moved toward the center onto the surface.
 	 */
-	Math::Vector3df clampPosition(const Math::Vector3df& pos) const;
+	Math::Vector3df clampPosition(const Math::Vector3df& pos) const override;
 
 private:
 	Math::Vector3df center_{ 0.f, 0.f, 0.f };

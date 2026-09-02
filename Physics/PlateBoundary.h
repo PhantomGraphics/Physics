@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BoundaryPenalty.h"
+#include "IShapeBoundary.h"
 #include "CGLib/Math/Vector3d.h"
 
 namespace Phantom {
@@ -27,7 +28,7 @@ namespace Phantom {
  * Choose halfThickness comfortably larger than v_max * dt so a particle cannot
  * tunnel through the plate in one step.
  */
-class PlateBoundary
+class PlateBoundary : public IShapeBoundary
 {
 public:
 	PlateBoundary() = default;
@@ -63,7 +64,7 @@ public:
 	 * the valid region, matching PlaneBoundary/SphereBoundary.
 	 * @param pos World-space position.
 	 */
-	float getSignedDistance(const Math::Vector3df& pos) const;
+	float getSignedDistance(const Math::Vector3df& pos) const override;
 
 	/**
 	 * @brief Whether pos lies within the plate's world AABB inflated by
@@ -72,7 +73,7 @@ public:
 	 * @param pos          World-space position.
 	 * @param effectLength Kernel support radius the AABB is inflated by.
 	 */
-	bool isActiveAt(const Math::Vector3df& pos, const float effectLength) const;
+	bool isActiveAt(const Math::Vector3df& pos, const float effectLength) const override;
 
 	/**
 	 * @brief Penalty force pushing a penetrating position out through the
@@ -83,7 +84,7 @@ public:
 	 * @param pos      World-space position.
 	 * @param timeStep Time step used to scale the repulsion force.
 	 */
-	Math::Vector3df getBoundaryForce(const Math::Vector3df& pos, const float timeStep) const;
+	Math::Vector3df getBoundaryForce(const Math::Vector3df& pos, const float timeStep) const override;
 
 	/**
 	 * @brief Same penalty force, plus a damper on the face-normal velocity
@@ -95,14 +96,14 @@ public:
 	 * @param dampingRatio Damping ratio, clamped to [0, 0.5].
 	 */
 	Math::Vector3df getBoundaryForce(const Math::Vector3df& pos, const Math::Vector3df& velocity,
-	                                 const float timeStep, const float dampingRatio) const;
+	                                 const float timeStep, const float dampingRatio) const override;
 
 	/**
 	 * @brief Hard position correction: projects a position inside the plate
 	 * onto its nearest face. pos unchanged if already outside.
 	 * @param pos World-space position.
 	 */
-	Math::Vector3df clampPosition(const Math::Vector3df& pos) const;
+	Math::Vector3df clampPosition(const Math::Vector3df& pos) const override;
 
 	/**
 	 * @brief Density contribution helper: outward distance from the large
@@ -111,6 +112,7 @@ public:
 	 * @param pos World-space position.
 	 */
 	float getFaceDistance(const Math::Vector3df& pos) const;
+	float getDensityDistance(const Math::Vector3df& pos) const override { return getFaceDistance(pos); }
 
 	/**
 	 * @brief Density contribution helper: a [0, 1] taper that falls off near
@@ -122,6 +124,9 @@ public:
 	 * @param effectLength Kernel support radius.
 	 */
 	float getRimFraction(const Math::Vector3df& pos, const float effectLength) const;
+	float getDensityWeight(const Math::Vector3df& pos, const float effectLength) const override {
+		return getRimFraction(pos, effectLength);
+	}
 
 private:
 	Math::Vector3df center_{ 0.f, 0.f, 0.f };

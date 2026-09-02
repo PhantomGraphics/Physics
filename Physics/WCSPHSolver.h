@@ -126,6 +126,12 @@ public:
 		this->boundaryPlates_ = std::move(plates);
 	}
 
+	void setShapeBoundaries(std::vector<std::shared_ptr<IShapeBoundary>> boundaries,
+	                        const float timeStep) override {
+		(void)timeStep;
+		this->boundaryShapes_ = std::move(boundaries);
+	}
+
 	/**
 	 * @brief Sets how much of a particle's wall-normal velocity the domain
 	 * walls absorb on contact (see ISPHSolver::setBoundaryDampingRatio()).
@@ -240,6 +246,7 @@ private:
 	std::vector<PlaneBoundary> boundaryPlanes_;
 	std::vector<SphereBoundary> boundarySpheres_;
 	std::vector<PlateBoundary> boundaryPlates_;
+	std::vector<std::shared_ptr<IShapeBoundary>> boundaryShapes_;
 	// No boundaryTimeStep member on purpose: addBoundaryForce() uses timeStep,
 	// the step simulate() is integrating. See setBoundaryPlanes().
 	// 0 == the historical undamped penalty spring, so every existing scene

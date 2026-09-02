@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BoundaryPenalty.h"
+#include "IShapeBoundary.h"
 #include "CGLib/Math/Vector3d.h"
 #include "CGLib/Math/Box3d.h"
 
@@ -18,7 +19,7 @@ namespace Phantom {
  * so all three physics types share one implementation of the underlying math
  * instead of each keeping its own copy.
  */
-class PlaneBoundary
+class PlaneBoundary : public IShapeBoundary
 {
 public:
 	PlaneBoundary() = default;
@@ -39,7 +40,7 @@ public:
 	 * @param pos World-space position.
 	 * @return dot(normal, pos) - offset.
 	 */
-	float getSignedDistance(const Math::Vector3df& pos) const;
+	float getSignedDistance(const Math::Vector3df& pos) const override;
 
 	/**
 	 * @brief Penalty force pushing a penetrating position back to the valid side.
@@ -48,7 +49,7 @@ public:
 	 * @param timeStep Time step used to scale the repulsion force.
 	 * @return Zero if pos is on the valid side; otherwise a force along +normal.
 	 */
-	Math::Vector3df getBoundaryForce(const Math::Vector3df& pos, const float timeStep) const;
+	Math::Vector3df getBoundaryForce(const Math::Vector3df& pos, const float timeStep) const override;
 
 	/**
 	 * @brief Same penalty force, plus a damper on the wall-normal velocity
@@ -62,14 +63,14 @@ public:
 	 * @return Zero if pos is on the valid side; otherwise a force along +normal.
 	 */
 	Math::Vector3df getBoundaryForce(const Math::Vector3df& pos, const Math::Vector3df& velocity,
-	                                 const float timeStep, const float dampingRatio) const;
+	                                 const float timeStep, const float dampingRatio) const override;
 
 	/**
 	 * @brief Hard position correction: projects a penetrating position back onto the plane.
 	 * @param pos World-space position.
 	 * @return pos unchanged if valid; otherwise pos - signedDistance*normal.
 	 */
-	Math::Vector3df clampPosition(const Math::Vector3df& pos) const;
+	Math::Vector3df clampPosition(const Math::Vector3df& pos) const override;
 
 private:
 	Math::Vector3df normal{ 0.f, 1.f, 0.f };
