@@ -26,18 +26,18 @@ void FluidRenderer::setParticles(const std::vector<glm::vec3>& positions)
 {
     std::lock_guard<std::mutex> lock(mutex_);
     pendingPositions_ = positions;
-    pendingDensityRatios_.clear();
+    pendingDensityDeviations_.clear();
     pendingHasDensity_ = false;
     dirty_ = true;
 }
 
 void FluidRenderer::setParticles(const std::vector<glm::vec3>& positions,
-                                 const std::vector<float>& densityRatios)
+                                 const std::vector<float>& densityDeviations)
 {
     std::lock_guard<std::mutex> lock(mutex_);
     pendingPositions_ = positions;
-    pendingDensityRatios_ = densityRatios;
-    pendingHasDensity_ = densityRatios.size() == positions.size();
+    pendingDensityDeviations_ = densityDeviations;
+    pendingHasDensity_ = densityDeviations.size() == positions.size();
     dirty_ = true;
 }
 
@@ -116,7 +116,7 @@ void FluidRenderer::onUpdate(uint32_t frameIndex)
         std::lock_guard<std::mutex> lock(mutex_);
         if (dirty_) {
             uploadData = pendingPositions_;
-            densityData = pendingDensityRatios_;
+            densityData = pendingDensityDeviations_;
             uploadHasDensity = pendingHasDensity_;
             dirty_ = false;
             hasNewData = true;
@@ -179,17 +179,17 @@ void FluidRenderer::onImGui()
         ImGui::SliderFloat("Distance", &distance_, 5.0f, 300.0f);
     }
     if (ImGui::CollapsingHeader("Fluid Color Map")) {
-        ImGui::TextUnformatted(hasDensity_ ? "Quantity: Density / Rest Density"
+        ImGui::TextUnformatted(hasDensity_ ? "Quantity: (Density - Rest Density) / Rest Density"
                                            : "Quantity: unavailable (fixed color)");
-        ImGui::SliderFloat("Density Min", &densityRangeMin_, 0.5f, 1.5f, "%.3f");
-        ImGui::SliderFloat("Density Max", &densityRangeMax_, 0.5f, 1.5f, "%.3f");
+        ImGui::SliderFloat("Density Difference Min", &densityRangeMin_, -0.5f, 0.0f, "%.3f");
+        ImGui::SliderFloat("Density Difference Max", &densityRangeMax_, 0.0f, 0.5f, "%.3f");
         densityRangeMax_ = std::max(densityRangeMax_, densityRangeMin_ + 0.001f);
     }
     ImGui::End();
 }
 
 void FluidRenderer::uploadVertices(const std::vector<glm::vec3>& pts,
-                                   const std::vector<float>& densityRatios,
+                                   const std::vector<float>& densityDeviations,
                                    bool hasDensity)
 {
     pointCount_ = static_cast<uint32_t>(pts.size());
@@ -201,8 +201,8 @@ void FluidRenderer::uploadVertices(const std::vector<glm::vec3>& pts,
     std::vector<VkFluidVertex> vertices;
     vertices.reserve(pts.size());
     for (size_t i = 0; i < pts.size(); ++i) {
-        const float densityRatio = hasDensity ? densityRatios[i] : 1.0f;
-        vertices.push_back({ glm::vec4(pts[i], densityRatio) });
+        const float densityDeviation = hasDensity ? densityDeviations[i] : 0.0f;
+        vertices.push_back({ glm::vec4(pts[i], densityDeviation) });
     }
 
     vertexBuffer_.create(*ctx_, *pool_,

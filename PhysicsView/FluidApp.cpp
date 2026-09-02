@@ -427,16 +427,16 @@ void FluidApp::syncParticlesToRenderer()
     auto merged = fluidPositions;
     merged.insert(merged.end(), spray.begin(), spray.end());
     merged.insert(merged.end(), foam.begin(), foam.end());
-    std::vector<float> densityRatios;
-    densityRatios.reserve(merged.size());
+    std::vector<float> densityDeviations;
+    densityDeviations.reserve(merged.size());
     const float restDensity = world_.getActiveRestDensity();
     const float invRestDensity = restDensity > 0.0f ? 1.0f / restDensity : 0.0f;
     for (float density : fluidDensities) {
-        densityRatios.push_back(density * invRestDensity);
+        densityDeviations.push_back((density - restDensity) * invRestDensity);
     }
     // White-water particles do not carry SPH density; use the neutral value.
-    densityRatios.resize(merged.size(), 1.0f);
-    fluidRenderer_.setParticles(merged, densityRatios);
+    densityDeviations.resize(merged.size(), 0.0f);
+    fluidRenderer_.setParticles(merged, densityDeviations);
 }
 
 void FluidApp::syncGpuCsphBufferToRenderer()
