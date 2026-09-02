@@ -143,3 +143,17 @@ TEST(PlateBoundaryTest, IsActiveAtCoversTheInflatedFootprint)
   EXPECT_FALSE(plate.isActiveAt(Vector3df(0.0f, 0.0f, 0.20f), h));
   EXPECT_FALSE(plate.isActiveAt(Vector3df(0.40f, 0.0f, 0.0f), h));
 }
+
+TEST(PlateBoundaryTest, CommonSampleKeepsDistanceAndRimCoverageTogether)
+{
+  const PlateBoundary plate(Vector3df(0.0f), Vector3df(0.0f, 0.0f, 1.0f),
+                            Vector3df(1.0f, 0.0f, 0.0f), 1.0f, 1.0f, 0.1f);
+  const Vector3df nearRim(1.0f, 0.0f, 0.15f);
+
+  const auto sample = plate.sample(nearRim, 0.2f);
+
+  EXPECT_TRUE(sample.active);
+  EXPECT_NEAR(sample.signedDistance, plate.getSignedDistance(nearRim), 1.0e-6f);
+  EXPECT_NEAR(sample.densityDistance, plate.getFaceDistance(nearRim), 1.0e-6f);
+  EXPECT_NEAR(sample.densityWeight, 0.5f, 1.0e-6f);
+}

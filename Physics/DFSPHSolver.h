@@ -59,7 +59,7 @@ public:
 	 */
 	void setBoundary(const Math::Box3df& box, const float timeStep) override {
 		(void)timeStep;
-		this->boundaryPlanes_ = makeBoxPlaneBoundaries(box);
+		this->boundaryPlanes_ = ownShapeBoundaries(makeBoxPlaneBoundaries(box));
 	}
 
 	/**
@@ -75,17 +75,17 @@ public:
 	 */
 	void setBoundaryPlanes(std::vector<PlaneBoundary> planes, const float timeStep) override {
 		(void)timeStep;
-		this->boundaryPlanes_ = std::move(planes);
+		this->boundaryPlanes_ = ownShapeBoundaries(std::move(planes));
 	}
 
 	void setBoundarySpheres(std::vector<SphereBoundary> spheres, const float timeStep) override {
 		(void)timeStep;
-		boundarySpheres_ = std::move(spheres);
+		boundarySpheres_ = ownShapeBoundaries(std::move(spheres));
 	}
 
 	void setBoundaryPlates(std::vector<PlateBoundary> plates, const float timeStep) override {
 		(void)timeStep;
-		boundaryPlates_ = std::move(plates);
+		boundaryPlates_ = ownShapeBoundaries(std::move(plates));
 	}
 
 	void setShapeBoundaries(std::vector<std::shared_ptr<IShapeBoundary>> boundaries,
@@ -286,9 +286,9 @@ private:
 	// proportionally to the scene's length scale if radius moves away from
 	// that default (docs/todo/PLAN_sph_scale_invariance.md Phase 6).
 	float maxTimeStep;
-	std::vector<PlaneBoundary> boundaryPlanes_;
-	std::vector<SphereBoundary> boundarySpheres_;
-	std::vector<PlateBoundary> boundaryPlates_;
+	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlanes_;
+	std::vector<std::shared_ptr<IShapeBoundary>> boundarySpheres_;
+	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlates_;
 	std::vector<std::shared_ptr<IShapeBoundary>> boundaryShapes_;
 	// Duration requested by the current simulate() call. Used to average
 	// two-way reactions and to cap passive-wall recovery across substeps.

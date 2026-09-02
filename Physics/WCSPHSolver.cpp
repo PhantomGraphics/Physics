@@ -266,15 +266,14 @@ void WCSPHSolver::addBoundaryDensity(std::vector<WCSPHParticle>& particles)
 
 		float contribution = 0.0f;
 		auto addShapeDensity = [&](const IShapeBoundary& boundary) {
-			if (!boundary.isActiveAt(p.getPosition(), effectLength)) return;
-			const float d = boundary.getDensityDistance(p.getPosition());
-			if (d >= effectLength) return;
-			const float weight = boundary.getDensityWeight(p.getPosition(), effectLength);
-			if (weight > 0.0f)
-				contribution += restDensity * poly6HalfSpaceFraction(d, effectLength) * weight;
+			const auto sample = boundary.sample(p.getPosition(), effectLength);
+			if (!sample.active || sample.densityDistance >= effectLength) return;
+			if (sample.densityWeight > 0.0f)
+				contribution += restDensity * poly6HalfSpaceFraction(
+					sample.densityDistance, effectLength) * sample.densityWeight;
 		};
-		for (const auto& plane : boundaryPlanes_) addShapeDensity(plane);
-		for (const auto& sphere : boundarySpheres_) addShapeDensity(sphere);
+		for (const auto& plane : boundaryPlanes_) if (plane) addShapeDensity(*plane);
+		for (const auto& sphere : boundarySpheres_) if (sphere) addShapeDensity(*sphere);
 		// A finite plate contributes like a plane's half-space integral off its
 		// large (normal-facing) face, but tapered toward the rim: near an edge
 		// most of that half-space is air, not solid, so handing the particle a
@@ -283,7 +282,7 @@ void WCSPHSolver::addBoundaryDensity(std::vector<WCSPHParticle>& particles)
 		// same accumulator and subject to the one headroom clamp below, exactly
 		// like planes and spheres -- the clamp is what keeps overlapping plates
 		// at a 9-plate seam from summing past rest density.
-		for (const auto& plate : boundaryPlates_) addShapeDensity(plate);
+		for (const auto& plate : boundaryPlates_) if (plate) addShapeDensity(*plate);
 		for (const auto& shape : boundaryShapes_) if (shape) addShapeDensity(*shape);
 		// The wall stands in for the neighbors a particle is *missing* because
 		// the wall is where they would have been -- so it may only ever fill
@@ -327,14 +326,14 @@ void WCSPHSolver::addBoundaryForce(std::vector<WCSPHParticle>& particles) {
 		// simulate() has already set this to its own dt. See
 		// setBoundaryPlanes()'s doc comment in the header.
 		auto addShapeForce = [&](const IShapeBoundary& boundary) {
-			if (boundary.isActiveAt(pos, 0.0f))
+			if (boundary.sample(pos, 0.0f).active)
 				force += boundary.getBoundaryForce(pos, vel, timeStep, boundaryDampingRatio_);
 		};
-		for (const auto& plane : boundaryPlanes_) addShapeForce(plane);
-		for (const auto& sphere : boundarySpheres_) addShapeForce(sphere);
+		for (const auto& plane : boundaryPlanes_) if (plane) addShapeForce(*plane);
+		for (const auto& sphere : boundarySpheres_) if (sphere) addShapeForce(*sphere);
 		// isActiveAt(pos, 0) exactly bounds the plate's OBB; getBoundaryForce()
 		// still does the precise inside test, so this is only an early-out.
-		for (const auto& plate : boundaryPlates_) addShapeForce(plate);
+		for (const auto& plate : boundaryPlates_) if (plate) addShapeForce(*plate);
 		for (const auto& shape : boundaryShapes_) if (shape) addShapeForce(*shape);
 		particles[i].addForce(force * particles[i].getDensity());
 	}

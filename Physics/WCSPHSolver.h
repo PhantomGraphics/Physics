@@ -74,7 +74,7 @@ public:
 	 */
 	void setBoundary(const Math::Box3df& box, const float timeStep) override {
 		(void)timeStep;
-		this->boundaryPlanes_ = makeBoxPlaneBoundaries(box);
+		this->boundaryPlanes_ = ownShapeBoundaries(makeBoxPlaneBoundaries(box));
 	}
 
 	/**
@@ -93,7 +93,7 @@ public:
 	 */
 	void setBoundaryPlanes(std::vector<PlaneBoundary> planes, const float timeStep) override {
 		(void)timeStep;
-		this->boundaryPlanes_ = std::move(planes);
+		this->boundaryPlanes_ = ownShapeBoundaries(std::move(planes));
 	}
 
 	/**
@@ -111,7 +111,7 @@ public:
 	 */
 	void setBoundarySpheres(std::vector<SphereBoundary> spheres, const float timeStep) override {
 		(void)timeStep;
-		this->boundarySpheres_ = std::move(spheres);
+		this->boundarySpheres_ = ownShapeBoundaries(std::move(spheres));
 	}
 
 	/**
@@ -124,7 +124,7 @@ public:
 	 */
 	void setBoundaryPlates(std::vector<PlateBoundary> plates, const float timeStep) override {
 		(void)timeStep;
-		this->boundaryPlates_ = std::move(plates);
+		this->boundaryPlates_ = ownShapeBoundaries(std::move(plates));
 	}
 
 	void setShapeBoundaries(std::vector<std::shared_ptr<IShapeBoundary>> boundaries,
@@ -251,9 +251,9 @@ public:
 private:
 	std::vector<WCSPHFluid*> fluids;
 	Math::Vector3df externalForce;
-	std::vector<PlaneBoundary> boundaryPlanes_;
-	std::vector<SphereBoundary> boundarySpheres_;
-	std::vector<PlateBoundary> boundaryPlates_;
+	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlanes_;
+	std::vector<std::shared_ptr<IShapeBoundary>> boundarySpheres_;
+	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlates_;
 	std::vector<std::shared_ptr<IShapeBoundary>> boundaryShapes_;
 	// No boundaryTimeStep member on purpose: addBoundaryForce() uses timeStep,
 	// the step simulate() is integrating. See setBoundaryPlanes().

@@ -375,12 +375,13 @@ void DFSPHSolver::addBoundaryDensity(std::vector<DFSPHParticle>& particles)
 		// former nearest-point-on-box distance -- an accepted approximation of
 		// decomposing the box into 6 independent half-spaces.
 		auto addShapeConstraint = [&](const IShapeBoundary& boundary) {
-			if (!boundary.isActiveAt(pos, r)) return;
-			const float dist = -boundary.getSignedDistance(pos);
+			const auto sample = boundary.sample(pos, r);
+			if (!sample.active) return;
+			const float dist = -sample.signedDistance;
 			if (dist <= 0.0f || dist >= r) return;
 
 			// boundary density contribution: rest * (1 - d/r) * kernel(d)
-			const float weight = boundary.getDensityWeight(pos, r);
+			const float weight = sample.densityWeight;
 			if (weight <= 0.0f) return;
 			const float contribution = restDensity * weight * (1.0f - dist / r) * kernel->getCubicSpline(dist);
 			p.addDensity(contribution);
@@ -396,9 +397,9 @@ void DFSPHSolver::addBoundaryDensity(std::vector<DFSPHParticle>& particles)
 					kernel->getCubicSplineGradient(direction * dist) * restDensity * weight);
 			}
 		};
-		for (const auto& plane : boundaryPlanes_) addShapeConstraint(plane);
-		for (const auto& sphere : boundarySpheres_) addShapeConstraint(sphere);
-		for (const auto& plate : boundaryPlates_) addShapeConstraint(plate);
+		for (const auto& plane : boundaryPlanes_) if (plane) addShapeConstraint(*plane);
+		for (const auto& sphere : boundarySpheres_) if (sphere) addShapeConstraint(*sphere);
+		for (const auto& plate : boundaryPlates_) if (plate) addShapeConstraint(*plate);
 		for (const auto& shape : boundaryShapes_) if (shape) addShapeConstraint(*shape);
 	}
 }
@@ -420,10 +421,9 @@ namespace {
 // and neither binds during an ordinary single-step impact.
 Vector3df clampToPassiveWall(const Vector3df& penaltyAcceleration, const IShapeBoundary& boundary,
                              const Vector3df& position, const Vector3df& velocity,
-                             const float dt, const float frameStep)
+	                         const float signedDistance, const float dt, const float frameStep)
 {
-	const float d = boundary.getSignedDistance(position);
-	if (d >= 0.0f) return penaltyAcceleration;
+	if (signedDistance >= 0.0f) return penaltyAcceleration;
 
 	const auto correction = boundary.clampPosition(position) - position;
 	const float correctionLength = glm::length(correction);
@@ -431,7 +431,7 @@ Vector3df clampToPassiveWall(const Vector3df& penaltyAcceleration, const IShapeB
 	const auto normal = correction / correctionLength;
 	const float normalVelocity = glm::dot(normal, velocity);
 	const float stopInward = (normalVelocity < 0.0f) ? -normalVelocity : 0.0f;
-	const float recovery   = (frameStep > 0.0f) ? (-d / frameStep) : 0.0f;
+	const float recovery   = (frameStep > 0.0f) ? (-signedDistance / frameStep) : 0.0f;
 	const float maxAcceleration = (stopInward + recovery) / dt;
 
 	const float magnitude = glm::length(penaltyAcceleration);
@@ -478,15 +478,16 @@ void DFSPHSolver::addBoundaryPressure(std::vector<DFSPHParticle>& particles, con
 		auto& p = particles[i];
 		Vector3df force(0.0f, 0.0f, 0.0f);
 		auto addShapeForce = [&](const IShapeBoundary& boundary) {
-			if (!boundary.isActiveAt(p.getPosition(), 0.0f)) return;
+			const auto sample = boundary.sample(p.getPosition(), 0.0f);
+			if (!sample.active) return;
 			const auto penalty = boundary.getBoundaryForce(p.getPosition(), p.getVelocity(),
 			                                                   dt, boundaryDampingRatio_);
 			force += clampToPassiveWall(penalty, boundary, p.getPosition(), p.getVelocity(),
-			                            dt, frameTimeStep_);
+			                            sample.signedDistance, dt, frameTimeStep_);
 		};
-		for (const auto& plane : boundaryPlanes_) addShapeForce(plane);
-		for (const auto& sphere : boundarySpheres_) addShapeForce(sphere);
-		for (const auto& plate : boundaryPlates_) addShapeForce(plate);
+		for (const auto& plane : boundaryPlanes_) if (plane) addShapeForce(*plane);
+		for (const auto& sphere : boundarySpheres_) if (sphere) addShapeForce(*sphere);
+		for (const auto& plate : boundaryPlates_) if (plate) addShapeForce(*plate);
 		for (const auto& shape : boundaryShapes_) if (shape) addShapeForce(*shape);
 		p.addForce(force * p.getMass());
 	}
