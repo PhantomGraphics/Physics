@@ -9,6 +9,8 @@
 #include "CGLib/Space/Space/NeighborList.h"
 
 
+#include <algorithm>
+#include <cmath>
 #include <iostream>
 
 using namespace Phantom::Math;
@@ -18,6 +20,11 @@ using namespace Phantom::Physics;
 PBSPHSolver::PBSPHSolver() :
 	maxTimeStep(0.01f)
 {}
+
+void PBSPHSolver::setEffectLength(const float length)
+{
+	for (auto* fluid : fluids) fluid->setEffectLength(length);
+}
 
 SPHKernel* PBSPHSolver::getKernel()
 {
@@ -78,6 +85,38 @@ void PBSPHSolver::step()
 void PBSPHSolver::simulate(const float dt, const int maxIter)
 {
 	ensurePassiveOpenMPWaitPolicy();
+	lastSolveStats_ = {};
+
+	if (fluids.empty()) return;
+	if (!std::isfinite(dt) || dt <= 0.0f || maxIter <= 0) {
+		lastSolveStats_.validConfiguration = false;
+		return;
+	}
+
+	// Reject an unset/garbage kernel instead of feeding it to the neighbor
+	// search: effectLength stays 0.f until setEffectLength() is called, so a
+	// caller that forgets it gets an inert (no-op) solver rather than UB
+	// (mirrors WCSPHSolver/DFSPHSolver; internal design notes Phase 5).
+	SPHKernel* frontKernel = fluids.front()->getKernel();
+	const float commonEffectLength = (frontKernel != nullptr) ? frontKernel->getEffectLength() : 0.0f;
+	const float commonRestDensity  = fluids.front()->getRestDensity();
+	if (frontKernel == nullptr || !std::isfinite(commonEffectLength) || commonEffectLength <= 0.0f) {
+		lastSolveStats_.validConfiguration = false;
+		return;
+	}
+	// Every registered fluid must share the same kernel support radius and rest
+	// density (mirrors DFSPHSolver): the single neighbor search and the shared
+	// lambda calibration below assume one consistent SPH scale.
+	for (auto* fluid : fluids) {
+		if (!fluid || !fluid->getKernel() ||
+		    std::abs(fluid->getKernel()->getEffectLength() - commonEffectLength) >
+		        std::max(1.0e-6f, std::abs(commonEffectLength) * 1.0e-5f) ||
+		    std::abs(fluid->getRestDensity() - commonRestDensity) >
+		        std::max(1.0e-6f, std::abs(commonRestDensity) * 1.0e-5f)) {
+			lastSolveStats_.validConfiguration = false;
+			return;
+		}
+	}
 
 	std::vector<PBSPHParticle> particles;
 	std::vector<bool> isStaticMask;
@@ -89,6 +128,8 @@ void PBSPHSolver::simulate(const float dt, const int maxIter)
 			isStaticMask.push_back(staticFluid);
 		}
 	}
+
+	if (particles.empty()) return;
 
 	for (auto& p : particles) {
 		p.init();
@@ -157,6 +198,10 @@ void PBSPHSolver::simulate(const float dt, const int maxIter)
 		this->addBoundaryParticleConstraintGradient(particles, rigidBoundaryParticles_);
 		this->addBoundaryParticleConstraintGradient(particles, softBoundaryParticles_);
 
+		// Analytic non-plane shapes (spheres): adds the paired density +
+		// constraint-gradient contribution in one pass, before calculateLambda().
+		this->addShapeBoundaryConstraint(particles);
+
 		for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
 			particles[i].calculateLambda();
 		}
@@ -212,6 +257,15 @@ void PBSPHSolver::simulate(const float dt, const int maxIter)
 	}
 	//std::cout << densityError << std::endl;
 
+	// Single-step position-based solve: exactly one "substep" advancing the
+	// full requested dt. The maxIter incompressibility-constraint iterations
+	// are the PBSPH counterpart of DFSPH's density-projection sweeps, so they
+	// go in densityIterations; divergenceIterations stays 0 (no separate
+	// divergence solve) and converged stays true (no residual tolerance check).
+	lastSolveStats_.substeps = 1;
+	lastSolveStats_.advancedTime = dt;
+	lastSolveStats_.densityIterations = maxIter;
+
 	/*
 	for (auto fluid : fluids) {
 		fluid->getPresenter()->updateView();
@@ -237,7 +291,7 @@ float PBSPHSolver::calculateTimeStep(const std::vector<PBSPHParticle>& particles
 
 void PBSPHSolver::addBoundadryPressure(std::vector<PBSPHParticle>& particles)
 {
-	if (boundaryPlanes_.empty()) {
+	if (!hasShapeBoundaries()) {
 		return;
 	}
 	// getBoundaryForce returns -over / dt^2 per axis. Multiplying by dt^2
@@ -259,11 +313,18 @@ void PBSPHSolver::addBoundadryPressure(std::vector<PBSPHParticle>& particles)
 	// shrinks between iterations and the same full correction gets re-added
 	// every iteration, amplifying the correction by ~maxIter.
 	const float dt2 = maxTimeStep * maxTimeStep;
+	const std::vector<std::shared_ptr<IShapeBoundary>>* lists[] = {
+		&boundaryPlanes_, &boundarySpheres_, &boundaryPlates_, &boundaryShapes_
+	};
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
+		const auto pos = particles[i].getPredictPosition();
 		Vector3df force(0.0f, 0.0f, 0.0f);
-		for (const auto& plane : boundaryPlanes_) {
-			force += plane.getBoundaryForce(particles[i].getPredictPosition(), maxTimeStep);
+		for (const auto* list : lists) {
+			for (const auto& shape : *list) {
+				if (!shape) continue;
+				force += shape->getBoundaryForce(pos, maxTimeStep);
+			}
 		}
 		particles[i].addPositionCorrection(force * dt2);
 	}
@@ -271,16 +332,78 @@ void PBSPHSolver::addBoundadryPressure(std::vector<PBSPHParticle>& particles)
 
 void PBSPHSolver::clampToBoundary(std::vector<PBSPHParticle>& particles)
 {
-	if (boundaryPlanes_.empty()) {
+	if (!hasShapeBoundaries()) {
 		return;
 	}
+	const std::vector<std::shared_ptr<IShapeBoundary>>* lists[] = {
+		&boundaryPlanes_, &boundarySpheres_, &boundaryPlates_, &boundaryShapes_
+	};
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
 		auto pos = particles[i].getPredictPosition();
-		for (const auto& plane : boundaryPlanes_) {
-			pos = plane.clampPosition(pos);
+		for (const auto* list : lists) {
+			for (const auto& shape : *list) {
+				if (!shape) continue;
+				pos = shape->clampPosition(pos);
+			}
 		}
 		particles[i].setPredictPosition(pos);
+	}
+}
+
+// See the header doc comment. Mirrors DFSPHSolver::addBoundaryDensity()'s
+// analytic-shape branch (numerator + denominator from one sample()), translated
+// to PBSPH's Poly6 kernel and constraint-gradient accumulators. The pseudo
+// boundary "particle" is weighted by the fluid particle's own mass -- the same
+// convention the discrete boundary-particle path uses via bp.psi -- so the
+// contribution is on the scale of one fluid neighbour rather than a raw
+// restDensity spike.
+void PBSPHSolver::addShapeBoundaryConstraint(std::vector<PBSPHParticle>& particles)
+{
+	if (!hasShapeBoundaries() || particles.empty()) return;
+
+	const std::vector<std::shared_ptr<IShapeBoundary>>* lists[] = {
+		&boundaryPlanes_, &boundarySpheres_, &boundaryPlates_, &boundaryShapes_
+	};
+#pragma omp parallel for
+	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
+		auto& p = particles[i];
+		PBSPHFluid* fluid = p.getFluid();
+		if (fluid == nullptr) continue;
+		SPHKernel* kernel = fluid->getKernel();
+		if (kernel == nullptr) continue;
+
+		const float r = kernel->getEffectLength();
+		if (r <= 0.0f) continue;
+		const float pseudoMass = p.getMass();
+		const auto pos = p.getPredictPosition();
+
+		auto addShape = [&](const IShapeBoundary& boundary) {
+			const auto sample = boundary.sample(pos, r);
+			if (!sample.active) return;
+			const float dist = -sample.signedDistance;   // penetration depth past the wall
+			if (dist <= 0.0f || dist >= r) return;
+			const float weight = sample.densityWeight;
+			if (weight <= 0.0f) return;
+
+			// numerator: the wall stands in for missing fluid on its far side.
+			p.addDensity(pseudoMass * weight * (1.0f - dist / r) * kernel->getPoly6Kernel(dist));
+
+			// denominator: the matching constraint-gradient term, along the
+			// shortest correction back onto the valid side of the shape.
+			const auto correction = boundary.clampPosition(pos) - pos;
+			const float correctionLength = glm::length(correction);
+			if (correctionLength > 1.0e-8f) {
+				const auto direction = correction / correctionLength;
+				p.addConstraintGradient(
+					kernel->getPoly6KernelGradient(direction * dist) * pseudoMass * weight);
+			}
+		};
+		for (const auto* list : lists) {
+			for (const auto& shape : *list) {
+				if (shape) addShape(*shape);
+			}
+		}
 	}
 }
 

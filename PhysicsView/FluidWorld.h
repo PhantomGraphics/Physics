@@ -148,8 +148,8 @@ public:
 
     // Rigid-Fluid coupling (internal design notes): dispatches
     // to whichever solver is currently active. Track A (SDF penalty, one-way)
-    // is supported by every CPU solver (DFSPH/PBSPH/CSPH); Track B
-    // (boundary particles, two-way) only by DFSPH/PBSPH. GPU_CSPH supports
+    // is supported by every CPU solver (WCSPH/DFSPH/PBSPH); Track B
+    // (boundary particles, two-way) by WCSPH/DFSPH/PBSPH. GPU_CSPH supports
     // neither (no CPU solver instance to register with) -- these calls are a
     // silent no-op for it, so callers should check supportsOneWayCoupling()/
     // supportsTwoWayCoupling() before relying on registration having taken effect.
@@ -190,7 +190,7 @@ public:
     }
 
     // ---- Sphere boundary (internal design notes) ----
-    // Supported by WCSPH and DFSPH (PBSPH inherits the no-op default).
+    // Supported by WCSPH, DFSPH and PBSPH.
     // Unlike addRigidBoundary()/loadMeshBoundary(),
     // which register non-owning pointers directly on the solver,
     // setBoundarySpheres() takes its whole list by value each call, so this

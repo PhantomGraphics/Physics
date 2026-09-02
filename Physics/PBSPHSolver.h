@@ -1,11 +1,15 @@
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include "CGLib/Math/Vector3d.h"
 #include "CGLib/Math/Box3d.h"
 #include "CGLib/Util/UnCopyable.h"
 #include "PlaneBoundary.h"
+#include "SphereBoundary.h"
+#include "PlateBoundary.h"
+#include "IShapeBoundary.h"
 #include "RigidBoundary.h"
 #include "RigidBoundaryParticles.h"
 #include "SoftBoundaryParticles.h"
@@ -39,9 +43,12 @@ public:
 	void add(PBSPHFluid* fluid) { this->fluids.push_back(fluid); }
 
 	/**
-	 * @brief Advances the simulation by one step.
-	 * @param dt      Desired time step (seconds).
-	 * @param maxIter Maximum number of constraint projection iterations.
+	 * @brief Advances all registered fluids by the requested frame duration.
+	 * @param dt      Frame duration to advance (seconds). PBSPH integrates this
+	 *                in a single position-based step -- it does not split dt into
+	 *                adaptive substeps, so setMaxSubstep()/setTimeStep() do not
+	 *                bound it (see setTimeStep()).
+	 * @param maxIter Number of incompressibility-constraint projection iterations.
 	 */
 	void simulate(const float dt, const int maxIter) override;
 
@@ -58,7 +65,11 @@ public:
 	 *      the density-driven predictPosition update. Cheap extra insurance
 	 *      against tunneling through a wall in one step; not load-bearing
 	 *      for ordinary contact once (3) below is in place.
-	 *   3. PBSPHParticle::calculateLambda()'s lambda clamp is what actually
+	 *   3. addShapeBoundaryConstraint(): the paired boundary density /
+	 *      constraint-gradient contribution -- the box planes go through the
+	 *      same analytic-shape path as spheres and plates, so lambda near a
+	 *      wall is calibrated for the fluid the wall stands in for.
+	 *   4. PBSPHParticle::calculateLambda()'s lambda clamp is what actually
 	 *      makes (1) safe to apply at full strength. This was investigated
 	 *      at length (internal design notes,
 	 *      "problem B"): a dam break settling against a wall diverged to the
@@ -76,7 +87,7 @@ public:
 	 */
 	void setBoundary(const Math::Box3df& box, const float timeStep) override {
 		this->boundaryTimeStep = timeStep;
-		this->boundaryPlanes_ = makeBoxPlaneBoundaries(box);
+		this->boundaryPlanes_ = ownShapeBoundaries(makeBoxPlaneBoundaries(box));
 	}
 
 	/**
@@ -86,7 +97,57 @@ public:
 	 */
 	void setBoundaryPlanes(std::vector<PlaneBoundary> planes, const float timeStep) override {
 		this->boundaryTimeStep = timeStep;
-		this->boundaryPlanes_ = std::move(planes);
+		this->boundaryPlanes_ = ownShapeBoundaries(std::move(planes));
+	}
+
+	/**
+	 * @brief Sets additional solid-sphere container walls, on top of (not
+	 * instead of) the box/plane boundary.
+	 * @param spheres  Sphere boundaries; valid region is the union interior of all of them.
+	 * @param timeStep Time step used to scale the repulsion force.
+	 */
+	void setBoundarySpheres(std::vector<SphereBoundary> spheres, const float timeStep) override {
+		this->boundaryTimeStep = timeStep;
+		this->boundarySpheres_ = ownShapeBoundaries(std::move(spheres));
+	}
+
+	/**
+	 * @brief Sets additional finite-plate container walls, on top of (not
+	 * instead of) the box/plane boundary.
+	 * @param plates   Finite plate boundaries; each plate's valid region is its exterior.
+	 * @param timeStep Time step used to scale the repulsion force.
+	 */
+	void setBoundaryPlates(std::vector<PlateBoundary> plates, const float timeStep) override {
+		this->boundaryTimeStep = timeStep;
+		this->boundaryPlates_ = ownShapeBoundaries(std::move(plates));
+	}
+
+	/**
+	 * @brief Registers arbitrary analytic boundaries through their common
+	 * interface. Evaluated through the exact same penalty / hard-clamp /
+	 * paired-density-and-constraint-gradient path as the typed
+	 * setBoundaryPlanes()/setBoundarySpheres()/setBoundaryPlates() lists, so a
+	 * given shape behaves identically however it was registered.
+	 * @param boundaries Analytic boundaries to own.
+	 * @param timeStep   Time step used to scale the repulsion force.
+	 */
+	void setShapeBoundaries(std::vector<std::shared_ptr<IShapeBoundary>> boundaries,
+	                        const float timeStep) override {
+		this->boundaryTimeStep = timeStep;
+		this->boundaryShapes_ = std::move(boundaries);
+	}
+
+	/** Adds one analytic boundary without replacing those already registered. */
+	void addShapeBoundary(std::shared_ptr<IShapeBoundary> boundary) override {
+		if (boundary) boundaryShapes_.push_back(std::move(boundary));
+	}
+
+	/** Clears every analytic boundary registered through typed or generic APIs. */
+	void clearShapeBoundaries() override {
+		boundaryPlanes_.clear();
+		boundarySpheres_.clear();
+		boundaryPlates_.clear();
+		boundaryShapes_.clear();
 	}
 
 	/**
@@ -175,10 +236,26 @@ public:
 	void setExternalForce(const Math::Vector3df& force) override { this->externalForce = force; }
 
 	/**
-	 * @brief Sets the maximum allowed time step.
-	 * @param dt Maximum time step (seconds).
+	 * @brief Sets the time step used to convert boundary penalty accelerations
+	 * into position corrections.
+	 *
+	 * Unlike WCSPH/DFSPH this is NOT an adaptive-substep ceiling: PBSPH advances
+	 * simulate()'s dt in a single position-based step. maxTimeStep only feeds the
+	 * dt^2 factor in addBoundadryPressure()/addRigidBoundaryPressure(), so with
+	 * no analytic/rigid boundary registered it has no effect on the result.
+	 * @param dt Time step (seconds).
 	 */
 	void setTimeStep(const float dt) override { this->maxTimeStep = dt; }
+	/** Explicit alias for setTimeStep(); see the note there on why PBSPH has no
+	 *  actual adaptive substep. */
+	void setMaxSubstep(const float dt) override { setTimeStep(dt); }
+
+	/** Applies the kernel support radius to every fluid currently registered. */
+	void setEffectLength(const float length) override;
+
+	/** @brief Returns diagnostics for the most recent simulate() call
+	 *  (mirrors DFSPHSolver/WCSPHSolver). */
+	SPHSolveStats getLastSolveStats() const override { return lastSolveStats_; }
 
 	/**
 	 * @brief Returns the SPH kernel of the first registered fluid.
@@ -209,6 +286,14 @@ private:
 	// normally overwritten via setTimeStep()).
 	float maxTimeStep;
 
+	// Diagnostics for the most recent simulate() call, reset at its start.
+	// PBSPH is a single-step position-based solver, so on a valid solve
+	// substeps == 1 and advancedTime == the requested dt; the maxIter
+	// incompressibility-constraint iterations are counted into
+	// densityIterations, divergenceIterations stays 0 (no separate divergence
+	// solve), and converged stays true (PBSPH has no residual tolerance check).
+	SPHSolveStats lastSolveStats_;
+
 	float calculateTimeStep(const std::vector<PBSPHParticle>& particles);
 
 	/**
@@ -226,9 +311,41 @@ private:
 	 */
 	void clampToBoundary(std::vector<PBSPHParticle>& particles);
 
+	/**
+	 * @brief For every registered analytic shape boundary (planes, spheres,
+	 * plates and generic shapes alike), adds -- from a single
+	 * IShapeBoundary::sample() -- both the boundary's contribution to each
+	 * penetrating fluid particle's density (the PBF constraint numerator) and
+	 * the matching constraint-gradient contribution (its denominator). The two
+	 * must be added together: a density excess with no matching gradient term
+	 * drives calculateLambda() unstable. Call once per iteration, after the
+	 * fluid-fluid and boundary-particle gradient passes and before calculateLambda().
+	 */
+	void addShapeBoundaryConstraint(std::vector<PBSPHParticle>& particles);
+
+	/** True while at least one analytic shape boundary of any kind is registered. */
+	bool hasShapeBoundaries() const {
+		return !boundaryPlanes_.empty() || !boundarySpheres_.empty() ||
+		       !boundaryPlates_.empty() || !boundaryShapes_.empty();
+	}
+
 	void addRigidBoundaryPressure(std::vector<PBSPHParticle>& particles);
 
-	std::vector<PlaneBoundary> boundaryPlanes_;
+	// Owned polymorphic copies of the domain container's walls (currently only
+	// PlaneBoundary is registered here -- Sphere/Plate/generic shape support is
+	// a later change unit). std::shared_ptr<IShapeBoundary> to match
+	// WCSPHSolver/DFSPHSolver's ownership model so the same registration and
+	// iteration structure can be reused.
+	// Owned polymorphic copies of the domain container's analytic walls, kept in
+	// four lists so each typed setter (and clearShapeBoundaries()) can replace
+	// exactly its own kind -- mirrors WCSPHSolver/DFSPHSolver. All four are
+	// evaluated through the identical penalty / hard-clamp / paired
+	// density-and-constraint-gradient path (addBoundadryPressure(),
+	// clampToBoundary(), addShapeBoundaryConstraint()).
+	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlanes_;
+	std::vector<std::shared_ptr<IShapeBoundary>> boundarySpheres_;
+	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlates_;
+	std::vector<std::shared_ptr<IShapeBoundary>> boundaryShapes_;
 	// Fallback used only before setBoundary()/setBoundaryPlanes() is called
 	// (both overwrite it); see DFSPHSolver.h's identical field for the
 	// default-scene calibration note.

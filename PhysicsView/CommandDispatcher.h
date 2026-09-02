@@ -74,9 +74,9 @@ namespace Phantom {
     // resulting per-frame particle positions as PLY. ----
     //
     // "AddBoundarySphere:cx,cy,cz,radius,maxPenetration"/"ClearBoundarySpheres"/
-    // "GetBoundarySphereCount" drive FluidWorld::addBoundarySphere() (WCSPH
-    // only -- ISPHSolver::setBoundarySpheres() defaults to a no-op for
-    // DFSPH/PBSPH, see SphereBoundary.h).
+    // "GetBoundarySphereCount" drive FluidWorld::addBoundarySphere()
+    // (ISPHSolver::setBoundarySpheres() is implemented by WCSPH/DFSPH/PBSPH; a
+    // no-op only for GPU_CSPH, see SphereBoundary.h).
     //
     // "AddFluidSourceBox:xmin,ymin,zmin,xmax,ymax,zmax"/
     // "AddFluidSourceSphere:cx,cy,cz,radius"/"ClearFluidSources"/

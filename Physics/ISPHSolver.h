@@ -19,11 +19,14 @@ class SoftBoundaryParticles;
 class SPHKernel;
 
 struct SPHSolveStats {
-	/** Number of integration substeps completed by the last simulate() call. */
+	/** Number of integration substeps completed by the last simulate() call.
+	 *  1 for the single-step solvers (PBSPH, WCSPH); >=1 for DFSPH's adaptive substepping. */
 	int substeps = 0;
-	/** Total DFSPH density-projection iterations; zero for non-iterative solvers. */
+	/** Total constraint-projection iterations: DFSPH density-projection sweeps,
+	 *  or PBSPH incompressibility-constraint iterations; zero for non-iterative solvers (WCSPH). */
 	int densityIterations = 0;
-	/** Total DFSPH divergence-projection iterations; zero where unsupported. */
+	/** Total DFSPH divergence-projection iterations; zero where the solver has
+	 *  no separate divergence solve (PBSPH, WCSPH). */
 	int divergenceIterations = 0;
 	/** Simulation time actually advanced by the last simulate() call. */
 	float advancedTime = 0.0f;
@@ -35,7 +38,7 @@ struct SPHSolveStats {
 
 /**
  * @brief Common interface implemented by the CPU SPH fluid solvers
- * (DFSPHSolver, PBSPHSolver, CSPHSolver).
+ * (WCSPHSolver, DFSPHSolver, PBSPHSolver, CSPHSolver).
  *
  * Before this interface existed, each solver had its own simulate() arity
  * (DFSPHSolver::simulate(searchRadius, maxIter), PBSPHSolver::simulate(dt,
@@ -46,9 +49,11 @@ struct SPHSolveStats {
  * RigidBoundary(Particles) coupling calls so those callers can hold a single
  * `std::unique_ptr<ISPHSolver>` instead.
  *
- * Two-Way (Track B, RigidBoundaryParticles) coupling is only implemented by
- * DFSPH/PBSPH, so those two methods default to a no-op rather than being
- * pure virtual -- CSPH simply inherits the no-op.
+ * Two-Way (Track B, RigidBoundaryParticles) coupling is implemented by
+ * WCSPH/DFSPH/PBSPH; the boundary-particle methods default to a no-op rather
+ * than being pure virtual so CSPH simply inherits that no-op. The analytic
+ * shape boundaries (setBoundarySpheres()/setBoundaryPlates()/
+ * setShapeBoundaries()) are likewise implemented by WCSPH/DFSPH/PBSPH.
  */
 class ISPHSolver
 {
@@ -104,8 +109,9 @@ public:
 	 * "water sphere" showcase's closed spherical container). These are on top
 	 * of, not instead of, the box/plane boundary from setBoundary()/
 	 * setBoundaryPlanes() -- a fluid solver still requires a domain box.
-	 * No-op where unsupported. WCSPH and DFSPH implement this; DFSPH adds the
-	 * matching alpha-gradient term whenever it adds boundary density.
+	 * No-op where unsupported. WCSPH, DFSPH and PBSPH implement this; the
+	 * constraint solvers (DFSPH, PBSPH) add the matching alpha- / constraint-
+	 * gradient term whenever they add boundary density.
 	 * @param spheres Sphere boundaries; valid region is the union interior of all of them.
 	 * @param timeStep Time step used to scale the repulsion force.
 	 */
@@ -115,8 +121,7 @@ public:
 	 * @brief Sets additional finite-plate container walls (the "waterfall"
 	 * showcase's channel floor, weir, cliff face and rock shelves). Like
 	 * setBoundarySpheres(), these are on top of -- not instead of -- the
-	 * box/plane boundary. WCSPH and DFSPH implement this; PBSPH retains the
-	 * default no-op until it has a matching constraint-gradient formulation.
+	 * box/plane boundary. WCSPH, DFSPH and PBSPH implement this.
 	 * @param plates   Finite plate boundaries; each plate's valid region is its exterior.
 	 * @param timeStep Ignored -- see setBoundaryPlanes().
 	 */

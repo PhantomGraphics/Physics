@@ -8,7 +8,11 @@ using namespace Phantom::Math;
 using namespace Phantom::Physics;
 
 PBSPHFluid::PBSPHFluid() :
-	kernel(1.0f),
+	// Default-constructed kernel: effectLength stays 0.f until setEffectLength()
+	// is called, matching WCSPHFluid/DFSPHFluid so that PBSPHSolver::simulate()
+	// treats a fluid whose support radius was never set as an inert no-op rather
+	// than silently running with h == 1 (see docs/guide/conventions.md and
+	// PBSPHSolver::simulate()'s configuration check).
 	restDensity(1.0f),
 	stiffness(0.05f),
 	viscosity(0.1f),
