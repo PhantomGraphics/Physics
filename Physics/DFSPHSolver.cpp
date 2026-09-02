@@ -61,10 +61,30 @@ void DFFluidSolver::step()
 void DFSPHSolver::simulate(const float dt, const int maxIter)
 {
 	ensurePassiveOpenMPWaitPolicy();
-	if (!std::isfinite(dt) || dt <= 0.0f || maxIter <= 0 || fluids.empty()) return;
+	lastSolveStats_ = {};
+	if (fluids.empty()) return;
+	if (!std::isfinite(dt) || dt <= 0.0f || maxIter <= 0) {
+		lastSolveStats_.validConfiguration = false;
+		return;
+	}
 	frameTimeStep_ = dt;
 	if (fluids.front()->getKernel() == nullptr ||
-	    fluids.front()->getKernel()->getEffectLength() <= 0.0f) return;
+	    fluids.front()->getKernel()->getEffectLength() <= 0.0f) {
+		lastSolveStats_.validConfiguration = false;
+		return;
+	}
+	const float commonEffectLength = fluids.front()->getKernel()->getEffectLength();
+	const float commonDensity = fluids.front()->getDensity();
+	for (auto* fluid : fluids) {
+		if (!fluid || !fluid->getKernel() ||
+		    std::abs(fluid->getKernel()->getEffectLength() - commonEffectLength) >
+		        std::max(1.0e-6f, std::abs(commonEffectLength) * 1.0e-5f) ||
+		    std::abs(fluid->getDensity() - commonDensity) >
+		        std::max(1.0e-6f, std::abs(commonDensity) * 1.0e-5f)) {
+			lastSolveStats_.validConfiguration = false;
+			return;
+		}
+	}
 
 	std::vector<DFSPHParticle> particles;
 	for (auto fluid : fluids) {
@@ -115,12 +135,8 @@ void DFSPHSolver::simulate(const float dt, const int maxIter)
 		particles[i].calculateAlpha(particles, neighborIndices[i]);
 	}
 	this->addBoundaryDensity(particles);
-	this->addBoundaryParticleDensity(particles, rigidBoundaryParticles_);
-	this->addBoundaryParticleDensity(particles, softBoundaryParticles_);
-	// Must accompany every addBoundaryParticleDensity() call: numerator and
-	// denominator of the same constraint (see addBoundaryParticleAlpha()).
-	this->addBoundaryParticleAlpha(particles, rigidBoundaryParticles_);
-	this->addBoundaryParticleAlpha(particles, softBoundaryParticles_);
+	this->addBoundaryParticleConstraintTerms(particles, rigidBoundaryParticles_);
+	this->addBoundaryParticleConstraintTerms(particles, softBoundaryParticles_);
 
 	auto time = 0.0f;
 	while (time < dt) {
@@ -144,6 +160,7 @@ void DFSPHSolver::simulate(const float dt, const int maxIter)
 
 		auto dt = calculateTimeStep(particles);
         if (!std::isfinite(dt) || dt <= 0.0f) {
+			lastSolveStats_.converged = false;
 			break;
 		}
 		// Land exactly on the caller's frame dt instead of overshooting it. The CFL
@@ -197,14 +214,14 @@ void DFSPHSolver::simulate(const float dt, const int maxIter)
 			particles[i].calculateAlpha(particles, neighborIndices[i]);
 		}
 		this->addBoundaryDensity(particles);
-		this->addBoundaryParticleDensity(particles, rigidBoundaryParticles_);
-		this->addBoundaryParticleDensity(particles, softBoundaryParticles_);
-		this->addBoundaryParticleAlpha(particles, rigidBoundaryParticles_);
-		this->addBoundaryParticleAlpha(particles, softBoundaryParticles_);
+		this->addBoundaryParticleConstraintTerms(particles, rigidBoundaryParticles_);
+		this->addBoundaryParticleConstraintTerms(particles, softBoundaryParticles_);
 
 		correctDivergenceError(particles, neighborIndices, dt, maxIter);
 		time += dt;
+		lastSolveStats_.substeps++;
 	}
+	lastSolveStats_.advancedTime = time;
 
 	auto densityError = 0.0;
 	for (auto& particle : particles) {
@@ -230,6 +247,8 @@ void DFSPHSolver::correctDivergenceError(std::vector<DFSPHParticle>& particles, 
 		isErrorOk = isDivergenceErrorAcceptable(averageDpDt, restDensity, dt);
 		iter++;
 	}
+	lastSolveStats_.divergenceIterations += iter;
+	if (!isErrorOk) lastSolveStats_.converged = false;
 }
 
 bool DFSPHSolver::isDivergenceErrorAcceptable(float averageDpDt, float restDensity, float dt, float maxDivergenceErrorRatio)
@@ -263,6 +282,19 @@ void DFSPHSolver::correctDensityError(std::vector<DFSPHParticle>& particles, con
 
 		iter++;
 	}
+	lastSolveStats_.densityIterations += iter;
+	if (!isErrorOk) lastSolveStats_.converged = false;
+}
+
+void DFSPHSolver::addBoundaryParticleConstraintTerms(
+	std::vector<DFSPHParticle>& particles,
+	const std::vector<IBoundaryParticles*>& boundaries)
+{
+	// These are the numerator and denominator of one DFSPH constraint. Keep
+	// them behind one internal call so simulate() cannot accidentally apply
+	// boundary density without the matching alpha gradient.
+	addBoundaryParticleDensity(particles, boundaries);
+	addBoundaryParticleAlpha(particles, boundaries);
 }
 
 float DFSPHSolver::calculateTimeStep(const std::vector<DFSPHParticle>& particles)

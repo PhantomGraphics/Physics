@@ -64,6 +64,7 @@ public:
 	 * @param timeStep Time step (seconds).
 	 */
 	void setTimeStep(const float timeStep) override { this->timeStep = timeStep; }
+	void setMaxSubstep(const float timeStep) override { setTimeStep(timeStep); }
 
 	/**
 	 * @brief Sets the domain container's walls as an axis-aligned box, internally
@@ -131,6 +132,13 @@ public:
 		(void)timeStep;
 		this->boundaryShapes_ = std::move(boundaries);
 	}
+	void addShapeBoundary(std::shared_ptr<IShapeBoundary> boundary) override {
+		if (boundary) boundaryShapes_.push_back(std::move(boundary));
+	}
+	void clearShapeBoundaries() override {
+		boundaryPlanes_.clear(); boundarySpheres_.clear(); boundaryPlates_.clear(); boundaryShapes_.clear();
+	}
+	SPHSolveStats getLastSolveStats() const override { return lastSolveStats_; }
 
 	/**
 	 * @brief Sets how much of a particle's wall-normal velocity the domain
@@ -259,6 +267,7 @@ private:
 	std::vector<IBoundaryParticles*> rigidBoundaryParticles_;
 	std::vector<IBoundaryParticles*> softBoundaryParticles_;
 	float timeStep;
+	SPHSolveStats lastSolveStats_;
 
 	/**
 	 * @brief Adds the density the domain walls (boundaryPlanes_ and

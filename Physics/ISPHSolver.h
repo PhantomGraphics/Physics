@@ -18,6 +18,21 @@ class RigidBoundaryParticles;
 class SoftBoundaryParticles;
 class SPHKernel;
 
+struct SPHSolveStats {
+	/** Number of integration substeps completed by the last simulate() call. */
+	int substeps = 0;
+	/** Total DFSPH density-projection iterations; zero for non-iterative solvers. */
+	int densityIterations = 0;
+	/** Total DFSPH divergence-projection iterations; zero where unsupported. */
+	int divergenceIterations = 0;
+	/** Simulation time actually advanced by the last simulate() call. */
+	float advancedTime = 0.0f;
+	/** False when an iterative solve exhausted maxIter before meeting its tolerance. */
+	bool converged = true;
+	/** False when simulate() rejected invalid or incompatible solver/fluid settings. */
+	bool validConfiguration = true;
+};
+
 /**
  * @brief Common interface implemented by the CPU SPH fluid solvers
  * (DFSPHSolver, PBSPHSolver, CSPHSolver). (MVCSolver formerly implemented
@@ -63,6 +78,8 @@ public:
 	 * @param dt Time step (seconds).
 	 */
 	virtual void setTimeStep(const float dt) { (void)dt; }
+	/** Explicit name for DFSPH's adaptive-substep ceiling. */
+	virtual void setMaxSubstep(const float dt) { setTimeStep(dt); }
 
 	/** Sets the kernel support radius on fluids already registered with the solver. */
 	virtual void setEffectLength(const float length) { (void)length; }
@@ -112,6 +129,14 @@ public:
 	                                const float timeStep) {
 		(void)boundaries; (void)timeStep;
 	}
+
+	/** Adds one analytic boundary without replacing those already registered. */
+	virtual void addShapeBoundary(std::shared_ptr<IShapeBoundary> boundary) { (void)boundary; }
+	/** Clears every analytic boundary registered through typed or generic APIs. */
+	virtual void clearShapeBoundaries() {}
+
+	/** Returns diagnostics for the most recent simulate() call. */
+	virtual SPHSolveStats getLastSolveStats() const { return {}; }
 
 	/**
 	 * @brief Sets how much of a particle's wall-normal velocity the domain

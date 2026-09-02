@@ -201,9 +201,18 @@ public:
 	 * @param dt Maximum time step (seconds).
 	 */
 	void setTimeStep(const float dt) override { this->maxTimeStep = dt; }
+	void setMaxSubstep(const float dt) override { setTimeStep(dt); }
 
 	/** Applies the kernel support radius to every fluid currently registered. */
 	void setEffectLength(const float length) override;
+
+	void addShapeBoundary(std::shared_ptr<IShapeBoundary> boundary) override {
+		if (boundary) boundaryShapes_.push_back(std::move(boundary));
+	}
+	void clearShapeBoundaries() override {
+		boundaryPlanes_.clear(); boundarySpheres_.clear(); boundaryPlates_.clear(); boundaryShapes_.clear();
+	}
+	SPHSolveStats getLastSolveStats() const override { return lastSolveStats_; }
 
 	/**
 	 * @brief Returns the SPH kernel of the first registered fluid.
@@ -284,6 +293,7 @@ private:
 	// Duration requested by the current simulate() call. Used to average
 	// two-way reactions and to cap passive-wall recovery across substeps.
 	float frameTimeStep_ = 0.0f;
+	SPHSolveStats lastSolveStats_;
 	// No boundaryTimeStep member on purpose: addBoundaryPressure() takes the
 	// adaptive substep it is about to integrate. See setBoundaryPlanes().
 	// 0 == the historical undamped penalty spring; see
@@ -320,6 +330,8 @@ private:
 	void addRigidBoundaryPressure(std::vector<DFSPHParticle>& particles);
 
 	void addBoundaryViscosity(std::vector<DFSPHParticle>& particles);
+	void addBoundaryParticleConstraintTerms(std::vector<DFSPHParticle>& particles,
+	                                        const std::vector<IBoundaryParticles*>& boundaries);
 
 };
 

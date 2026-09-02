@@ -97,11 +97,24 @@ std::vector<Vector3df> WCSPHSolver::getParticlePositions() const
 void WCSPHSolver::simulate(const float dt, const int maxIter)
 {
 	ensurePassiveOpenMPWaitPolicy();
+	lastSolveStats_ = {};
 
 	(void)maxIter;
 	this->timeStep = dt;
 
 	if (fluids.empty()) return;
+	if (!std::isfinite(dt) || dt <= 0.0f) {
+		lastSolveStats_.validConfiguration = false;
+		return;
+	}
+	const float commonEffectLength = fluids.front()->getEffectLength();
+	for (const auto* fluid : fluids) {
+		if (!fluid || std::abs(fluid->getEffectLength() - commonEffectLength) >
+		              std::max(1.0e-6f, std::abs(commonEffectLength) * 1.0e-5f)) {
+			lastSolveStats_.validConfiguration = false;
+			return;
+		}
+	}
 
 	// Fail safe instead of feeding a garbage search radius to the neighbor
 	// search below: effectLength defaults to 0.f
@@ -109,7 +122,10 @@ void WCSPHSolver::simulate(const float dt, const int maxIter)
 	// that forgets to call it gets an inert (no-op) solver rather than an
 	// undefined/UB neighbor-search radius (see simulate()'s doc comment and
 	// docs/todo/PLAN_sph_scale_invariance.md Phase 5).
-	if (fluids.front()->getEffectLength() <= 0.0f) return;
+	if (commonEffectLength <= 0.0f) {
+		lastSolveStats_.validConfiguration = false;
+		return;
+	}
 
 	std::vector<WCSPHParticle> particles;
 
@@ -205,6 +221,8 @@ void WCSPHSolver::simulate(const float dt, const int maxIter)
 			p.forwardTime(timeStep);
 		}
 	}
+	lastSolveStats_.substeps = 1;
+	lastSolveStats_.advancedTime = dt;
 
 	/*
 	for (auto fluid : fluids) {

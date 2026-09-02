@@ -364,6 +364,51 @@ TEST(WCSPHSolverTest, GetFluidsReturnsRegisteredFluids)
   EXPECT_EQ(fluids[1], &fluidB);
 }
 
+TEST(WCSPHSolverTest, ReportsFrameAdvanceThroughCommonSolveStats)
+{
+  WCSPHFluid fluid;
+  fluid.setDensity(1000.0f);
+  fluid.setPressureCoe(0.0f);
+  fluid.setVicosityCoe(0.0f);
+  fluid.setEffectLength(0.2f);
+  fluid.createParticle(Vector3df(0.0f), 0.025f);
+
+  WCSPHSolver solver;
+  solver.add(&fluid);
+  solver.setExternalForce(Vector3df(0.0f));
+  solver.setMaxSubstep(0.005f);
+  solver.simulate(0.005f, 2);
+
+  const auto stats = solver.getLastSolveStats();
+  EXPECT_TRUE(stats.validConfiguration);
+  EXPECT_TRUE(stats.converged);
+  EXPECT_EQ(stats.substeps, 1);
+  EXPECT_FLOAT_EQ(stats.advancedTime, 0.005f);
+}
+
+TEST(WCSPHSolverTest, RejectsFluidsWithMismatchedKernelConfiguration)
+{
+  WCSPHFluid a;
+  WCSPHFluid b;
+  for (auto* fluid : { &a, &b }) {
+    fluid->setDensity(1000.0f);
+    fluid->setPressureCoe(0.0f);
+    fluid->setVicosityCoe(0.0f);
+    fluid->createParticle(Vector3df(0.0f), 0.025f);
+  }
+  a.setEffectLength(0.1f);
+  b.setEffectLength(0.2f);
+
+  WCSPHSolver solver;
+  solver.add(&a);
+  solver.add(&b);
+  solver.simulate(0.005f, 1);
+
+  EXPECT_FALSE(solver.getLastSolveStats().validConfiguration);
+  EXPECT_FLOAT_EQ(a.getParticles().positions[0].y, 0.0f);
+  EXPECT_FLOAT_EQ(b.getParticles().positions[0].y, 0.0f);
+}
+
 // ---- simulate() is a no-op when effectLength was never set --------------
 // docs/todo/PLAN_sph_scale_invariance.md Phase 5: effectLength defaults to
 // 0.f (SPHKernel/WCSPHFluid) until setEffectLength() is called, so a caller

@@ -757,10 +757,16 @@ TEST(DFSPHSolverTest, SimulateAdvancesRequestedFrameDurationNotMaxSubstep)
   DFSPHSolver solver;
   solver.add(&fluid);
   solver.setExternalForce(Vector3df(0.0f, -9.8f, 0.0f));
-  solver.setTimeStep(0.002f); // maximum internal substep, not frame duration
+  solver.setMaxSubstep(0.002f);
   solver.simulate(0.01f, 2);
 
   EXPECT_NEAR(fluid.getParticles().velocities[0].y, -0.098f, 1.0e-5f);
+  const auto stats = solver.getLastSolveStats();
+  EXPECT_TRUE(stats.validConfiguration);
+  EXPECT_GE(stats.substeps, 2);
+  EXPECT_NEAR(stats.advancedTime, 0.01f, 1.0e-6f);
+  EXPECT_GT(stats.densityIterations, 0);
+  EXPECT_GT(stats.divergenceIterations, 0);
 }
 
 TEST(DFSPHSolverTest, SphereBoundaryUsesCommonShapeInterface)
@@ -817,4 +823,47 @@ TEST(DFSPHSolverTest, PlateBoundaryUsesSameRegistrationAndForcePath)
 
   EXPECT_TRUE(std::isfinite(fluid.getParticles().velocities[0].z));
   EXPECT_GT(std::abs(fluid.getParticles().velocities[0].z), 0.0f);
+}
+
+TEST(DFSPHSolverTest, ShapeBoundariesCanBeAddedAndClearedThroughCommonInterface)
+{
+  DFSPHFluid fluid;
+  fluid.density = 1000.0f;
+  fluid.viscosityCoe = 0.0f;
+  fluid.pressureCoe = 0.0f;
+  fluid.setEffectLength(0.2f);
+  fluid.createParticle(Vector3df(1.01f, 0.0f, 0.0f), 0.025f, 1.0f);
+
+  DFSPHSolver solver;
+  solver.add(&fluid);
+  solver.setExternalForce(Vector3df(0.0f));
+  solver.setMaxSubstep(0.005f);
+  solver.addShapeBoundary(std::make_shared<SphereBoundary>(Vector3df(0.0f), 1.0f, 0.2f));
+  solver.clearShapeBoundaries();
+  solver.simulate(0.005f, 2);
+
+  EXPECT_NEAR(fluid.getParticles().velocities[0].x, 0.0f, 1.0e-6f);
+}
+
+TEST(DFSPHSolverTest, RejectsFluidsWithMismatchedKernelConfiguration)
+{
+  DFSPHFluid a;
+  DFSPHFluid b;
+  for (auto* fluid : { &a, &b }) {
+    fluid->density = 1000.0f;
+    fluid->viscosityCoe = 0.0f;
+    fluid->pressureCoe = 0.0f;
+    fluid->createParticle(Vector3df(0.0f), 0.025f, 1.0f);
+  }
+  a.setEffectLength(0.1f);
+  b.setEffectLength(0.2f);
+
+  DFSPHSolver solver;
+  solver.add(&a);
+  solver.add(&b);
+  solver.simulate(0.005f, 2);
+
+  EXPECT_FALSE(solver.getLastSolveStats().validConfiguration);
+  EXPECT_FLOAT_EQ(a.getParticles().positions[0].y, 0.0f);
+  EXPECT_FLOAT_EQ(b.getParticles().positions[0].y, 0.0f);
 }

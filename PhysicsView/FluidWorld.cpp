@@ -721,7 +721,9 @@ void FluidWorld::createDFSPH()
     }
 
     auto solver = std::make_unique<DFSPHSolver>();
-    solver->setTimeStep(params_.timeStep);
+    // DFSPH treats this as the adaptive integration ceiling; simulate(dt)
+    // still advances the caller-requested frame duration.
+    solver->setMaxSubstep(params_.timeStep);
     solver->setBoundary(params_.boundary, params_.timeStep);
     solver->setExternalForce(params_.gravity);
     solver->add(dfsphFluid_.get());
