@@ -6,7 +6,7 @@
 # PhysicsTest.vcxproj, driven by Phantom2026.sln). MathCore/SpaceCore/
 # VolumeCore/NumericsCore/VkAppBaseCore/etc. are now defined once in
 # ../cmake/PhantomCoreLibs.cmake and ../cmake/PhantomVulkanApp.cmake
-# (Phase 4 §5.4 item 1 dedup, docs/todo/PLAN_crossplatform_non_cgapp_build.md)
+# (Phase 4 §5.4 item 1 dedup, internal design notes)
 # -- this file just calls them (PhysicsCore itself links against those
 # instead of bundling their raw sources, same behavior, cleaner) and adds
 # PhysicsTest/PhysicsView/FlameView on top, so it also works standalone
@@ -64,7 +64,11 @@ phantom_add_space_core()
 phantom_add_volume_core()
 phantom_add_numerics_core()
 
-file(GLOB PHYSICS_SOURCES ${PHYSICS_ROOT}/Physics/*.cpp)
+# CONFIGURE_DEPENDS so adding/removing a .cpp (e.g. splitting a boundary class
+# out into its own file) is picked up on the next build without a manual
+# `cmake <builddir>` reconfigure -- otherwise a stale object of a rewritten
+# source can linger and cause "unresolved external symbol" at link time.
+file(GLOB PHYSICS_SOURCES CONFIGURE_DEPENDS ${PHYSICS_ROOT}/Physics/*.cpp)
 list(FILTER PHYSICS_SOURCES EXCLUDE REGEX "pch\\.cpp$")
 
 add_library(PhysicsCore STATIC ${PHYSICS_SOURCES})
@@ -91,7 +95,7 @@ phantom_find_gtest()
 if(PHANTOM_GTEST_FOUND)
     enable_testing()
 
-    file(GLOB PHYSICSTEST_SOURCES ${PHYSICS_ROOT}/PhysicsTest/*.cpp)
+    file(GLOB PHYSICSTEST_SOURCES CONFIGURE_DEPENDS ${PHYSICS_ROOT}/PhysicsTest/*.cpp)
     list(FILTER PHYSICSTEST_SOURCES EXCLUDE REGEX "pch\\.cpp$")
     # Long-running WCSPH scene/stability checks belong to PhysicsView's
     # scenario suite, not the component-level GoogleTest executable.
