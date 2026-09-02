@@ -155,7 +155,10 @@ void FluidApp::onInit()
     static const std::array<std::string, 6> kFaceNames = {
         "right.png", "left.png", "top.png", "bottom.png", "front.png", "back.png"
     };
-    static const std::string kEnvMapDir = "../SSFR_Vk/envmap";
+    // Shipped default environment: a compact studio with large light panels
+    // and a cool window, giving water readable highlights without visual noise.
+    static const std::string kEnvMapDir =
+        (::VKG::detail::detectModuleDir() / "envmap").string();
     {
         std::array<std::string, 6> paths;
         bool ok = true;

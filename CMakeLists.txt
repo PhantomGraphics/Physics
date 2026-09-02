@@ -283,6 +283,16 @@ phantom_add_runtime_shaders(PhysicsView
     ${PHYSICS_ROOT}/Fluid_GPU_Vk/Shader
     ${PHYSICS_ROOT}/FluidRenderer/shaders)
 
+# Default cubemap used by SSFR when the viewer starts. Generate it beside the
+# executable so binary images do not need to be stored in source control.
+find_program(PHANTOM_POWERSHELL_EXECUTABLE NAMES pwsh powershell REQUIRED)
+add_custom_command(TARGET PhysicsView POST_BUILD
+    COMMAND "${PHANTOM_POWERSHELL_EXECUTABLE}"
+        -NoProfile -ExecutionPolicy Bypass
+        -File "${PHYSICS_ROOT}/FluidRenderer/assets/default_envmap/generate_indoor_envmap.ps1"
+        -OutputDir "$<TARGET_FILE_DIR:PhysicsView>/envmap"
+    VERBATIM)
+
 # --- FlameView (FlameApp : VkAppBase) -- minimal flame-SPH standalone viewer,
 # intentionally independent of RigidBodyWorld/VkRenderer/FluidRenderer (see
 # Physics/CLAUDE.md's Flame section) ---
