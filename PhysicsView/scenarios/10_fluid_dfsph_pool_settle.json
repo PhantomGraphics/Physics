@@ -8,7 +8,7 @@
     { "label": "Rebuild fluid", "command": "Reset", "expect": "OK" },
     { "label": "Precondition: sane, non-zero seed count", "command": "GetParticleCount", "expect_prefix": "Count:", "store_as": "count0", "strip_prefix": "Count:" },
     { "label": "Precondition: block starts resting at y in [8,12] -- record min Y before any settling", "command": "GetMinParticlePositionY", "expect_range": "7.9,8.1", "store_as": "min_y_before" },
-    { "label": "Block falls and settles under gravity (~2s)", "command": "Step", "expect": "OK", "repeat": 200 },
+    { "label": "Long-run adaptive stepping: block falls and settles under gravity (~3s)", "command": "Step", "expect": "OK", "repeat": 300 },
     { "label": "Change: the block has fallen -- min Y after settling is measurably lower than the pre-drop min Y", "command": "GetMinParticlePositionY", "store_as": "min_y_after" },
     { "label": "Invariant: particle count conserved (no births/deaths in plain DFSPH)", "command": "GetParticleCount", "expect": "Count:${count0}" },
     { "label": "Invariant: stays inside the container (upper bound)", "command": "GetMaxParticlePositionY", "expect_range": "-8.5,14.5" },

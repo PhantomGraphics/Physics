@@ -221,6 +221,8 @@ public:
 
 	/** @brief Returns the world-space positions of all particles across all registered fluids. */
 	std::vector<Math::Vector3df> getParticlePositions() const override;
+	std::vector<Math::Vector3df> getParticleVelocities() const override;
+	std::vector<float> getParticleDensities() const override;
 
 	/**
 	 * @brief Adds each boundary particle's psi-weighted kernel contribution to

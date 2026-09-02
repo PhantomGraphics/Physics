@@ -374,102 +374,24 @@ void FluidWorld::refreshSoftCoupling()
 
 size_t FluidWorld::getParticleCount() const
 {
-    switch (type_) {
-    case SimulationType::DFSPH:
-        return dfsphFluid_ ? dfsphFluid_->getParticles().size() : 0;
-    case SimulationType::PBSPH:
-        return pbsphFluid_ ? pbsphFluid_->getParticles().size() : 0;
-    case SimulationType::WCSPH:
-        return csphFluid_ ? csphFluid_->getParticles().size() : 0;
-    case SimulationType::GPU_CSPH:
-        return gpuSolver_ ? static_cast<size_t>(gpuSolver_->getNumParticles()) : 0;
-    }
-    return 0;
+    if (fluidSolver_) return static_cast<size_t>(fluidSolver_->getParticleCount());
+    return gpuSolver_ ? static_cast<size_t>(gpuSolver_->getNumParticles()) : 0;
 }
 
 std::vector<glm::vec3> FluidWorld::getParticlePositions() const
 {
-    std::vector<glm::vec3> positions;
-    positions.reserve(getParticleCount());
-
-    switch (type_) {
-    case SimulationType::DFSPH:
-        if (dfsphFluid_) {
-            for (const auto& pos : dfsphFluid_->getParticles().positions) {
-                positions.emplace_back(pos.x, pos.y, pos.z);
-            }
-        }
-        break;
-    case SimulationType::PBSPH:
-        if (pbsphFluid_) {
-            for (const auto& pos : pbsphFluid_->getParticles().positions) {
-                positions.emplace_back(pos.x, pos.y, pos.z);
-            }
-        }
-        break;
-    case SimulationType::WCSPH:
-        if (csphFluid_) {
-            for (const auto& pos : csphFluid_->getParticles().positions) {
-                positions.emplace_back(pos.x, pos.y, pos.z);
-            }
-        }
-        break;
-    case SimulationType::GPU_CSPH:
-        // GPU_CSPH path is rendered directly from GPU buffer.
-        break;
-    }
-
-    return positions;
+    if (!fluidSolver_) return {}; // GPU_CSPH renders directly from its GPU buffer.
+    return fluidSolver_->getParticlePositions();
 }
 
 std::vector<float> FluidWorld::getParticleDensities() const
 {
-    switch (type_) {
-    case SimulationType::DFSPH:
-        return dfsphFluid_ ? dfsphFluid_->getParticles().densities : std::vector<float>{};
-    case SimulationType::PBSPH:
-        return pbsphFluid_ ? pbsphFluid_->getParticles().densities : std::vector<float>{};
-    case SimulationType::WCSPH:
-        return csphFluid_ ? csphFluid_->getParticles().densities : std::vector<float>{};
-    case SimulationType::GPU_CSPH:
-        break;
-    }
-    return {};
+    return fluidSolver_ ? fluidSolver_->getParticleDensities() : std::vector<float>{};
 }
 
 std::vector<glm::vec3> FluidWorld::getParticleVelocities() const
 {
-    std::vector<glm::vec3> velocities;
-    velocities.reserve(getParticleCount());
-
-    switch (type_) {
-    case SimulationType::DFSPH:
-        if (dfsphFluid_) {
-            for (const auto& vel : dfsphFluid_->getParticles().velocities) {
-                velocities.emplace_back(vel.x, vel.y, vel.z);
-            }
-        }
-        break;
-    case SimulationType::PBSPH:
-        if (pbsphFluid_) {
-            for (const auto& vel : pbsphFluid_->getParticles().velocities) {
-                velocities.emplace_back(vel.x, vel.y, vel.z);
-            }
-        }
-        break;
-    case SimulationType::WCSPH:
-        if (csphFluid_) {
-            for (const auto& vel : csphFluid_->getParticles().velocities) {
-                velocities.emplace_back(vel.x, vel.y, vel.z);
-            }
-        }
-        break;
-    case SimulationType::GPU_CSPH:
-        // GPU_CSPH has no CPU-side velocity readback (see header doc).
-        break;
-    }
-
-    return velocities;
+    return fluidSolver_ ? fluidSolver_->getParticleVelocities() : std::vector<glm::vec3>{};
 }
 
 std::vector<glm::vec3> FluidWorld::getSprayPositions() const
@@ -644,25 +566,13 @@ void FluidWorld::clearSoftBoundaryParticles() {
 }
 
 SPHKernel* FluidWorld::getActiveKernel() const {
-    switch (type_) {
-    case SimulationType::DFSPH: return dfsphFluid_ ? dfsphFluid_->getKernel() : nullptr;
-    case SimulationType::PBSPH: return pbsphFluid_ ? pbsphFluid_->getKernel() : nullptr;
-    // WCSPHFluid gained its own kernel in Phase 4 of
-    // docs/todo/PLAN_physics_ownership_and_coupling_unification.md (mirrors
-    // DFSPHFluid/PBSPHFluid, replacing WCSPHSolver::simulate()'s old
-    // throwaway local SPHKernel), so it can now be reported here too.
-    case SimulationType::WCSPH: return csphFluid_ ? csphFluid_->getKernel() : nullptr;
-    default: return nullptr;
-    }
+    return fluidSolver_ ? fluidSolver_->getKernel() : nullptr;
 }
 
 float FluidWorld::getActiveRestDensity() const {
-    switch (type_) {
-    case SimulationType::DFSPH: return dfsphFluid_ ? dfsphFluid_->getDensity()     : params_.density;
-    case SimulationType::PBSPH: return pbsphFluid_ ? pbsphFluid_->getRestDensity() : params_.density;
-    case SimulationType::WCSPH: return csphFluid_ ? csphFluid_->getDensity()       : params_.density;
-    default: return params_.density;
-    }
+    if (!fluidSolver_) return params_.density;
+    const float density = fluidSolver_->getRestDensity();
+    return density > 0.0f ? density : params_.density;
 }
 
 void FluidWorld::clear()
@@ -854,52 +764,14 @@ void FluidWorld::createGPUCSPH()
 
 void FluidWorld::updateWhiteWater(float dt)
 {
-    std::vector<Vector3df> pos;
-    std::vector<Vector3df> vel;
-    std::vector<float> density;
-    float restDensity = params_.density;
-
-    switch (type_) {
-    case SimulationType::DFSPH:
-        if (!dfsphFluid_) break;
-        restDensity = dfsphFluid_->getDensity();
-        pos.reserve(dfsphFluid_->getParticles().size());
-        vel.reserve(dfsphFluid_->getParticles().size());
-        density.reserve(dfsphFluid_->getParticles().size());
-        for (size_t i = 0; i < dfsphFluid_->getParticles().size(); ++i) {
-            pos.push_back(dfsphFluid_->getParticles().positions[i]);
-            vel.push_back(dfsphFluid_->getParticles().velocities[i]);
-            density.push_back(dfsphFluid_->getParticles().densities[i]);
-        }
-        break;
-    case SimulationType::PBSPH:
-        if (!pbsphFluid_) break;
-        restDensity = pbsphFluid_->getRestDensity();
-        pos.reserve(pbsphFluid_->getParticles().size());
-        vel.reserve(pbsphFluid_->getParticles().size());
-        density.reserve(pbsphFluid_->getParticles().size());
-        for (size_t i = 0; i < pbsphFluid_->getParticles().size(); ++i) {
-            pos.push_back(pbsphFluid_->getParticles().positions[i]);
-            vel.push_back(pbsphFluid_->getParticles().velocities[i]);
-            density.push_back(pbsphFluid_->getParticles().densities[i]);
-        }
-        break;
-    case SimulationType::WCSPH:
-        if (!csphFluid_) break;
-        restDensity = csphFluid_->getDensity();
-        pos.reserve(csphFluid_->getParticles().size());
-        vel.reserve(csphFluid_->getParticles().size());
-        density.reserve(csphFluid_->getParticles().size());
-        for (size_t i = 0; i < csphFluid_->getParticles().size(); ++i) {
-            pos.push_back(csphFluid_->getParticles().positions[i]);
-            vel.push_back(csphFluid_->getParticles().velocities[i]);
-            density.push_back(csphFluid_->getParticles().densities[i]);
-        }
-        break;
-    case SimulationType::GPU_CSPH:
+    if (!fluidSolver_) {
         whiteWater_.clear();
         return;
     }
+    const auto pos = fluidSolver_->getParticlePositions();
+    const auto vel = fluidSolver_->getParticleVelocities();
+    const auto density = fluidSolver_->getParticleDensities();
+    const float restDensity = getActiveRestDensity();
 
     if (!pos.empty()) {
         whiteWater_.generate(pos, vel, density, restDensity, dt);

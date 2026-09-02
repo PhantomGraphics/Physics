@@ -51,6 +51,26 @@ std::vector<Vector3df> DFSPHSolver::getParticlePositions() const
 	return positions;
 }
 
+std::vector<Vector3df> DFSPHSolver::getParticleVelocities() const
+{
+	std::vector<Vector3df> velocities;
+	for (const auto* fluid : fluids) {
+		const auto& soa = fluid->getParticles();
+		velocities.insert(velocities.end(), soa.velocities.begin(), soa.velocities.end());
+	}
+	return velocities;
+}
+
+std::vector<float> DFSPHSolver::getParticleDensities() const
+{
+	std::vector<float> densities;
+	for (const auto* fluid : fluids) {
+		const auto& soa = fluid->getParticles();
+		densities.insert(densities.end(), soa.densities.begin(), soa.densities.end());
+	}
+	return densities;
+}
+
 /*
 void DFFluidSolver::step()
 {

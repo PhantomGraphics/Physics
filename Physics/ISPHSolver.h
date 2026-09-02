@@ -181,6 +181,12 @@ public:
 	/** @brief Returns the world-space positions of all particles across all registered fluids. */
 	virtual std::vector<Math::Vector3df> getParticlePositions() const = 0;
 
+	/** @brief Returns the world-space velocities in the same order as positions. */
+	virtual std::vector<Math::Vector3df> getParticleVelocities() const = 0;
+
+	/** @brief Returns particle densities in the same order as positions. */
+	virtual std::vector<float> getParticleDensities() const = 0;
+
 	/**
 	 * @brief Registers a rigid-body boundary for One-Way SDF penalty coupling.
 	 * @param b Non-owning pointer to the boundary; must outlive the solver.
