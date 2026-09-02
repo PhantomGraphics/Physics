@@ -44,9 +44,8 @@ public:
 
 	/**
 	 * @brief Advances all fluids registered with this solver by one frame.
-	 * @param dt      Requested time step (seconds). DFSPH/PBSPH use it as an
-	 *                 dt/upper-bound alongside their own setTimeStep()-configured
-	 *                 state; CSPH uses it directly as the integration step.
+	 * @param dt      Requested frame duration (seconds). DFSPH may split it
+	 *                 into adaptive substeps; all solvers advance this duration.
 	 * @param maxIter Constraint-projection iteration count. Ignored by
 	 *                 solvers without an iterative projection step (CSPH).
 	 */
@@ -59,12 +58,14 @@ public:
 	virtual void setExternalForce(const Math::Vector3df& force) = 0;
 
 	/**
-	 * @brief Sets the maximum allowed / requested time step (seconds), used by
-	 * simulate() alongside (DFSPH) or instead of (PBSPH/CSPH) its own dt
-	 * parameter.
+	 * @brief Sets the solver's time-step limit/state. For DFSPH this is the
+	 * maximum adaptive substep; simulate()'s dt remains the frame duration.
 	 * @param dt Time step (seconds).
 	 */
 	virtual void setTimeStep(const float dt) { (void)dt; }
+
+	/** Sets the kernel support radius on fluids already registered with the solver. */
+	virtual void setEffectLength(const float length) { (void)length; }
 
 	/**
 	 * @brief Sets the domain container's walls as an arbitrary set of planes.
@@ -88,10 +89,8 @@ public:
 	 * "water sphere" showcase's closed spherical container). These are on top
 	 * of, not instead of, the box/plane boundary from setBoundary()/
 	 * setBoundaryPlanes() -- a fluid solver still requires a domain box.
-	 * No-op where unsupported; only WCSPHSolver implements this (see
-	 * WCSPHSolver.h's doc comment for why DFSPH/PBSPH don't -- the density
-	 * contribution can't safely be added without their solver-specific
-	 * alpha/constraint-gradient counterpart).
+	 * No-op where unsupported. WCSPH and DFSPH implement this; DFSPH adds the
+	 * matching alpha-gradient term whenever it adds boundary density.
 	 * @param spheres Sphere boundaries; valid region is the union interior of all of them.
 	 * @param timeStep Time step used to scale the repulsion force.
 	 */
@@ -101,11 +100,8 @@ public:
 	 * @brief Sets additional finite-plate container walls (the "waterfall"
 	 * showcase's channel floor, weir, cliff face and rock shelves). Like
 	 * setBoundarySpheres(), these are on top of -- not instead of -- the
-	 * box/plane boundary, and only WCSPHSolver implements this: DFSPH/PBSPH
-	 * must keep a boundary's density and its solver-specific alpha/constraint
-	 * gradient in lockstep, and a density-only plate term would violate that
-	 * (see WCSPHSolver.h and docs/todo/PLAN_sph_showcase_waterfall.md
-	 * section 3.5).
+	 * box/plane boundary. WCSPH and DFSPH implement this; PBSPH retains the
+	 * default no-op until it has a matching constraint-gradient formulation.
 	 * @param plates   Finite plate boundaries; each plate's valid region is its exterior.
 	 * @param timeStep Ignored -- see setBoundaryPlanes().
 	 */

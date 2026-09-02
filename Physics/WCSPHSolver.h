@@ -162,7 +162,7 @@ public:
 	 * this call are unaffected -- call add() first, or call this again.
 	 * @param length Effect length value.
 	 */
-	void setEffectLength(const float length);
+	void setEffectLength(const float length) override;
 
 	/**
 	 * @brief Registers a rigid-body boundary particle set for Two-Way (Track B) coupling.

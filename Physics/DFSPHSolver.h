@@ -5,6 +5,8 @@
 #include "CGLib/Math/Vector3d.h"
 #include "CGLib/Math/Box3d.h"
 #include "PlaneBoundary.h"
+#include "SphereBoundary.h"
+#include "PlateBoundary.h"
 #include "RigidBoundary.h"
 #include "RigidBoundaryParticles.h"
 #include "SoftBoundaryParticles.h"
@@ -41,10 +43,10 @@ public:
 
 	/**
 	 * @brief Advances the simulation by one step.
-	 * @param dt      Requested time step (seconds); unused -- see class doc
-	 *                on this being dead in DFSPH's substep loop, which runs
-	 *                off setTimeStep()'s maxTimeStep instead.
-	 * @param maxIter Unused by DFSPH (kept for ISPHSolver signature parity).
+	 * @param dt      Frame duration to advance. Adaptive substeps land exactly
+	 *                on this duration; setTimeStep() only limits their size.
+	 * @param maxIter Maximum correction sweeps per adaptive substep. Density
+	 *                correction retains its required minimum of two sweeps.
 	 */
 	void simulate(const float dt, const int maxIter) override;
 
@@ -64,9 +66,8 @@ public:
 	 * @brief Sets the domain container's walls as an arbitrary set of planes.
 	 * @param planes Plane boundaries; valid region is the intersection of all of them.
 	 * @param timeStep Ignored by this solver. Unlike WCSPH/PBSPH, DFSPH does
-	 *        not integrate at the caller's time step: simulate() substeps
-	 *        adaptively (calculateTimeStep()) until it has covered
-	 *        maxTimeStep. The wall penalty spring is calibrated as -d/dt^2
+	 *        integrates the caller's frame duration using adaptive substeps
+	 *        bounded by setTimeStep(). The wall penalty spring is calibrated as -d/dt^2
 	 *        against the step actually being integrated, so
 	 *        addBoundaryPressure() uses that substep and storing a separate
 	 *        boundary time step here would only reintroduce the mismatch it
@@ -75,6 +76,22 @@ public:
 	void setBoundaryPlanes(std::vector<PlaneBoundary> planes, const float timeStep) override {
 		(void)timeStep;
 		this->boundaryPlanes_ = std::move(planes);
+	}
+
+	void setBoundarySpheres(std::vector<SphereBoundary> spheres, const float timeStep) override {
+		(void)timeStep;
+		boundarySpheres_ = std::move(spheres);
+	}
+
+	void setBoundaryPlates(std::vector<PlateBoundary> plates, const float timeStep) override {
+		(void)timeStep;
+		boundaryPlates_ = std::move(plates);
+	}
+
+	void setShapeBoundaries(std::vector<std::shared_ptr<IShapeBoundary>> boundaries,
+	                        const float timeStep) override {
+		(void)timeStep;
+		boundaryShapes_ = std::move(boundaries);
 	}
 
 	/**
@@ -165,7 +182,7 @@ public:
 	 * @param boundaries Boundary particle sets to couple against (rigid or SoftBody).
 	 * @param dt         This substep's time step (seconds). The fluid-side force
 	 *                   is per-substep and does not use it; the boundary-side
-	 *                   reaction is weighted by dt/maxTimeStep so accumForce
+	 *                   reaction is weighted by dt/frameDt so accumForce
 	 *                   ends the frame holding the frame-average force rather
 	 *                   than a substep-count-dependent sum (see the .cpp).
 	 */
@@ -184,6 +201,9 @@ public:
 	 * @param dt Maximum time step (seconds).
 	 */
 	void setTimeStep(const float dt) override { this->maxTimeStep = dt; }
+
+	/** Applies the kernel support radius to every fluid currently registered. */
+	void setEffectLength(const float length) override;
 
 	/**
 	 * @brief Returns the SPH kernel of the first registered fluid.
@@ -258,6 +278,12 @@ private:
 	// that default (docs/todo/PLAN_sph_scale_invariance.md Phase 6).
 	float maxTimeStep;
 	std::vector<PlaneBoundary> boundaryPlanes_;
+	std::vector<SphereBoundary> boundarySpheres_;
+	std::vector<PlateBoundary> boundaryPlates_;
+	std::vector<std::shared_ptr<IShapeBoundary>> boundaryShapes_;
+	// Duration requested by the current simulate() call. Used to average
+	// two-way reactions and to cap passive-wall recovery across substeps.
+	float frameTimeStep_ = 0.0f;
 	// No boundaryTimeStep member on purpose: addBoundaryPressure() takes the
 	// adaptive substep it is about to integrate. See setBoundaryPlanes().
 	// 0 == the historical undamped penalty spring; see
@@ -275,9 +301,11 @@ private:
 	std::vector<IBoundaryParticles*> rigidBoundaryParticles_;
 	std::vector<IBoundaryParticles*> softBoundaryParticles_;
 
-	void correctDivergenceError(std::vector<DFSPHParticle>& particles, const Space::CSRNeighborList& neighbors, const float dt);
+	void correctDivergenceError(std::vector<DFSPHParticle>& particles, const Space::CSRNeighborList& neighbors,
+	                            const float dt, const int maxIter);
 
-	void correctDensityError(std::vector<DFSPHParticle>& particles, const Space::CSRNeighborList& neighbors, const float dt);
+	void correctDensityError(std::vector<DFSPHParticle>& particles, const Space::CSRNeighborList& neighbors,
+	                         const float dt, const int maxIter);
 
 	float calculateTimeStep(const std::vector<DFSPHParticle>& particles);
 

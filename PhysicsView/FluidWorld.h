@@ -191,9 +191,8 @@ public:
     }
 
     // ---- Sphere boundary (docs/todo/PLAN_sph_showcase_water_sphere.md) ----
-    // WCSPH-only (ISPHSolver::setBoundarySpheres() defaults to a no-op; only
-    // WCSPHSolver overrides it -- see that header's doc comment for why DFSPH/
-    // PBSPH intentionally don't). Unlike addRigidBoundary()/loadMeshBoundary(),
+    // Supported by WCSPH and DFSPH (PBSPH inherits the no-op default).
+    // Unlike addRigidBoundary()/loadMeshBoundary(),
     // which register non-owning pointers directly on the solver,
     // setBoundarySpheres() takes its whole list by value each call, so this
     // list is the only copy that needs to survive reset() -- reregistered
@@ -454,8 +453,8 @@ private:
     std::vector<Phantom::Physics::SphereBoundary> boundarySpheres_;
 
     // Re-registers boundarySpheres_ (whole list, by value) on the
-    // (possibly just-rebuilt) active solver. A no-op (ISPHSolver's default)
-    // on solvers that don't override setBoundarySpheres(). Called by
+    // (possibly just-rebuilt) active solver. A no-op on solvers that don't
+    // override setBoundarySpheres(). Called by
     // addBoundarySphere()/clearBoundarySpheres() and reset().
     void reregisterBoundarySpheres();
 

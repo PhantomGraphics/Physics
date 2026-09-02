@@ -744,3 +744,77 @@ TEST(DFSPHSolverTest, WallPenetrationDoesNotGrowWithImpactSpeed)
       << "penetration is still scaling with impact speed: slow=" << slow
       << " fast=" << fast;
 }
+
+TEST(DFSPHSolverTest, SimulateAdvancesRequestedFrameDurationNotMaxSubstep)
+{
+  DFSPHFluid fluid;
+  fluid.density = 1000.0f;
+  fluid.viscosityCoe = 0.0f;
+  fluid.pressureCoe = 0.0f;
+  fluid.setEffectLength(0.1f);
+  fluid.createParticle(Vector3df(0.0f), 0.025f, 1.0f);
+
+  DFSPHSolver solver;
+  solver.add(&fluid);
+  solver.setExternalForce(Vector3df(0.0f, -9.8f, 0.0f));
+  solver.setTimeStep(0.002f); // maximum internal substep, not frame duration
+  solver.simulate(0.01f, 2);
+
+  EXPECT_NEAR(fluid.getParticles().velocities[0].y, -0.098f, 1.0e-5f);
+}
+
+TEST(DFSPHSolverTest, SphereBoundaryUsesCommonShapeInterface)
+{
+  DFSPHFluid fluid;
+  fluid.density = 1000.0f;
+  fluid.viscosityCoe = 0.0f;
+  fluid.pressureCoe = 0.0f;
+  fluid.setEffectLength(0.2f);
+  fluid.createParticle(Vector3df(1.01f, 0.0f, 0.0f), 0.025f, 1.0f);
+
+  DFSPHSolver solver;
+  solver.add(&fluid);
+  solver.setExternalForce(Vector3df(0.0f));
+  solver.setTimeStep(0.005f);
+  solver.setShapeBoundaries(
+      { std::make_shared<SphereBoundary>(Vector3df(0.0f), 1.0f, 0.2f) }, 0.005f);
+  solver.simulate(0.005f, 2);
+
+  EXPECT_LT(fluid.getParticles().velocities[0].x, 0.0f);
+  EXPECT_LT(fluid.getParticles().positions[0].x, 1.01f);
+}
+
+TEST(DFSPHSolverTest, CommonEffectLengthInterfaceUpdatesRegisteredFluid)
+{
+  DFSPHFluid fluid;
+  DFSPHSolver concreteSolver;
+  concreteSolver.add(&fluid);
+  ISPHSolver* solver = &concreteSolver;
+
+  solver->setEffectLength(0.125f);
+
+  EXPECT_FLOAT_EQ(fluid.getKernel()->getEffectLength(), 0.125f);
+}
+
+TEST(DFSPHSolverTest, PlateBoundaryUsesSameRegistrationAndForcePath)
+{
+  DFSPHFluid fluid;
+  fluid.density = 1000.0f;
+  fluid.viscosityCoe = 0.0f;
+  fluid.pressureCoe = 0.0f;
+  fluid.setEffectLength(0.2f);
+  fluid.createParticle(Vector3df(0.0f), 0.025f, 1.0f);
+
+  DFSPHSolver solver;
+  solver.add(&fluid);
+  solver.setExternalForce(Vector3df(0.0f));
+  solver.setTimeStep(0.005f);
+  solver.setBoundaryPlates(
+      { PlateBoundary(Vector3df(0.0f), Vector3df(0.0f, 0.0f, 1.0f),
+                      Vector3df(1.0f, 0.0f, 0.0f), 1.0f, 1.0f, 0.05f) },
+      0.005f);
+  solver.simulate(0.005f, 2);
+
+  EXPECT_TRUE(std::isfinite(fluid.getParticles().velocities[0].z));
+  EXPECT_GT(std::abs(fluid.getParticles().velocities[0].z), 0.0f);
+}

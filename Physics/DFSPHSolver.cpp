@@ -17,6 +17,11 @@ DFSPHSolver::DFSPHSolver() :
 	maxTimeStep(0.01f)
 {}
 
+void DFSPHSolver::setEffectLength(const float length)
+{
+	for (auto* fluid : fluids) fluid->setEffectLength(length);
+}
+
 SPHKernel* DFSPHSolver::getKernel()
 {
 	return fluids.empty() ? nullptr : fluids.front()->getKernel();
@@ -56,9 +61,10 @@ void DFFluidSolver::step()
 void DFSPHSolver::simulate(const float dt, const int maxIter)
 {
 	ensurePassiveOpenMPWaitPolicy();
-
-	(void)dt;
-	(void)maxIter;
+	if (!std::isfinite(dt) || dt <= 0.0f || maxIter <= 0 || fluids.empty()) return;
+	frameTimeStep_ = dt;
+	if (fluids.front()->getKernel() == nullptr ||
+	    fluids.front()->getKernel()->getEffectLength() <= 0.0f) return;
 
 	std::vector<DFSPHParticle> particles;
 	for (auto fluid : fluids) {
@@ -108,6 +114,7 @@ void DFSPHSolver::simulate(const float dt, const int maxIter)
 		particles[i].calculateDensity(particles, neighborIndices[i]);
 		particles[i].calculateAlpha(particles, neighborIndices[i]);
 	}
+	this->addBoundaryDensity(particles);
 	this->addBoundaryParticleDensity(particles, rigidBoundaryParticles_);
 	this->addBoundaryParticleDensity(particles, softBoundaryParticles_);
 	// Must accompany every addBoundaryParticleDensity() call: numerator and
@@ -116,7 +123,7 @@ void DFSPHSolver::simulate(const float dt, const int maxIter)
 	this->addBoundaryParticleAlpha(particles, softBoundaryParticles_);
 
 	auto time = 0.0f;
-	while (time < maxTimeStep) {
+	while (time < dt) {
 		// Apply external force (e.g. gravity) to every particle.
 		for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
 			particles[i].setForce(externalForce * particles[i].getMass());
@@ -139,9 +146,9 @@ void DFSPHSolver::simulate(const float dt, const int maxIter)
         if (!std::isfinite(dt) || dt <= 0.0f) {
 			break;
 		}
-		// Land exactly on maxTimeStep instead of overshooting it. The CFL
+		// Land exactly on the caller's frame dt instead of overshooting it. The CFL
 		// substep does not divide the frame evenly in general, so without this
-		// the loop kept taking whole substeps until `time` passed maxTimeStep
+		// the loop kept taking whole substeps until `time` passed the frame end
 		// and the frame advanced further than the caller asked for -- by up to
 		// one substep, i.e. as much as 50% (calculateTimeStep() caps a substep
 		// at maxTimeStep/2). Measured on a block in free fall with no wall in
@@ -155,8 +162,8 @@ void DFSPHSolver::simulate(const float dt, const int maxIter)
 		// small to be worth a full solve (below calculateTimeStep()'s own
 		// minTimeStep floor) ends the frame instead, so the density/divergence
 		// solves are never handed a degenerate dt.
-		const float remaining = maxTimeStep - time;
-		if (remaining <= maxTimeStep * 1.0e-4f) {
+		const float remaining = frameTimeStep_ - time;
+		if (remaining <= std::max(dt, maxTimeStep) * 1.0e-6f) {
 			break;
 		}
 		if (dt > remaining) {
@@ -173,7 +180,7 @@ void DFSPHSolver::simulate(const float dt, const int maxIter)
 			if (particles[i].getParent()->isStatic()) continue;
 			particles[i].addVelocity(dt * particles[i].getForce() / particles[i].getMass());
 		}
-		correctDensityError(particles, neighborIndices, dt);
+		correctDensityError(particles, neighborIndices, dt, maxIter);
 
 		// Integrate positions (skip static fluids).
 		for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
@@ -189,12 +196,13 @@ void DFSPHSolver::simulate(const float dt, const int maxIter)
 			particles[i].calculateDensity(particles, neighborIndices[i]);
 			particles[i].calculateAlpha(particles, neighborIndices[i]);
 		}
+		this->addBoundaryDensity(particles);
 		this->addBoundaryParticleDensity(particles, rigidBoundaryParticles_);
 		this->addBoundaryParticleDensity(particles, softBoundaryParticles_);
 		this->addBoundaryParticleAlpha(particles, rigidBoundaryParticles_);
 		this->addBoundaryParticleAlpha(particles, softBoundaryParticles_);
 
-		correctDivergenceError(particles, neighborIndices, dt);
+		correctDivergenceError(particles, neighborIndices, dt, maxIter);
 		time += dt;
 	}
 
@@ -205,12 +213,13 @@ void DFSPHSolver::simulate(const float dt, const int maxIter)
 	//std::cout << densityError << std::endl;
 }
 
-void DFSPHSolver::correctDivergenceError(std::vector<DFSPHParticle>& particles, const CSRNeighborList& neighbors, const float dt)
+void DFSPHSolver::correctDivergenceError(std::vector<DFSPHParticle>& particles, const CSRNeighborList& neighbors,
+	                                     const float dt, const int maxIter)
 {
 	bool isErrorOk = false;
 	int iter = 0;
 	const auto restDensity = particles.front().getParent()->getDensity();
-	while ((!isErrorOk || iter < 1) && iter < 100) {
+	while ((!isErrorOk || iter < 1) && iter < maxIter) {
 		for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
 			particles[i].calculateDpDt(particles, neighbors[i]);
 		}
@@ -229,11 +238,16 @@ bool DFSPHSolver::isDivergenceErrorAcceptable(float averageDpDt, float restDensi
 	return ::fabs(averageDpDt) * dt / restDensity < maxDivergenceErrorRatio;
 }
 
-void DFSPHSolver::correctDensityError(std::vector<DFSPHParticle>& particles, const CSRNeighborList& neighbors, const float dt)
+void DFSPHSolver::correctDensityError(std::vector<DFSPHParticle>& particles, const CSRNeighborList& neighbors,
+	                                  const float dt, const int maxIter)
 {
 	bool isErrorOk = false;
 	auto iter = 0;
-	while ((!isErrorOk || iter < 2) && iter < 100) {
+	// DFSPH requires two startup sweeps for a usable density projection. Keep
+	// that algorithmic minimum even when the common API's advisory maxIter is
+	// 1 (the value WCSPH-oriented callers traditionally pass).
+	const int iterationLimit = std::max(2, maxIter);
+	while ((!isErrorOk || iter < 2) && iter < iterationLimit) {
 		const auto restDensity = particles.front().getParent()->getDensity();
 
 		for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
@@ -302,7 +316,8 @@ float DFSPHSolver::calculateAverageDpDt(const std::vector<DFSPHParticle>& partic
 
 void DFSPHSolver::addBoundaryDensity(std::vector<DFSPHParticle>& particles)
 {
-	if (this->boundaryPlanes_.empty()) {
+	if (boundaryPlanes_.empty() && boundarySpheres_.empty() &&
+	    boundaryPlates_.empty() && boundaryShapes_.empty()) {
 		return;
 	}
 
@@ -322,19 +337,37 @@ void DFSPHSolver::addBoundaryDensity(std::vector<DFSPHParticle>& particles)
 		// independently hardcoded ratio of particle radius).
 		const float r = kernel->getEffectLength();
 
-		// Each plane contributes independently when the particle has already
+		// Each shape contributes independently when the particle has already
 		// penetrated past it (dist > 0, within influence radius r). Near a box
 		// corner/edge this sums more than one plane's contribution, unlike the
 		// former nearest-point-on-box distance -- an accepted approximation of
 		// decomposing the box into 6 independent half-spaces.
-		for (const auto& plane : this->boundaryPlanes_) {
-			const float dist = -plane.getSignedDistance(pos);
-			if (dist <= 0.0f || dist >= r) continue;
+		auto addShapeConstraint = [&](const IShapeBoundary& boundary) {
+			if (!boundary.isActiveAt(pos, r)) return;
+			const float dist = -boundary.getSignedDistance(pos);
+			if (dist <= 0.0f || dist >= r) return;
 
 			// boundary density contribution: rest * (1 - d/r) * kernel(d)
-			const float contribution = restDensity * (1.0f - dist / r) * kernel->getCubicSpline(dist);
+			const float weight = boundary.getDensityWeight(pos, r);
+			if (weight <= 0.0f) return;
+			const float contribution = restDensity * weight * (1.0f - dist / r) * kernel->getCubicSpline(dist);
 			p.addDensity(contribution);
-		}
+
+			// DFSPH's constraint numerator (density) and denominator (alpha)
+			// must be extended together. The projection direction is the shortest
+			// correction back to the valid side of the analytic shape.
+			const auto correction = boundary.clampPosition(pos) - pos;
+			const float correctionLength = glm::length(correction);
+			if (correctionLength > 1.0e-8f) {
+				const auto direction = correction / correctionLength;
+				p.addBoundaryAlphaGradient(
+					kernel->getCubicSplineGradient(direction * dist) * restDensity * weight);
+			}
+		};
+		for (const auto& plane : boundaryPlanes_) addShapeConstraint(plane);
+		for (const auto& sphere : boundarySpheres_) addShapeConstraint(sphere);
+		for (const auto& plate : boundaryPlates_) addShapeConstraint(plate);
+		for (const auto& shape : boundaryShapes_) if (shape) addShapeConstraint(*shape);
 	}
 }
 
@@ -353,14 +386,18 @@ namespace {
 // out at the frame-level recovery rate (|d|/frameStep) rather than the
 // substep one. Neither term depends on how far the CFL substep has collapsed,
 // and neither binds during an ordinary single-step impact.
-Vector3df clampToPassiveWall(const Vector3df& penaltyAcceleration, const PlaneBoundary& plane,
+Vector3df clampToPassiveWall(const Vector3df& penaltyAcceleration, const IShapeBoundary& boundary,
                              const Vector3df& position, const Vector3df& velocity,
                              const float dt, const float frameStep)
 {
-	const float d = plane.getSignedDistance(position);
+	const float d = boundary.getSignedDistance(position);
 	if (d >= 0.0f) return penaltyAcceleration;
 
-	const float normalVelocity = glm::dot(plane.getNormal(), velocity);
+	const auto correction = boundary.clampPosition(position) - position;
+	const float correctionLength = glm::length(correction);
+	if (correctionLength <= 1.0e-8f) return penaltyAcceleration;
+	const auto normal = correction / correctionLength;
+	const float normalVelocity = glm::dot(normal, velocity);
 	const float stopInward = (normalVelocity < 0.0f) ? -normalVelocity : 0.0f;
 	const float recovery   = (frameStep > 0.0f) ? (-d / frameStep) : 0.0f;
 	const float maxAcceleration = (stopInward + recovery) / dt;
@@ -380,8 +417,8 @@ Vector3df clampToPassiveWall(const Vector3df& penaltyAcceleration, const PlaneBo
 // correction collapses to -d*(dt/T)^2.
 //
 // This solver substeps adaptively (calculateTimeStep(), 0.4*2r/v_max clamped
-// to [maxTimeStep*1e-4, maxTimeStep/2]) while boundaryTimeStep held the
-// caller's frame-level timeStep, i.e. maxTimeStep. That made T >= 2*dt always,
+// to [maxTimeStep*1e-4, maxTimeStep/2]) while the old boundaryTimeStep held a
+// separately registered frame-level value. That made T >= 2*dt always,
 // so the walls removed at most a quarter of each penetration -- and for fast
 // particles, where the CFL substep runs down toward maxTimeStep*1e-4, the
 // walls effectively stopped existing exactly when they were needed most.
@@ -402,17 +439,23 @@ Vector3df clampToPassiveWall(const Vector3df& penaltyAcceleration, const PlaneBo
 // of being launched back up.
 void DFSPHSolver::addBoundaryPressure(std::vector<DFSPHParticle>& particles, const float dt)
 {
-	if (this->boundaryPlanes_.empty()) return;
+	if (boundaryPlanes_.empty() && boundarySpheres_.empty() &&
+	    boundaryPlates_.empty() && boundaryShapes_.empty()) return;
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
 		auto& p = particles[i];
 		Vector3df force(0.0f, 0.0f, 0.0f);
-		for (const auto& plane : this->boundaryPlanes_) {
-			const auto penalty = plane.getBoundaryForce(p.getPosition(), p.getVelocity(),
-			                                             dt, this->boundaryDampingRatio_);
-			force += clampToPassiveWall(penalty, plane, p.getPosition(), p.getVelocity(),
-			                            dt, this->maxTimeStep);
-		}
+		auto addShapeForce = [&](const IShapeBoundary& boundary) {
+			if (!boundary.isActiveAt(p.getPosition(), 0.0f)) return;
+			const auto penalty = boundary.getBoundaryForce(p.getPosition(), p.getVelocity(),
+			                                                   dt, boundaryDampingRatio_);
+			force += clampToPassiveWall(penalty, boundary, p.getPosition(), p.getVelocity(),
+			                            dt, frameTimeStep_);
+		};
+		for (const auto& plane : boundaryPlanes_) addShapeForce(plane);
+		for (const auto& sphere : boundarySpheres_) addShapeForce(sphere);
+		for (const auto& plate : boundaryPlates_) addShapeForce(plate);
+		for (const auto& shape : boundaryShapes_) if (shape) addShapeForce(*shape);
 		p.addForce(force * p.getMass());
 	}
 }
@@ -496,7 +539,7 @@ void DFSPHSolver::addBoundaryParticlePressure(std::vector<DFSPHParticle>& partic
 	// dependent, so an unweighted sum made the reaction on the rigid body swing
 	// by orders of magnitude between frames (docs/issue/CODEBASE_ISSUES.md 1.6).
 	// The fluid-side force below is per-substep and stays unweighted.
-	const float frameShare = (maxTimeStep > 0.0f) ? (dt / maxTimeStep) : 1.0f;
+	const float frameShare = (frameTimeStep_ > 0.0f) ? (dt / frameTimeStep_) : 1.0f;
 
 	// Sequential: bp.accumForce is shared across fluid particles, so this loop
 	// cannot be parallelized the way the sibling boundary method above is
