@@ -181,6 +181,10 @@ void FluidRenderer::onImGui()
     if (ImGui::CollapsingHeader("Fluid Color Map")) {
         ImGui::TextUnformatted(hasDensity_ ? "Quantity: (Density - Rest Density) / Rest Density"
                                            : "Quantity: unavailable (fixed color)");
+        ImGui::Checkbox("Auto Contrast", &autoDensityRange_);
+        if (hasDensity_) {
+            ImGui::Text("Observed robust range: +/- %.5f", observedDensityRange_);
+        }
         ImGui::SliderFloat("Density Difference Min", &densityRangeMin_, -0.5f, 0.0f, "%.3f");
         ImGui::SliderFloat("Density Difference Max", &densityRangeMax_, 0.0f, 0.5f, "%.3f");
         densityRangeMax_ = std::max(densityRangeMax_, densityRangeMin_ + 0.001f);
@@ -198,6 +202,10 @@ void FluidRenderer::uploadVertices(const std::vector<glm::vec3>& pts,
         return;
     }
 
+    if (hasDensity && autoDensityRange_) {
+        updateDensityColorRange(densityDeviations);
+    }
+
     std::vector<VkFluidVertex> vertices;
     vertices.reserve(pts.size());
     for (size_t i = 0; i < pts.size(); ++i) {
@@ -209,6 +217,43 @@ void FluidRenderer::uploadVertices(const std::vector<glm::vec3>& pts,
                          sizeof(VkFluidVertex) * vertices.size(),
                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                          vertices.data());
+}
+
+void FluidRenderer::updateDensityColorRange(const std::vector<float>& densityDeviations)
+{
+    // Incompressible solvers intentionally keep density very close to the rest
+    // value, so a fixed +/-5% scale often collapses the whole fluid to white.
+    // Use a robust percentile of the actual error as a symmetric range: zero
+    // remains the neutral colour while a few boundary outliers cannot consume
+    // all of the available contrast.
+    std::vector<float> magnitudes;
+    magnitudes.reserve(densityDeviations.size());
+    for (float value : densityDeviations) {
+        // Spray/foam entries are appended with an exact neutral value because
+        // they have no SPH density. Exclude those placeholders from the
+        // percentile so a large white-water population cannot flatten the
+        // fluid's colour range.
+        if (std::isfinite(value) && value != 0.0f) {
+            magnitudes.push_back(std::abs(value));
+        }
+    }
+    if (magnitudes.empty()) {
+        observedDensityRange_ = 0.0f;
+        return;
+    }
+
+    const size_t percentileIndex = static_cast<size_t>(
+        0.95f * static_cast<float>(magnitudes.size() - 1));
+    std::nth_element(magnitudes.begin(),
+                     magnitudes.begin() + percentileIndex,
+                     magnitudes.end());
+    observedDensityRange_ = magnitudes[percentileIndex];
+
+    // Avoid amplifying floating-point noise when a settled fluid is virtually
+    // exact, while still exposing sub-percent variation from DFSPH/PBSPH.
+    const float colorRange = std::max(observedDensityRange_, 1.0e-4f);
+    densityRangeMin_ = -colorRange;
+    densityRangeMax_ = colorRange;
 }
 
 glm::mat4 FluidRenderer::computeMVP() const

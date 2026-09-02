@@ -69,6 +69,8 @@ private:
 
     float densityRangeMin_ = -0.05f;
     float densityRangeMax_ = 0.05f;
+    bool autoDensityRange_ = true;
+    float observedDensityRange_ = 0.0f;
 
     float yaw_ = 0.6f;
     float pitch_ = 0.6f;
@@ -84,6 +86,7 @@ private:
     void uploadVertices(const std::vector<glm::vec3>& pts,
                         const std::vector<float>& densityDeviations,
                         bool hasDensity);
+    void updateDensityColorRange(const std::vector<float>& densityDeviations);
 };
 
 } // namespace Phantom  
