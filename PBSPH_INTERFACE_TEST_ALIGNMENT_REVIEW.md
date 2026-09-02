@@ -23,7 +23,7 @@
 2. `setMaxSubstep()` の意味が計画上の adaptive substep 上限と一致していない。
 3. shape boundary の重要な「密度寄与と拘束勾配の対」をテストが直接保証していない。
 
-判定: **要修正**
+判定: **要修正** → 対応済み（下記「対応状況（2026-09-03）」節を参照）
 
 ## 指摘事項
 
@@ -126,11 +126,11 @@ std::abs(value - commonValue) > tolerance
 | 項目 | 判定 | 備考 |
 |---|---|---|
 | `setEffectLength()` の共通 API | 適合 | 登録済み fluid へ伝播する |
-| `setMaxSubstep()` | 不適合 | alias は追加されたが substep 上限として機能しない |
+| `setMaxSubstep()` | 適合（単一ステップ仕様に統一） | alias。計画・`ISPHSolver` コメントを単一ステップ仕様へ修正済み |
 | `SPHSolveStats` | 概ね適合 | single-step と反復数を報告する |
-| 設定不整合の拒否 | 要修正 | mismatch は拒否するが非有限値に穴がある |
+| 設定不整合の拒否 | 適合 | null・非有限・非正を登録順に関係なく状態変更なしで拒否（異常系テスト追加済み） |
 | Plane/Sphere/Plate/generic shape 登録 | 適合 | 共通所有・走査経路が追加された |
-| 密度寄与と拘束勾配の対 | 実装あり、検証不足 | 専用の回帰テストが必要 |
+| 密度寄与と拘束勾配の対 | 適合 | 専用の回帰テスト 4 本を追加（片方欠落・rim taper・重複 shape） |
 | shape の追加・全消去 | 適合 | typed/generic リストを消去する |
 | rigid/soft Two-Way no-op/clear | 適合 | 対称テストが追加された |
 | Two-Way 反力の反復依存性 | 部分適合 | 有限性は確認するが、許容基準が緩く厳密な不変性ではない |
@@ -174,3 +174,70 @@ std::abs(value - commonValue) > tolerance
 - shape boundary の密度寄与と拘束勾配の対が、専用テストで保証される。
 - plate rim と重複 shape の重要な境界条件がテストされる。
 - 全 unit test と対象 PBSPH scenario に回帰がない。
+
+## 対応状況（2026-09-03）
+
+判定「要修正」の 3 点をすべて対応した。
+
+### 1. 高: 非有限・null fluid 設定の拒否 — 対応済み
+
+`PBSPHSolver::simulate()` の設定検証を、差分比較の前に各 fluid を明示検証する形へ変更した
+（`Physics/PBSPHSolver.cpp`）。`fluidScaleValid()` ローカルラムダが、登録順に関係なく次を拒否する。
+
+- fluid ポインタが null（先頭 fluid をデリファレンスする前に検証。`add(nullptr)` でクラッシュしない）
+- kernel ポインタが null
+- effect length が非有限または 0 以下
+- rest density が非有限または 0 以下
+
+いずれも `lastSolveStats_.validConfiguration = false` として粒子状態を変更せずに終了する。
+
+追加テスト（`PhysicsTest/PBSPHSolverTest.cpp`）:
+`RejectsNullFrontFluidWithoutCrashing` / `RejectsNullSecondFluidWithoutTouchingFirst` /
+`RejectsSecondFluidWithNonFiniteEffectLength`（NaN・infinity）/
+`RejectsSecondFluidWithNonFiniteOrNonPositiveRestDensity`（NaN・infinity・0・負）/
+`RejectsSingleFluidWithNonPositiveEffectLength`。全ケースで拒否後の位置・速度不変を確認。
+
+### 2. 中: `setMaxSubstep()` の契約 — 単一ステップ仕様として統一（計画・コメント側を修正）
+
+レビューの選択肢 2 を採った。PBSPH の position-based projection は 1 ステップ内の反復で
+incompressibility を解く設計であり、DFSPH の adaptive substep 方式は非目標（「PBSPH を圧力ばね方式
+または DFSPH の divergence solve に変更しない」と同じ理由）。実装はすでにこの単一ステップ方式で、
+`setMaxSubstep()` は `setTimeStep()` の alias、`maxTimeStep` は境界ペナルティ加速度→位置補正の `dt^2`
+係数としてのみ使われる（解析/剛体境界が未登録なら結果に影響しない）。
+
+意味の不一致を解消するため、以下を単一ステップ仕様に合わせて更新した。
+
+- `Physics/ISPHSolver.h` — `setTimeStep()`/`setMaxSubstep()` のコメントに、単一ステップ solver
+  （WCSPH/PBSPH）は dt を substep 分割せず、この値がフレーム進行量を gate しないことを明記。
+- `PBSPH_INTERFACE_TEST_ALIGNMENT_PLAN.md` Phase 2・最終受け入れ基準 — 「`maxTimeStep` は adaptive
+  substep の上限」という記述を「PBSPH は意図的に単一ステップ」に修正。
+
+`PBSPHSolver.h` のコメントと `SimulateAdvancesRequestedFrameDurationNotMaxSubstep`
+（異なる `setMaxSubstep()` 値でも結果不変）はもともとこの仕様と一致しているため変更なし。
+
+### 3. 中: shape boundary の数値契約テスト — 追加済み
+
+`addShapeBoundaryConstraint()` が「密度寄与（PBF 制約の分子）」と「拘束勾配（`calculateLambda()` の
+分母）」を同一 `sample()` から対で加えることを直接検証する回帰テストを追加した
+（`PhysicsTest/PBSPHSolverTest.cpp`、いずれも近傍ゼロの孤立粒子で penalty/clamp から分離）。
+
+- `ShapeBoundaryAddsToPenetratingParticleDensity` — 貫入した平面境界がある場合の最終密度が、境界
+  なしより厳密に大きい（密度寄与の項を削ると失敗）。
+- `ShapeBoundaryConstraintGradientKeepsLambdaCalibrated` — 唯一の拘束勾配寄与が境界由来のとき、
+  lambda が有限かつ ±1 cap から十分内側（拘束勾配の項を削ると denom が 1e-6 床に落ちて lambda が
+  cap に張り付き失敗）。
+- `PlateBoundaryDensityContributionTapersTowardRim` — 同じ貫入深さで plate 中央 vs u 端の粒子を比較、
+  rim taper（`getDensityWeight`）により端の密度寄与が中央より小さい。
+- `OverlappingShapeBoundariesStayFiniteAndBounded` — 箱の角（3 平面が重なる領域）へ強く押し込んでも
+  位置・速度が有限で角の近傍に留まる（重複寄与が発散しない）。
+
+### 検証結果
+
+- ビルド: `PhysicsCore` / `PhysicsTest` とも成功（`Phantom/build/windows-debug`、VS2026 v145）。
+- 全 `PhysicsTest`: 382 件中 382 件成功（373 + 新規 9）。
+- PBSPH 対象 scenario: `11_fluid_pbsph_pool_settle` / `15_fluid_pbsph_dam_break` /
+  `17_fluid_pbsph_small_scale_regression` / `51_couple_rigid_fluid_twoway` / `12_fluid_wcsph_pool_settle`
+  すべて成功。
+- `60_bound_mesh_floor` は失敗するが、原因は `${repo_root}` が `Phantom/` を欠いた
+  `C:/Dev/Crystal2024/Physics/...` に解決される環境側のパス問題（"failed to load mesh boundary"）で、
+  本修正とは無関係（mesh boundary の読み込み経路には触れていない）。

@@ -37,12 +37,12 @@
 
 - `PBSPHSolver::setMaxSubstep(dt)` を `setTimeStep(dt)` の明示的 alias として override する。
 - `PBSPHSolver::setEffectLength(length)` を追加し、登録済み全 `PBSPHFluid` に伝播する。
-- `simulate(dt, maxIter)` が要求された frame 時間を進め、`maxTimeStep` は adaptive substep の上限としてだけ使われることをコメントとテストで固定する。
+- **PBSPH は意図的に単一ステップ**とする（DFSPH の adaptive substep 方式は採らない。非目標「PBSPH を圧力ばね方式または DFSPH の divergence solve に変更しない」と同じ理由——PBSPH の position-based projection は 1 ステップ内の反復で incompressibility を解く設計）。`simulate(dt, maxIter)` は要求された frame 時間 `dt` を 1 ステップで進める。保存された `maxTimeStep` は substep 上限としては使われず、境界ペナルティ加速度を位置補正へ変換する `dt^2` 係数としてのみ使われる（解析/剛体境界が未登録なら結果に影響しない）。この意味を `ISPHSolver.h`／`PBSPHSolver.h` のコメントとテストで固定する。
 - 追加テスト:
   - `CommonEffectLengthInterfaceUpdatesRegisteredFluid`
-  - `SimulateAdvancesRequestedFrameDurationNotMaxSubstep`
+  - `SimulateAdvancesRequestedFrameDurationNotMaxSubstep`（異なる `setMaxSubstep()` 値でも結果が変わらないこと＝単一ステップ仕様の固定）
   - 未登録 fluid に対する両 setter の安全な no-op
-- 完了条件: `ISPHSolver*` 経由で設定しても PBSPH 具象 API と同じ結果になる。
+- 完了条件: `ISPHSolver*` 経由で設定しても PBSPH 具象 API と同じ結果になり、`setMaxSubstep()` の意味が実装・テスト・本計画・`ISPHSolver` コメントで一致する。
 
 ### 3. 共通 solve diagnostics と設定検証
 
@@ -122,7 +122,7 @@
 
 ## 最終受け入れ基準
 
-- PBSPH が `ISPHSolver*` 経由で effect length、最大 substep、全 analytic shape、diagnostics を扱える。
+- PBSPH が `ISPHSolver*` 経由で effect length、時間刻み（`setTimeStep()`/`setMaxSubstep()` alias、単一ステップ仕様）、全 analytic shape、diagnostics を扱える。
 - 無効設定を状態変更なしで拒否し、その理由を少なくとも `validConfiguration` で通知できる。
 - Plane/Sphere/Plate/generic shape の登録、追加、全消去が共通 API で機能する。
 - rigid/soft Two-Way の登録・未登録・clear・反力の契約がテストされる。
