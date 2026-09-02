@@ -10,7 +10,7 @@
 using namespace Phantom::Math;
 using namespace Phantom::Physics;
 
-// docs/todo/PLAN_sph_scale_invariance.md Phase 8: a dedicated end-to-end
+// internal design notes Phase 8: a dedicated end-to-end
 // check that the scale-invariance work from Phases 1-7 actually composes --
 // running the *same* relative scenario (a small particle block settling
 // under gravity inside a box) at two different length scales should produce

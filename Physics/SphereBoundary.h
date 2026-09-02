@@ -14,7 +14,7 @@ namespace Phantom {
  *
  * The valid/interior region is where getSignedDistance() >= 0 (inside the
  * sphere), the same convention as PlaneBoundary. See
- * docs/todo/PLAN_sph_showcase_water_sphere.md section 8-A for the design
+ * internal design notes section 8-A for the design
  * rationale (closed container for the "water sphere" showcase scene).
  */
 class SphereBoundary : public IShapeBoundary
@@ -71,7 +71,7 @@ public:
 	 * @brief Same penalty force, plus a damper on the wall-normal velocity
 	 * component -- see boundaryPenaltyAcceleration() for why the undamped form
 	 * above is a restitution-1 trampoline, and
-	 * docs/issue/water_sphere_showcase_emitter_instability.md section 3 for the
+	 * internal design notes section 3 for the
 	 * showcase scene that made it visible (a jet landing in an *empty* sphere
 	 * has no water above it to absorb the rebound).
 	 * @param pos          World-space position.

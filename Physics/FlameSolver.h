@@ -22,7 +22,7 @@ namespace Phantom {
  * lifetime bookkeeping at the end of each step.
  *
  * Deliberately does NOT implement ISPHSolver: Rigid/SoftBody coupling is out
- * of scope for this solver (see docs/todo/sph_flame_plan.md), so simulate()
+ * of scope for this solver (see internal design notes), so simulate()
  * takes only dt (no maxIter, no boundary-particle registration API).
  */
 class FlameSolver : private UnCopyable

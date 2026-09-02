@@ -12,11 +12,11 @@ namespace Phantom {
  * cloud (x,y,z float32 only -- no color/normal/velocity/density). Creates
  * the parent directory if it doesn't exist yet.
  *
- * Deliberately minimal compared to CGApp/blender/PyFluid/PyFluid.cpp's own
- * writeFluidsToPLY() (which also carries velocity/density/fluid_id so a bake
- * can resume from it): PhysicsView's own PLY export exists to give the
- * native showcase scenarios (scenarios/showcase/*.json) an inspectable
- * per-frame point cloud, not a resumable bake checkpoint. Position-only is
+ * Deliberately minimal compared to a full bake writer that also carries
+ * velocity/density/fluid_id so a bake can resume from it: PhysicsView's own
+ * PLY export exists to give the native showcase scenarios
+ * (scenarios/showcase/*.json) an inspectable per-frame point cloud, not a
+ * resumable bake checkpoint. Position-only is
  * enough for that and keeps this independent of any *Fluid's internal SoA
  * layout.
  *

@@ -1,8 +1,8 @@
 {
   "name": "showcase_dam_break",
   "_comment": [
-    "Native PhysicsView port of the Blender crystal_sph_addon preset SHOWCASE_DAM_BREAK",
-    "(CGApp/blender/PyFluid/crystal_sph_addon/presets.py). Same WCSPH physics values,",
+    "Native PhysicsView scenario for the SHOWCASE_DAM_BREAK",
+    "Same WCSPH physics values,",
     "converted from Blender's Z-up world space to PhysicsView's Y-up convention via",
     "(Bx,By,Bz) -> (Bx,Bz,By) (gravity (0,0,-9.8) -> (0,-9.8,0), matching PhysicsView's",
     "own default). Not run by run_physics_scenarios.ps1's default sweep -- it only",

@@ -90,7 +90,7 @@ public:
 	void setStatic(const bool b) { isStatic_ = b; }
 	bool isStatic() const { return isStatic_; }
 
-	// ---- Emitter (continuous particle generation, docs/todo/PLAN_physics_fluid_emitter.md) ----
+	// ---- Emitter (continuous particle generation, internal design notes) ----
 
 	/** @brief Registers a new emission region. */
 	void addEmitter(const Emitter& e) { emitters_.push_back(e); }
@@ -165,7 +165,7 @@ public:
 	 * unlike viscosityCoe/effectLength/pressureCoe/density above, this field
 	 * is new and has no existing caller that always sets it, so it is
 	 * default-initialized rather than left indeterminate (see
-	 * docs/todo/PLAN_sph_surface_tension.md Phase 0's WCSPHFluid::tensionCoe
+	 * internal design notes Phase 0's WCSPHFluid::tensionCoe
 	 * bug, which this avoids repeating).
 	 */
 	float tensionCoe = 0.0f;

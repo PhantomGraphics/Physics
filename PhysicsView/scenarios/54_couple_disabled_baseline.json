@@ -6,7 +6,7 @@
     { "label": "Effect length 0.6 = one seed spacing", "command": "SetFluidEffectLength:0.6", "expect": "OK" },
     { "label": "Pressure coe scale (WCSPHFluid::estimatePressureCoe(0.6, 98.0))", "command": "SetFluidPressureCoeScale:98.0", "expect": "OK" },
     { "label": "Rest density", "command": "SetFluidDensity:1.0", "expect": "OK" },
-    { "label": "Particle radius 0.3 = seed spacing 0.6, which puts seeds on x=0/z=0 and therefore inside ScenePreset::BoxDrop's 1x1x1 drop column (docs/issue/CODEBASE_ISSUES.md 1.7)", "command": "SetFluidRadius:0.3", "expect": "OK" },
+    { "label": "Particle radius 0.3 = seed spacing 0.6, which puts seeds on x=0/z=0 and therefore inside ScenePreset::BoxDrop's 1x1x1 drop column (internal design notes 1.7)", "command": "SetFluidRadius:0.3", "expect": "OK" },
     { "label": "Shallow pool, x/z in [-1.2,1.2], y in [0,1.2]", "command": "SetFluidBounds:-1.2:0:-1.2:1.2:1.2:1.2", "expect": "OK" },
     { "label": "Container: floor at y=0, walls just outside the pool, open top", "command": "SetFluidBoundary:-1.5:0:-1.5:1.5:1000:1.5", "expect": "OK" },
     { "label": "Floor + box dropping from y=3", "command": "SetPreset:BoxDrop", "expect": "OK" },

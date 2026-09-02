@@ -19,7 +19,7 @@ using namespace Phantom::Math;
 // simulate -> stepForced order), so a regression here shows up in that scenario
 // too, but runs in a second instead of needing the Vulkan app.
 //
-// This is the regression guard for docs/issue/CODEBASE_ISSUES.md 1.6: before the
+// This is the regression guard for internal design notes 1.6: before the
 // fix the pool went NaN within a single frame and the sphere was flung around at
 // 10^6 m/s.
 namespace {
@@ -117,7 +117,7 @@ TEST(RigidFluidTwoWayDFSPHTest, UncoupledPoolFreeFalls) {
     EXPECT_NEAR(scene.maxParticleY(), 2.2f - drop, 0.02f);
 }
 
-// The coupled pool must stay bounded. Until docs/issue/CODEBASE_ISSUES.md 1.6
+// The coupled pool must stay bounded. Until internal design notes 1.6
 // was fixed, the boundary-particle density excess drove DFSPH's density-error
 // solve to NaN inside the very first frame.
 TEST(RigidFluidTwoWayDFSPHTest, CoupledPoolStaysFiniteAndBounded) {

@@ -41,7 +41,7 @@ TEST(DFSPHFluidTest, PublicFieldsSetAndRead)
   EXPECT_FLOAT_EQ(fluid.getViscosityCoe(), 0.05f);
 }
 
-// ---- Surface tension coefficient (docs/todo/PLAN_sph_surface_tension.md
+// ---- Surface tension coefficient (internal design notes
 // Phase 5) -- defaults to 0.f (disabled) rather than being left indeterminate
 // like the other public fields above, since unlike those there is no
 // existing caller that always sets it (see DFSPHFluid.h's field comment).
@@ -91,7 +91,7 @@ TEST(DFSPHFluidTest, BoundingBoxContainsAllParticles)
   EXPECT_GE(bb.getMax().y,  0.3f - kTol);
 }
 
-// ---- Emitter (docs/todo/PLAN_physics_fluid_emitter.md) -------------------
+// ---- Emitter (internal design notes) -------------------
 
 TEST(DFSPHFluidTest, UpdateEmittersIsNoOpWithoutRegisteredEmitters)
 {
@@ -418,7 +418,7 @@ TEST(DFSPHParticleTest, DivergenceCorrectionKeepsUniformVelocity)
   EXPECT_NEAR(particles[1].getVelocity().z, v1Before.z, kTol);
 }
 
-// ---- Surface normal / surface tension (docs/todo/PLAN_sph_surface_tension.md
+// ---- Surface normal / surface tension (internal design notes
 // Phase 5) -- mirrors WCSPHParticle::solveNormal()/solveSurfaceTension() and
 // the WCSPHSolverTest coverage for them, adapted to DFSPHParticle's explicit
 // neighbor-list-argument style (see this file's DFSPHParticleTest comment
@@ -580,7 +580,7 @@ TEST(DFSPHSolverTest, CalculateRestDensityVariesWithParticleRadius)
 }
 
 // ---- DFSPHSolver: neighbor search radius tracks the fluid's effectLength,
-// not a hardcoded 2.25x-radius ratio (docs/todo/PLAN_sph_scale_invariance.md
+// not a hardcoded 2.25x-radius ratio (internal design notes
 // Phase 4, item #8) ---------------------------------------------------------
 
 TEST(DFSPHSolverTest, CalculateRestDensityUsesFluidsEffectLengthNotHardcodedRatio)
@@ -633,7 +633,7 @@ TEST(DFSPHSolverTest, CalculateRestDensityUsesFluidsEffectLengthNotHardcodedRati
 }
 
 // ---- DFSPHSolver: divergence-error convergence check is relative, not
-// absolute (docs/todo/PLAN_sph_scale_invariance.md Phase 3) --------------
+// absolute (internal design notes Phase 3) --------------
 
 TEST(DFSPHSolverTest, IsDivergenceErrorAcceptable_ReproducesHistoricalThresholdAtDefaultScale)
 {

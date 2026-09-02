@@ -92,7 +92,7 @@ TEST(PBSPHFluidTest, BoundingBoxContainsAllParticles)
   EXPECT_GE(bb.getMax().y,  0.3f - kTol);
 }
 
-// ---- Emitter (docs/todo/PLAN_physics_fluid_emitter.md) -------------------
+// ---- Emitter (internal design notes) -------------------
 
 TEST(PBSPHFluidTest, UpdateEmittersIsNoOpWithoutRegisteredEmitters)
 {
@@ -234,7 +234,7 @@ TEST(PBSPHFluidTest, EffectLengthUpdatesKernel)
 }
 
 // ---- Scale invariance: mass-weighted constraint gradient -----------------
-// Locks in the fix from docs/todo/PLAN_sph_scale_invariance.md section 4:
+// Locks in the fix from internal design notes section 4:
 // PBSPHParticle::accumulateConstraintGradient()/calculatePressure() used to
 // weight the Poly6 gradient without the neighbor's mass, inconsistent with
 // addDensity(rhs) (which is mass-weighted) and with the boundary-particle
@@ -303,7 +303,7 @@ TEST(PBSPHFluidTest, PositionCorrectionOverRadiusIsScaleInvariant)
   }
 }
 
-// docs/todo/PLAN_sph_scale_invariance.md Phase 7 re-verification: Phase 1
+// internal design notes Phase 7 re-verification: Phase 1
 // found that before the accumulateConstraintGradient()/calculatePressure()
 // mass-weighting fix, kLambdaCap=1.0f (PBSPHParticle.cpp) was already
 // saturated at the codebase's conventional default scale (radius=1,

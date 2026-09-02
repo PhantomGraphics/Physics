@@ -70,7 +70,7 @@ public:
 
     /**
      * @brief Estimates a scale-appropriate penalty stiffness from the
-     * simulation time step alone (see docs/todo/PLAN_sph_scale_invariance.md
+     * simulation time step alone (see internal design notes
      * Phase 2: penaltyStiffness_ has units 1/time^2 -- getBoundaryForce()
      * returns stiffness * penetrationDepth as an acceleration, not a length-
      * scaled force -- so, unlike #9's pressureCoe/stiffness, it does not need

@@ -1,7 +1,7 @@
 {
   "name": "91_neg_unknown_preset",
   "steps": [
-    { "label": "Unknown rigid-body preset name is rejected (Phase 0 fix -- previously silently fell back to ScenePreset::Custom, see docs/todo/PLAN_physics_scenario_test_rebuild.md 1.4)",
+    { "label": "Unknown rigid-body preset name is rejected (Phase 0 fix -- previously silently fell back to ScenePreset::Custom, see internal design notes 1.4)",
       "command": "SetPreset:NoSuchRigidPreset", "expect_prefix": "Error:" },
     { "label": "A real preset name still works after the rejected one",
       "command": "SetPreset:SphereDrop", "expect": "OK" },

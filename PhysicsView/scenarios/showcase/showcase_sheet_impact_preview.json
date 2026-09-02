@@ -1,12 +1,12 @@
 {
   "name": "showcase_sheet_impact_preview",
   "_comment": [
-    "Native PhysicsView port of the Blender crystal_sph_addon preset",
+    "Native PhysicsView scenario for the",
     "SHOWCASE_SHEET_IMPACT_PREVIEW -- same geometry/camera framing as",
     "SHOWCASE_SHEET_IMPACT (showcase_sheet_impact.json) but with particle radius",
     "doubled (~65k particles instead of ~400k). Note the sheet is 4 layers here",
     "(18mm) instead of 3 -- at 6mm spacing, 15mm would round down to only 3 layers",
-    "and stop behaving like a thin sheet (see presets.py's sheet_max_z comment) --",
+    "and stop behaving like a thin sheet (see the preset's sheet_max_z note) --",
     "so its native-space max Y differs slightly from the main-tier scenario, unlike",
     "the 5 drops (unchanged). Axis conversion and drop coordinates are otherwise the",
     "same as showcase_sheet_impact.json -- see its _comment.",
@@ -18,7 +18,7 @@
     { "label": "particle_radius=0.003 (2x SHOWCASE_SHEET_IMPACT)", "command": "SetFluidRadius:0.003", "expect": "OK" },
     { "label": "effect_length_factor=4.0 -> effectLength=4*radius=0.012", "command": "SetFluidEffectLength:0.012", "expect": "OK" },
     { "label": "rest_density=1000 kg/m^3", "command": "SetFluidDensity:1000", "expect": "OK" },
-    { "label": "viscosity_coe=0.003 -- same as SHOWCASE_SHEET_IMPACT on purpose: viscosityCoe is a kinematic viscosity (m^2/s) and must NOT be rescaled with the particle radius (docs/issue/water_sphere_showcase_emitter_instability.md section 11.2)", "command": "SetFluidViscosity:0.003", "expect": "OK" },
+    { "label": "viscosity_coe=0.003 -- same as SHOWCASE_SHEET_IMPACT on purpose: viscosityCoe is a kinematic viscosity (m^2/s) and must NOT be rescaled with the particle radius (internal design notes section 11.2)", "command": "SetFluidViscosity:0.003", "expect": "OK" },
     { "label": "tension_coe=0.0", "command": "SetFluidTension:0.0", "expect": "OK" },
     { "label": "preset doesn't override pressure_coe_scale -> addon default 1.96", "command": "SetFluidPressureCoeScale:1.96", "expect": "OK" },
     { "label": "time_step=0.0003 (2x)", "command": "SetFluidTimeStep:0.0003", "expect": "OK" },

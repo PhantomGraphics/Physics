@@ -39,7 +39,7 @@ private:
     // WCSPH/DFSPH -- see pressureCoeScaleView_ below.
     Phantom::UI::FloatView stiffnessView_ { "Stiffness",    20.0f  };
     // Scale-invariant replacement for the raw Stiffness slider, WCSPH and
-    // DFSPH only (docs/todo/PLAN_sph_scale_invariance.md section 4/Phase 1):
+    // DFSPH only (internal design notes section 4/Phase 1):
     // a raw pressureCoe means something different at every scene scale, so
     // these two instead derive it as pressureCoeScale * effectLength via
     // WCSPHFluid::estimatePressureCoe()/setPressureCoeFromScale() (see
@@ -53,7 +53,7 @@ private:
     // Mesh Boundary section (LoadMeshBoundary/ClearMeshBoundary demo wiring).
     char meshBoundaryPathBuf_[260] = "";
 
-    // Emitter section (docs/todo/PLAN_physics_fluid_emitter.md): scratch
+    // Emitter section (internal design notes): scratch
     // fields for the "new emitter" form, cleared to a plain upward jet on
     // "Add" (mirrors Emitter's own struct defaults).
     float newEmitterCenter_[3] = { 0.0f, 0.0f, 0.0f };

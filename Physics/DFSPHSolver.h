@@ -141,7 +141,7 @@ public:
 	 * addBoundaryParticlePressure()'s pressure term stays zero regardless of
 	 * proximity. Call once per density recompute (mirrors addBoundaryDensity()
 	 * above), after calculateDensity(). Shared by rigid and SoftBody boundary
-	 * particle sets alike (docs/todo/PLAN_physics_ownership_and_coupling_unification.md,
+	 * particle sets alike (internal design notes,
 	 * Phase 3) -- the two only differ in how their worldPos/psi get produced,
 	 * not in how this loop consumes them.
 	 * @param particles  Fluid particles to accumulate density onto.
@@ -157,7 +157,7 @@ public:
 	 * The denominator counterpart of addBoundaryParticleDensity()'s numerator:
 	 * both must be applied together, or the density-error/divergence solve
 	 * sees a boundary-induced density excess with no matching stiffness term
-	 * and diverges (docs/issue/CODEBASE_ISSUES.md 1.6). Mirrors
+	 * and diverges (internal design notes 1.6). Mirrors
 	 * PBSPHSolver::addBoundaryParticleConstraintGradient(). Call right after
 	 * each calculateAlpha() pass, for the same boundary lists that
 	 * addBoundaryParticleDensity() is called with.
@@ -250,7 +250,7 @@ public:
 
 	/**
 	 * @brief Default relative tolerance for correctDivergenceError()'s
-	 * convergence check (docs/todo/PLAN_sph_scale_invariance.md Phase 3):
+	 * convergence check (internal design notes Phase 3):
 	 * the loop stops once one substep's predicted density drift from
 	 * residual divergence (|averageDpDt| * dt) is below this fraction of
 	 * restDensity, instead of the pre-Phase-3 hardcoded absolute threshold
@@ -286,7 +286,7 @@ private:
 	// (0.4*2*radius/velocity) for the codebase's conventional default scene
 	// (radius=1, typical fall velocities of a few units/s) -- rescale it
 	// proportionally to the scene's length scale if radius moves away from
-	// that default (docs/todo/PLAN_sph_scale_invariance.md Phase 6).
+	// that default (internal design notes Phase 6).
 	float maxTimeStep;
 	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlanes_;
 	std::vector<std::shared_ptr<IShapeBoundary>> boundarySpheres_;

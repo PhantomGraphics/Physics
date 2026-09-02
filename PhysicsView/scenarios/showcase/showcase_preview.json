@@ -1,7 +1,7 @@
 {
   "name": "showcase_preview",
   "_comment": [
-    "Native PhysicsView port of the Blender crystal_sph_addon preset SHOWCASE_PREVIEW --",
+    "Native PhysicsView scenario for the SHOWCASE_PREVIEW --",
     "same geometry/camera framing as SHOWCASE_DAM_BREAK (showcase_dam_break.json) but",
     "with particle radius tripled (~30k particles instead of ~800k), for a fast local",
     "sanity check before running the full showcase_dam_break.json bake. Axis conversion",
@@ -15,7 +15,7 @@
     { "label": "particle_radius=0.0075 (3x SHOWCASE_DAM_BREAK)", "command": "SetFluidRadius:0.0075", "expect": "OK" },
     { "label": "effect_length_factor=4.0 -> effectLength=4*radius=0.03", "command": "SetFluidEffectLength:0.03", "expect": "OK" },
     { "label": "rest_density=1000 kg/m^3", "command": "SetFluidDensity:1000", "expect": "OK" },
-    { "label": "viscosity_coe=0.005 -- same as SHOWCASE_DAM_BREAK on purpose: viscosityCoe is a kinematic viscosity (m^2/s) and must NOT be rescaled with the particle radius. The 0.015 this used to carry made the preview damp 3x harder than the tier it is previewing (docs/issue/water_sphere_showcase_emitter_instability.md section 11.2)", "command": "SetFluidViscosity:0.005", "expect": "OK" },
+    { "label": "viscosity_coe=0.005 -- same as SHOWCASE_DAM_BREAK on purpose: viscosityCoe is a kinematic viscosity (m^2/s) and must NOT be rescaled with the particle radius. The 0.015 this used to carry made the preview damp 3x harder than the tier it is previewing (internal design notes section 11.2)", "command": "SetFluidViscosity:0.005", "expect": "OK" },
     { "label": "no surface tension", "command": "SetFluidTension:0.0", "expect": "OK" },
     { "label": "preset doesn't override pressure_coe_scale -> addon default 1.96", "command": "SetFluidPressureCoeScale:1.96", "expect": "OK" },
     { "label": "time_step=0.00075 (3x, scale law)", "command": "SetFluidTimeStep:0.00075", "expect": "OK" },

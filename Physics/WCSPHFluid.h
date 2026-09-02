@@ -112,13 +112,12 @@ public:
 
 	/**
 	 * @brief Estimates a scale-appropriate pressure stiffness coefficient
-	 * (see docs/todo/PLAN_sph_scale_invariance.md section 4: with pressureCoe
+	 * (see internal design notes section 4: with pressureCoe
 	 * held fixed, the pressure acceleration for a fixed relative compression
 	 * scales as 1/effectLength, so a raw numeric pressureCoe means something
 	 * different at every scene scale). Simply linear in effectLength
 	 * (pressureCoe = pressureCoeScale * effectLength) rather than derived from
-	 * gravity/target density error/rest density -- see docs/todo/
-	 * PLAN_sph_scale_invariance.md for the retired physics-based derivation.
+	 * gravity/target density error/rest density -- see internal design notes for the retired physics-based derivation.
 	 * @param effectLength Kernel support radius (the scene's length scale).
 	 * @param pressureCoeScale Proportionality constant. Defaults to 1960.0f,
 	 *        matching the historical value at effectLength=1 under the retired
@@ -151,7 +150,7 @@ public:
 	// "scale viscosity with resolution" as this codebase's rule -- which is how
 	// the water-sphere showcase came to run its production tier at half the
 	// preview tier's viscosity and spray all over the container
-	// (docs/issue/water_sphere_showcase_emitter_instability.md 11.1-11.3).
+	// (internal design notes 11.1-11.3).
 	//
 	// solveViscosityForce() adds viscosityCoe * dv * laplacian(W_visc) * m_j and
 	// forwardTime() divides by rho, so next to Muller et al. 2003's
@@ -199,7 +198,7 @@ public:
 	 */
 	bool isStatic() const { return isBoundary; }
 
-	// ---- Emitter (continuous particle generation, docs/todo/PLAN_physics_fluid_emitter.md) ----
+	// ---- Emitter (continuous particle generation, internal design notes) ----
 
 	/** @brief Registers a new emission region. */
 	void addEmitter(const Emitter& e) { emitters_.push_back(e); }
@@ -263,7 +262,7 @@ private:
 	// Zero-initialized so WCSPHSolver::simulate() can detect "setEffectLength()
 	// was never called" as a checkable getEffectLength() == 0.f rather than
 	// reading indeterminate garbage into its neighbor search radius (see
-	// docs/todo/PLAN_sph_scale_invariance.md Phase 5).
+	// internal design notes Phase 5).
 	float effectLength = 0.0f;
 	float pressureCoe;
 	float density;

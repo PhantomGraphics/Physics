@@ -163,7 +163,7 @@ std::string SoftBodyCommandDispatcher::route(const std::string& cmd) {
         else if (name == "TwoJelliesStacked") p = SoftBodyPreset::TwoJelliesStacked;
         else if (name == "Mixed")          p = SoftBodyPreset::Mixed;
         // Unlike rigid-body's ScenePreset, SoftBodyPreset has no "Custom" escape
-        // hatch -- every name must be a real preset (see docs/todo/PLAN_physics_scenario_test_rebuild.md 1.4).
+        // hatch -- every name must be a real preset (see internal design notes 1.4).
         else return "Error:unknown preset '" + std::string(name) + "'";
         world_->setPreset(p);
         if (onWorldChanged_) onWorldChanged_();

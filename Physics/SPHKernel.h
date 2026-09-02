@@ -111,7 +111,7 @@ private:
 	// kernel that was never given a support radius via the owning fluid's
 	// setEffectLength() reads back as a deterministic, checkable "unset"
 	// state (getEffectLength() == 0.f) instead of garbage -- see
-	// docs/todo/PLAN_sph_scale_invariance.md Phase 5.
+	// internal design notes Phase 5.
 	float effectLength = 0.0f;
 	float poly6KernelConstant = 0.0f;
 	float spikyKernelGradConstant = 0.0f;

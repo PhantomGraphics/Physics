@@ -15,7 +15,7 @@ namespace Phantom {
  * Where PlaneBoundary is an infinite half-space (so a box container can only
  * be a convex interior), a plate is finite in every direction: water runs off
  * its edge instead of being held by an invisible wall that extends forever.
- * See docs/todo/PLAN_sph_showcase_waterfall.md section 3 for the design
+ * See internal design notes section 3 for the design
  * rationale (the "waterfall" showcase's channel floor, weir, cliff face and
  * rock shelves are all finite plates).
  *
@@ -118,7 +118,7 @@ public:
 	 * @brief Density contribution helper: a [0, 1] taper that falls off near
 	 * the plate's rim, so an edge particle is not handed the density of a
 	 * full solid half-space that mostly isn't there (see
-	 * docs/todo/PLAN_sph_showcase_waterfall.md section 3.4). 1 more than
+	 * internal design notes section 3.4). 1 more than
 	 * effectLength inside the rim, 0.5 right over the rim, 0 past it.
 	 * @param pos          World-space position.
 	 * @param effectLength Kernel support radius.

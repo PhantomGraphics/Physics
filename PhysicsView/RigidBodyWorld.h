@@ -23,7 +23,7 @@ enum class ScenePreset {
 class RigidBodyWorld {
 public:
     // solver must outlive this RigidBodyWorld (typically owned by the same FluidWorld that
-    // constructs this). Rigid-Fluid coupling (docs/todo/PLAN_rigid_fluid_coupling.md) reaches
+    // constructs this). Rigid-Fluid coupling (internal design notes) reaches
     // solver.rigidFluidSolver() directly from FluidWorld rather than through this class -- see
     // its class doc.
     explicit RigidBodyWorld(Physics::PhysicsSolver& solver);

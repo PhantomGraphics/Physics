@@ -256,7 +256,7 @@ float FluidWorld::coupledTimeStep() const
     // agree (fluid 0.01 vs RigidBodySolver/SoftBodySolver 0.016), so a coupled
     // frame used to advance the rigid body 1.6x further through the fluid than
     // the fluid itself advanced -- reading exactly like the rigid body
-    // "accelerating past free fall" (docs/issue/CODEBASE_ISSUES.md 1.6).
+    // "accelerating past free fall" (internal design notes 1.6).
     // The fluid's dt wins: it is the one the SPH solvers were configured with
     // (createDFSPH()/createWCSPH()/... pass it to setTimeStep()/setBoundary()).
     return params_.timeStep;
@@ -603,7 +603,7 @@ void FluidWorld::createDFSPH()
     // divergence-free pressure solve doesn't use pressureCoe at all. A raw
     // fixed value means something different at every scene scale for the
     // same reason as WCSPH's (see createWCSPH() below and
-    // docs/todo/PLAN_sph_scale_invariance.md section 4/Phase 1), so this
+    // internal design notes section 4/Phase 1), so this
     // reuses WCSPHFluid::estimatePressureCoe() -- a pure function of
     // effectLength/pressureCoeScale, not tied to WCSPH's own instance state
     // -- instead of params_.stiffness.
@@ -690,7 +690,7 @@ void FluidWorld::createWCSPH()
     // Scale-invariant in place of a raw params_.stiffness: derives pressureCoe
     // from effectLength * pressureCoeScale so the UI's "Pressure Coe Scale"
     // knob keeps meaning the same thing regardless of scene scale
-    // (docs/todo/PLAN_sph_scale_invariance.md section 4/Phase 1).
+    // (internal design notes section 4/Phase 1).
     csphFluid_->setPressureCoeFromScale(params_.pressureCoeScale);
     csphFluid_->setMaxParticles(params_.maxParticles);
 

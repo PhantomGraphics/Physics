@@ -18,7 +18,7 @@
     { "label": "Invariant: contacts reported without erroring", "command": "GetContactCount", "expect_prefix": "Contacts:" },
     { "label": "Reset restores the Custom scene exactly as built", "command": "Reset", "expect": "OK" },
     { "label": "Body count after reset", "command": "GetBodyCount", "expect": "Count:7" },
-    { "label": "Sphere 1's position IS restored by Reset (regression check: AddSphere/AddBox/AddFloor each re-snapshot, see docs/issue/CODEBASE_ISSUES.md 1.4 history)",
+    { "label": "Sphere 1's position IS restored by Reset (regression check: AddSphere/AddBox/AddFloor each re-snapshot, see internal design notes 1.4 history)",
       "command": "GetBodyPositionY:2", "expect": "${y0}" }
   ],
   "post_assert": "y1 < y0"

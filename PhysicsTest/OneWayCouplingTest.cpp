@@ -54,7 +54,7 @@ TEST(OneWayCouplingTest, PBSPH_ParticleFallingOntoStaticSphere_DoesNotPenetrate)
     EXPECT_GT(minDist, sphere.radius - 0.15f);
 }
 
-// docs/todo/PLAN_sph_scale_invariance.md Phase 2 (#1): a particle falling
+// internal design notes Phase 2 (#1): a particle falling
 // onto a RigidBoundary plane whose stiffness comes from
 // RigidBoundary::estimateStiffness(dt) should stay bounded near the plane at
 // both the historical scale (radius=1) and a 10x-smaller one, with gravity

@@ -136,7 +136,7 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
         // RigidBodyCommandDispatcher via the processQueue() fallback below
         // (nullopt keeps that fallthrough unchanged); only soft-body
         // stepping is added here, alongside it, with no coupling between
-        // the two (see docs/todo/PLAN_softbody_physics_integration.md;
+        // the two (see internal design notes;
         // fluid+soft coupled stepping goes through the plain "Step" command
         // instead, repeated via a scenario JSON's "repeat" field).
         // stepForced() (not step()) is used so this actually advances the
@@ -227,7 +227,7 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
         return std::to_string(world_->getMeshBoundaryTriangleCount());
     }
 
-    // ---- Emitter (continuous particle generation, docs/todo/PLAN_physics_fluid_emitter.md) ----
+    // ---- Emitter (continuous particle generation, internal design notes) ----
     // "AddEmitter:cx,cy,cz,radius,rate,dirX,dirY,dirZ,speed" -- speedJitter
     // isn't exposed here (scenario-only surface for demo setup, mirrors the
     // other Set* commands above); tune it via the fluid's own addEmitter()
@@ -320,7 +320,7 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
         return std::string("OK");
     }
     // Scale-invariant counterpart to SetFluidStiffness for WCSPH/DFSPH (see
-    // FluidWorld::createWCSPH()/createDFSPH()/docs/todo/PLAN_sph_scale_invariance.md):
+    // FluidWorld::createWCSPH()/createDFSPH()/internal design notes):
     // both ignore params().stiffness and always derive their pressureCoe as
     // pressureCoeScale * effectLength instead.
     if (sv.rfind("SetFluidPressureCoeScale:", 0) == 0) {
@@ -421,7 +421,7 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
         return std::to_string(minY);
     }
     // Distinguishes "settled" from "collapsed to a point" -- min/max alone
-    // can't tell those apart (docs/todo/PLAN_physics_scenario_test_rebuild.md
+    // can't tell those apart (internal design notes
     // Phase 0 item 3).
     if (cmd == "GetAvgParticlePositionY") {
         const auto positions = world_->getParticlePositions();

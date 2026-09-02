@@ -1,8 +1,8 @@
 {
   "name": "showcase_sheet_impact",
   "_comment": [
-    "Native PhysicsView port of the Blender crystal_sph_addon preset SHOWCASE_SHEET_IMPACT",
-    "(CGApp/blender/PyFluid/crystal_sph_addon/presets.py, docs/todo/PLAN_sph_showcase_sheet_impact.md):",
+    "Native PhysicsView scenario for the SHOWCASE_SHEET_IMPACT",
+    "(internal design notes):",
     "a thin 15mm water sheet plus 5 falling drops of differing size/height/plan position",
     "(so they land at staggered times), ~400k particles. Same axis conversion as",
     "showcase_dam_break.json (Blender Z-up (Bx,By,Bz) -> PhysicsView Y-up (Bx,Bz,By)).",

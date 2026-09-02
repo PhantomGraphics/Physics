@@ -85,7 +85,7 @@ TEST(WCSPHFluidTest, BoundingBoxContainsAllParticles)
   EXPECT_GE(bb.getMax().y,  0.3f - kTol);
 }
 
-// ---- Emitter (docs/todo/PLAN_physics_fluid_emitter.md) -------------------
+// ---- Emitter (internal design notes) -------------------
 
 TEST(WCSPHFluidTest, UpdateEmittersIsNoOpWithoutRegisteredEmitters)
 {
@@ -163,7 +163,7 @@ TEST(WCSPHFluidTest, UpdateEmittersGivesSpawnedParticlesVelocityAlongDirection)
 // have zero thickness along Z; the old XZ-plane-only emission offset produced
 // exactly the opposite -- a zero-thickness ribbon in Y standing parallel to
 // the flow, whose SPH density had nothing to do with the intended jet's
-// (docs/todo/PLAN_sph_showcase_water_sphere.md section 2.3).
+// (internal design notes section 2.3).
 TEST(WCSPHFluidTest, UpdateEmittersSpawnsDiskPerpendicularToDirection)
 {
   WCSPHFluid fluid;
@@ -410,7 +410,7 @@ TEST(WCSPHSolverTest, RejectsFluidsWithMismatchedKernelConfiguration)
 }
 
 // ---- simulate() is a no-op when effectLength was never set --------------
-// docs/todo/PLAN_sph_scale_invariance.md Phase 5: effectLength defaults to
+// internal design notes Phase 5: effectLength defaults to
 // 0.f (SPHKernel/WCSPHFluid) until setEffectLength() is called, so a caller
 // that forgets to call it must get an inert solver, not an undefined/UB
 // search radius fed to IndexedSortBasedSearcher.
@@ -576,7 +576,7 @@ TEST(CSPHFluidTest, GetPositionMatchesParticlePosition)
 
 // ---- estimatePressureCoe(): pressureCoe = pressureCoeScale * effectLength -
 // 2026-08-17: the earlier gravity/target-density-error-ratio/rest-density
-// based derivation (docs/todo/PLAN_sph_scale_invariance.md section 4) was
+// based derivation (internal design notes section 4) was
 // retired in favor of a plain proportionality, per user request. These tests
 // lock in the new, simpler contract.
 
@@ -625,8 +625,7 @@ TEST(WCSPHFluidTest, SetPressureCoeFromScaleUsesEffectLengthTimesScale)
 //
 // So the property worth pinning is resolution independence: the same
 // viscosityCoe must damp the same physical flow by the same amount at two
-// resolutions. Measured in docs/issue/
-// water_sphere_showcase_emitter_instability.md 11.2 (agreement within 5%
+// resolutions. Measured in internal design notes 11.2 (agreement within 5%
 // across a 2x resolution change); this is that measurement, shrunk to unit
 // test size. The estimator and its "scale viscosity with h" guidance are
 // gone -- viscosityCoe cannot be derived from the kernel radius, because the
@@ -718,15 +717,14 @@ TEST(WCSPHFluidTest, ViscousDampingIsResolutionIndependentForAFixedViscosityCoe)
   // Doubling the resolution must not change the damping. It would if
   // viscosityCoe carried a hidden power of h: the deleted effectLength^1.5
   // rule would have called for 2.8x the coefficient at the finer spacing.
-  // Measured: 0.845 vs 0.834, i.e. 1.3% apart (docs/issue/
-  // water_sphere_showcase_emitter_instability.md 11.2 measured the same pair
+  // Measured: 0.845 vs 0.834, i.e. 1.3% apart (internal design notes 11.2 measured the same pair
   // as 0.843 / 0.833).
   EXPECT_NEAR(fine, coarse, coarse * 0.10f)
       << "coarse=" << coarse << " fine=" << fine;
 }
 
 // ---- Surface tension: cohesion (attraction) -------------------------------
-// docs/todo/PLAN_sph_surface_tension.md Phase 2: the classic Muller et al.
+// internal design notes Phase 2: the classic Muller et al.
 // 2003 color-field model implemented in solveSurfaceTension() is only
 // attractive once two particles are far enough apart that the Poly6
 // Laplacian's sign flips positive (r > sqrt(3/7)*effectLength =~
@@ -768,7 +766,7 @@ TEST(WCSPHSolverTest, SurfaceTensionPullsTwoNearbyParticlesTogether)
 }
 
 // ---- Surface tension: threshold is scale-invariant -------------------------
-// docs/todo/PLAN_sph_surface_tension.md Phase 2 point 3: surfaceNormalHat()'s
+// internal design notes Phase 2 point 3: surfaceNormalHat()'s
 // "is this a surface particle" threshold compares getLengthSquared(normal) *
 // effectLength^2 against a fixed dimensionless constant (not the raw,
 // unit-bearing normal magnitude) specifically so the same threshold applies
@@ -997,7 +995,7 @@ TEST(WCSPHSolverTest, WallDensityLeavesParticlesFurtherThanSupportUntouched)
   EXPECT_GT(halfIn, farAway);
 }
 
-// ---- SphereBoundary integration (docs/todo/PLAN_sph_showcase_water_sphere.md section 8-B) ----
+// ---- SphereBoundary integration (internal design notes section 8-B) ----
 
 TEST(WCSPHSolverTest, ParticlesSettlingInsideSphereContainerStayWithinRadius)
 {
@@ -1179,7 +1177,7 @@ TEST(WCSPHSolverTest, PlaneAndSphereCombinedDensityIsCappedAtRestDensity)
 // of the jet to reach the dry container floor had a full fluid neighborhood
 // (the column ramming into it) *and* the wall's unconditional ~0.5*rho0, so it
 // was handed rho ~ 1.5*rho0 and the pressure spike blew it back up at 2.4x its
-// own impact speed. See docs/issue/water_sphere_showcase_emitter_instability.md.
+// own impact speed. See internal design notes.
 namespace {
 
 // One over-packed lattice block (spacing below the rest spacing, so its
@@ -1322,7 +1320,7 @@ TEST(WCSPHSolverTest, CoincidentParticlesDoNotContaminateTheFluidWithNaN)
 }
 
 
-// ---- PlateBoundary integration (docs/todo/PLAN_sph_showcase_waterfall.md section 3) ----
+// ---- PlateBoundary integration (internal design notes section 3) ----
 //
 // A finite plate is a thin OBB whose *outside* is valid. In the solver it has
 // to do everything an infinite wall does for the fluid sitting on it -- supply

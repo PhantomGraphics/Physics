@@ -121,7 +121,7 @@ void DFSPHSolver::simulate(const float dt, const int maxIter)
 	// not an independently hardcoded ratio of particle radius -- otherwise a
 	// fluid whose effectLength was set to something other than the default
 	// 2.25x radius (via setEffectLength()) silently misses real neighbors
-	// within the kernel's support (docs/todo/PLAN_sph_scale_invariance.md
+	// within the kernel's support (internal design notes
 	// Phase 4, item #8).
 	const auto searchRadius = particles.front().getParent()->getKernel()->getEffectLength();
 
@@ -131,7 +131,7 @@ void DFSPHSolver::simulate(const float dt, const int maxIter)
 	// one std::vector<int> per particle: this list is rebuilt on every
 	// sub-step of the loop below, so the per-particle heap allocations the old
 	// CompactSpaceHash::findNeighborIndices() form paid were the dominant cost
-	// (docs/issue/wcsph_parallel_scaling_profile.md section 4). The neighbor
+	// (internal design notes section 4). The neighbor
 	// *set* is unchanged -- both forms exclude the particle itself and keep
 	// only particles strictly closer than searchRadius; only the order within
 	// a row (hence the floating-point summation order) differs.
@@ -320,7 +320,7 @@ void DFSPHSolver::addBoundaryParticleConstraintTerms(
 float DFSPHSolver::calculateTimeStep(const std::vector<DFSPHParticle>& particles)
 {
 	// Safety floor for the CFL-derived dt below, expressed relative to
-	// maxTimeStep instead of an absolute magic number (docs/todo/PLAN_sph_scale_invariance.md
+	// maxTimeStep instead of an absolute magic number (internal design notes
 	// Phase 6) so it scales along with maxTimeStep instead of becoming
 	// disproportionately coarse/fine if a caller's maxTimeStep departs from
 	// the historical default of 0.01f. Reproduces the historical constant
@@ -590,7 +590,7 @@ void DFSPHSolver::addBoundaryParticlePressure(std::vector<DFSPHParticle>& partic
 	// sum into the frame-average force instead of a raw sum whose magnitude
 	// tracks the substep count -- which is CFL-derived and therefore data
 	// dependent, so an unweighted sum made the reaction on the rigid body swing
-	// by orders of magnitude between frames (docs/issue/CODEBASE_ISSUES.md 1.6).
+	// by orders of magnitude between frames (internal design notes 1.6).
 	// The fluid-side force below is per-substep and stays unweighted.
 	const float frameShare = (frameTimeStep_ > 0.0f) ? (dt / frameTimeStep_) : 1.0f;
 

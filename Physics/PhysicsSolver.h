@@ -33,7 +33,7 @@ namespace Physics {
  *
  * SoftBody classes (ClothBody/JellyBody/RopeBody/XPBDSolver/SoftBodySolver)
  * live in this same library since the SoftBody -> Physics integration (see
- * docs/todo/PLAN_softbody_physics_integration.md). This class also drives a
+ * internal design notes). This class also drives a
  * three-way (fluid/rigid/soft) coupling: bindSoftBody() registers a SoftBody
  * as an Akinci-style boundary-particle set (SoftBoundaryParticles), mirroring
  * RigidFluidSolver's Two-Way ("Track B") mechanism -- SoftBody has no

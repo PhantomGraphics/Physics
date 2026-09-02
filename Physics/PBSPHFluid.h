@@ -114,7 +114,7 @@ public:
 	void setStatic(const bool b) { _isBoundary = b; }
 	bool isStatic() const { return _isBoundary; }
 
-	// ---- Emitter (continuous particle generation, docs/todo/PLAN_physics_fluid_emitter.md) ----
+	// ---- Emitter (continuous particle generation, internal design notes) ----
 
 	/** @brief Registers a new emission region. */
 	void addEmitter(const Emitter& e) { emitters_.push_back(e); }

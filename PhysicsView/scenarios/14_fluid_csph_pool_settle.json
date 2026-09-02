@@ -10,6 +10,6 @@
     { "label": "Precondition: reports as GPU_CSPH", "command": "GetSimulationType", "expect": "GPU_CSPH" },
     { "label": "Change: GPU compute step runs without erroring, repeatedly (~2s -- the closest thing to a 'settling' observation available for this type)", "command": "Step", "expect": "OK", "repeat": 200 },
     { "label": "Invariant: particle count conserved across 200 GPU steps (no desync/loss between CPU-side bookkeeping and the GPU buffer)", "command": "GetParticleCount", "expect": "Count:${count0}" },
-    { "label": "Process exits cleanly after GPU_CSPH was selected (regression check for the VMA shutdown abort, see docs/issue/CODEBASE_ISSUES.md 1.3 history)", "command": "GetStatus", "expect": "OK" }
+    { "label": "Process exits cleanly after GPU_CSPH was selected (regression check for the VMA shutdown abort, see internal design notes 1.3 history)", "command": "GetStatus", "expect": "OK" }
   ]
 }

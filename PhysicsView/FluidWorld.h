@@ -31,7 +31,7 @@ namespace Phantom {
 /**
  * @brief Top-level scene for FluidApp: an SPH fluid plus an embedded
  * RigidBodyWorld, with an optional Rigid-Fluid coupling layer between
- * them (docs/todo/PLAN_rigid_fluid_coupling.md).
+ * them (internal design notes).
  *
  * rigid() is a plain, fully-functional rigid-body world in its own right --
  * this class adds nothing when coupling is disabled:
@@ -49,12 +49,12 @@ namespace Phantom {
  * from FluidWorld itself.
  *
  * Owns the single Phantom::Physics::PhysicsSolver (physicsSolver_) that rigid_ and the
- * sibling SoftBodyWorld (set via setSoftBodyWorld()) both reference -- mirrors
- * CGApp/Universe/Entity/UniverseScene's single-PhysicsSolver ownership (see
- * Physics/CLAUDE.md). Rigid-Fluid/SoftBody-Fluid coupling below (refreshCoupling()/
+ * sibling SoftBodyWorld (set via setSoftBodyWorld()) both reference -- the same
+ * single-PhysicsSolver ownership pattern PhysicsSolver.h documents for its
+ * intended top-level users. Rigid-Fluid/SoftBody-Fluid coupling below (refreshCoupling()/
  * refreshSoftCoupling()/step()/stepOnce()) still hand-orchestrates sync/step/apply-reaction
  * itself rather than calling PhysicsSolver::step()/stepUnconditional()/setRunning(), because
- * this class -- unlike UniverseScene -- needs fluid/rigid/soft to play/pause independently
+ * this class needs fluid/rigid/soft to play/pause independently
  * (three separate isRunning() flags) and to couple only the subset that's actually running;
  * PhysicsSolver's step() ties all three to one running_ flag and always steps every part
  * together. physicsSolver_.rigidFluidSolver()/softFluidSolver() are used directly instead.
@@ -77,7 +77,7 @@ public:
         float density = 1.0f;
         // Raw pressure/PBF-relaxation coefficient. Only meaningful for
         // PBSPH's WCSPHFluid::setStiffness()-equivalent (PBSPHFluid::setStiffness()) --
-        // already scale-invariant when held fixed (docs/todo/PLAN_sph_scale_invariance.md
+        // already scale-invariant when held fixed (internal design notes
         // Phase 1's PositionCorrectionOverRadiusIsScaleInvariant test). WCSPH
         // and DFSPH's Two-Way boundary coupling force instead derive their
         // pressureCoe from pressureCoeScale below (see createWCSPH()/
@@ -86,8 +86,7 @@ public:
         // Proportionality constant used by WCSPH's own pressure solve and
         // DFSPH's Two-Way boundary coupling force to derive their pressureCoe
         // via WCSPHFluid::estimatePressureCoe()/setPressureCoeFromScale()
-        // (pressureCoe = pressureCoeScale * effectLength, see docs/todo/
-        // PLAN_sph_scale_invariance.md section 4/Phase 1). A raw pressureCoe
+        // (pressureCoe = pressureCoeScale * effectLength, see internal design notes section 4/Phase 1). A raw pressureCoe
         // means something different at every scene scale (fixed stiffness ->
         // pressure accel scales as 1/effectLength), whereas this scale stays
         // meaningful regardless of radius/effectLength. Defaults to 1960.0f,
@@ -102,13 +101,13 @@ public:
         // container into upward spray. Clamped to [0, 0.5] by the solver;
         // ~0.35 is where the measured restitution bottoms out (see
         // SphereBoundaryTest's DampedBoundaryForceAbsorbsMostOfTheRebound and
-        // docs/issue/water_sphere_showcase_emitter_instability.md).
+        // internal design notes).
         // Applied by reset(); WCSPH and DFSPH honor it, PBSPH does not need
         // it (it hard-clamps predicted positions instead).
         float boundaryDampingRatio = 0.0f;
         float viscosity = 5.0f;
         // Surface tension coefficient (WCSPH only, see WCSPHFluid::setTensionCoe()
-        // -- docs/todo/PLAN_sph_surface_tension.md). Defaults to 0.f (disabled),
+        // -- internal design notes). Defaults to 0.f (disabled),
         // matching WCSPHFluid's own zero-initialized default.
         float tension = 0.0f;
         Phantom::Math::Vector3df gravity = Phantom::Math::Vector3df(0.0f, -9.8f, 0.0f);
@@ -147,7 +146,7 @@ public:
     void setSimulationType(SimulationType t) { type_ = t; }
     SimulationType getSimulationType() const { return type_; }
 
-    // Rigid-Fluid coupling (docs/todo/PLAN_rigid_fluid_coupling.md): dispatches
+    // Rigid-Fluid coupling (internal design notes): dispatches
     // to whichever solver is currently active. Track A (SDF penalty, one-way)
     // is supported by every CPU solver (DFSPH/PBSPH/CSPH); Track B
     // (boundary particles, two-way) only by DFSPH/PBSPH. GPU_CSPH supports
@@ -161,7 +160,7 @@ public:
     bool supportsOneWayCoupling() const { return type_ != SimulationType::GPU_CSPH; }
     // Delegates to the active ISPHSolver instead of a type_ switch (WCSPH
     // joined DFSPH/PBSPH in Phase 4 of
-    // docs/todo/PLAN_physics_ownership_and_coupling_unification.md, and this
+    // internal design notes, and this
     // hardcoded switch predated ISPHSolver::supportsTwoWayCoupling() -- it
     // would otherwise have needed a 3rd case added here to stay correct).
     bool supportsTwoWayCoupling() const { return fluidSolver_ && fluidSolver_->supportsTwoWayCoupling(); }
@@ -190,7 +189,7 @@ public:
         return meshBoundaryShape_ ? meshBoundaryShape_->getTriangleCount() : 0;
     }
 
-    // ---- Sphere boundary (docs/todo/PLAN_sph_showcase_water_sphere.md) ----
+    // ---- Sphere boundary (internal design notes) ----
     // Supported by WCSPH and DFSPH (PBSPH inherits the no-op default).
     // Unlike addRigidBoundary()/loadMeshBoundary(),
     // which register non-owning pointers directly on the solver,
@@ -235,7 +234,7 @@ public:
     Phantom::Physics::SPHKernel* getActiveKernel() const;
     float getActiveRestDensity() const;
 
-    // ---- Emitter (continuous particle generation, docs/todo/PLAN_physics_fluid_emitter.md) ----
+    // ---- Emitter (continuous particle generation, internal design notes) ----
     // Dispatches to whichever concrete *Fluid is currently active (same
     // pattern as loadMeshBoundary()/addRigidBoundary() above). A no-op for
     // GPU_CSPH, which has no CPU *Fluid instance to register with (mirrors
@@ -309,8 +308,7 @@ public:
     const RigidBodyWorld& rigid() const { return rigid_; }
 
     // The single Phantom::Physics::PhysicsSolver shared by rigid() and the sibling
-    // SoftBodyWorld set via setSoftBodyWorld() (mirrors CGApp/Universe/Entity/UniverseScene's
-    // single PhysicsSolver ownership). FluidApp constructs its SoftBodyWorld with this.
+    // SoftBodyWorld set via setSoftBodyWorld(). FluidApp constructs its SoftBodyWorld with this.
     Phantom::Physics::PhysicsSolver& physicsSolver() { return physicsSolver_; }
 
     /**
@@ -332,7 +330,7 @@ public:
      * solver doesn't supportTwoWayCoupling() (e.g. GPU_CSPH), in which
      * case refreshCoupling() silently falls back to OneWay per body. Exists
      * so scenario tests can detect that fallback (see
-     * docs/todo/PLAN_physics_scenario_test_rebuild.md 1.1) instead of
+     * internal design notes 1.1) instead of
      * asserting on the requested mode and never noticing it wasn't honored.
      * Plane-shaped bodies (floors) are always bound OneWay regardless of
      * this value (refreshCoupling() excludes static bodies, but a dynamic
@@ -407,7 +405,7 @@ public:
     // destroys the context's VmaAllocator -- FluidWorld's own destructor
     // runs too late for this (after the context is already gone), which is
     // what caused the VMA "allocations were not freed" abort on shutdown
-    // whenever GPU_CSPH was ever selected (docs/issue/CODEBASE_ISSUES.md 1.3).
+    // whenever GPU_CSPH was ever selected (internal design notes 1.3).
     void releaseGpuResources() { gpuSolver_.reset(); }
 
     Phantom::Physics::WhiteWaterSystem::Params&       whiteWaterParams()       { return whiteWater_.params; }

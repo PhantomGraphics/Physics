@@ -141,7 +141,7 @@ void WCSPHSolver::simulate(const float dt, const int maxIter)
 	// (SPHKernel/WCSPHFluid) until setEffectLength() is called, so a caller
 	// that forgets to call it gets an inert (no-op) solver rather than an
 	// undefined/UB neighbor-search radius (see simulate()'s doc comment and
-	// docs/todo/PLAN_sph_scale_invariance.md Phase 5).
+	// internal design notes Phase 5).
 	if (commonEffectLength <= 0.0f) {
 		lastSolveStats_.validConfiguration = false;
 		return;
@@ -298,7 +298,7 @@ void WCSPHSolver::addBoundaryDensity(std::vector<WCSPHParticle>& particles)
 		// large (normal-facing) face, but tapered toward the rim: near an edge
 		// most of that half-space is air, not solid, so handing the particle a
 		// full plane's worth would lift the water unnaturally at the weir lip
-		// (docs/todo/PLAN_sph_showcase_waterfall.md section 3.4). Added into the
+		// (internal design notes section 3.4). Added into the
 		// same accumulator and subject to the one headroom clamp below, exactly
 		// like planes and spheres -- the clamp is what keeps overlapping plates
 		// at a 9-plate seam from summing past rest density.
@@ -322,8 +322,7 @@ void WCSPHSolver::addBoundaryDensity(std::vector<WCSPHParticle>& particles)
 		//    the first layer against the floor was handed rho ~ 1500 (990
 		//    from the column ramming into it, plus the wall's unconditional
 		//    ~500) and the resulting pressure spike blew it back up at 2.4x
-		//    its own impact speed. See docs/issue/
-		//    water_sphere_showcase_emitter_instability.md.
+		//    its own impact speed. See internal design notes.
 		//
 		// A settled pool is unaffected: its floor layer really is missing its
 		// lower half (fluid-only density ~0.5*rho0), so the headroom is ~0.5*

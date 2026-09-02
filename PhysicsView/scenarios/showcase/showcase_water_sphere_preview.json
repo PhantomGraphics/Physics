@@ -1,14 +1,13 @@
 {
   "name": "showcase_water_sphere_preview",
   "_comment": [
-    "Native PhysicsView port of the Blender crystal_sph_addon preset",
+    "Native PhysicsView scenario for the",
     "SHOWCASE_WATER_SPHERE_PREVIEW -- same geometry/camera framing as",
     "SHOWCASE_WATER_SPHERE (showcase_water_sphere.json) but with particle radius",
     "doubled (~44k particles instead of ~354k). Same wall-damping setting, and the same",
     "emit_speed_jitter/emitter-position notes -- see showcase_water_sphere.json's",
-    "_comment. This is the tier docs/issue/water_sphere_showcase_emitter_instability.md's",
-    "own repro used (labeled there as \"下見ティア\"), and the tier its section 9",
-    "measured the fix on.",
+    "_comment. This is the tier the internal design notes' own repro used",
+    "(labeled there as \"下見ティア\"), and the tier section 9 measured the fix on.",
     "  PhysicsView.exe --run-scenario scenarios/showcase/showcase_water_sphere_preview.json"
   ],
   "steps": [
@@ -20,9 +19,9 @@
     { "label": "viscosity_coe=0.010 -- same as SHOWCASE_WATER_SPHERE (viscosityCoe is a kinematic viscosity and is not rescaled with the radius)", "command": "SetFluidViscosity:0.010", "expect": "OK" },
     { "label": "tension_coe=0.0", "command": "SetFluidTension:0.0", "expect": "OK" },
     { "label": "pressure_coe_scale=20.0 (same as SHOWCASE_WATER_SPHERE, not scaled with radius)", "command": "SetFluidPressureCoeScale:20.0", "expect": "OK" },
-    { "label": "time_step=0.0002 (dt upper bound scales with sqrt(effectLength), not radius -- see presets.py's note)", "command": "SetFluidTimeStep:0.0002", "expect": "OK" },
+    { "label": "time_step=0.0002 (dt upper bound scales with sqrt(effectLength), not radius -- see the preset's note)", "command": "SetFluidTimeStep:0.0002", "expect": "OK" },
     { "label": "gravity (0,0,-9.8) Blender -> (0,-9.8,0) native", "command": "SetFluidGravity:0:-9.8:0", "expect": "OK" },
-    { "label": "wall damping 0.35: takes the restitution off the wall penalty spring, which on its own has a measured coefficient of restitution of 1.03. Kept because it costs nothing, but it is NOT what fixed this scene -- with the density clamp and viscosity right, particles penetrate the wall by only ~5% of h and zeta changes peak speed by under 1% at this tier (docs/issue/water_sphere_showcase_emitter_instability.md section 11.5)", "command": "SetFluidBoundaryDamping:0.35", "expect": "OK" },
+    { "label": "wall damping 0.35: takes the restitution off the wall penalty spring, which on its own has a measured coefficient of restitution of 1.03. Kept because it costs nothing, but it is NOT what fixed this scene -- with the density clamp and viscosity right, particles penetrate the wall by only ~5% of h and zeta changes peak speed by under 1% at this tier (internal design notes section 11.5)", "command": "SetFluidBoundaryDamping:0.35", "expect": "OK" },
     { "label": "boundary_min/max (-0.30,-0.30,-0.35)/(0.30,0.30,0.30) Blender -> native", "command": "SetFluidBoundary:-0.3:-0.35:-0.3:0.3:0.3:0.3", "expect": "OK" },
     { "label": "empty at frame 1: degenerate (zero-size) box seeds at most 1 particle at the origin (see showcase_water_sphere.json's note)", "command": "SetFluidBounds:0:0:0:0:0:0", "expect": "OK" },
     { "label": "no box/sphere source regions either", "command": "ClearFluidSources", "expect": "OK" },

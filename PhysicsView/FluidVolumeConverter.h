@@ -16,11 +16,9 @@ namespace Phantom {
  * writes the result out as a .vdb file.
  *
  * Uses Volume::SparseVolumeVdbWriter (the dependency-free writer that lives
- * alongside SparseVolume itself) rather than CGApp/VDBIO's compressed
- * VdbWriter -- PhysicsView sits below CGApp in the module dependency graph
- * (see ../CLAUDE.md) and must not depend back up into it. FluidStudio's
- * offline PLY->VDB conversion (CGApp/FluidStudio/FSPLYtoVDBConverter) uses
- * the CGApp/VDBIO writer instead since it already lives above both.
+ * alongside SparseVolume itself) rather than a heavier compressed VDB writer:
+ * PhysicsView deliberately keeps its dependency footprint minimal and does not
+ * pull in a full OpenVDB I/O stack for this live-simulation path.
  */
 class FluidVolumeConverter {
 public:

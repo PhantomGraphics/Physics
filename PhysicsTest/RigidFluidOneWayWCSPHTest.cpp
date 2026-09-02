@@ -20,7 +20,7 @@ using namespace Phantom::Math;
 // regression here shows up in those scenarios too, but runs in a second instead
 // of needing the Vulkan app.
 //
-// This is the regression guard for docs/issue/CODEBASE_ISSUES.md 1.7: the
+// This is the regression guard for internal design notes 1.7: the
 // coupled and uncoupled runs came out bit-for-bit identical, and the cause was
 // the *scene*, not the coupling -- see OriginalPoolNeverOverlapsTheBox below.
 namespace {
@@ -134,7 +134,7 @@ void makeOverlapping(BoxDropScene& scene) {
 
 } // namespace
 
-// Root cause of docs/issue/CODEBASE_ISSUES.md 1.7. The original scene seeds the
+// Root cause of internal design notes 1.7. The original scene seeds the
 // pool on a 2.0 grid from x = -3 (so x, z in {-3, -1, 1, 3}), while the box is
 // 1x1x1 centred on x = z = 0: the nearest particle column misses the box by
 // 0.5 in each of x and z, at every height. RigidBoundary::getBoundaryForce()

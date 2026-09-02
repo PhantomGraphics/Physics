@@ -154,7 +154,7 @@ float SPHKernel::getCubicSpline(const float distance) const
 	// disagreed by that factor -- and because it depends on h, every DFSPH
 	// quantity derived from both silently changed meaning with the scene's
 	// scale. That is what made rigid-fluid coupling diverge at one scale and do
-	// nothing at another (docs/issue/CODEBASE_ISSUES.md 1.6).
+	// nothing at another (internal design notes 1.6).
 	const auto coe = 12.0f / (PIf * effectLength * effectLength * effectLength);
 
 	if (q < 1) {

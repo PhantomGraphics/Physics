@@ -69,7 +69,7 @@ TEST(PhysicsSolverTest, SetCustomInitialData_OverridesGridSeeding) {
 }
 
 // WCSPH joined DFSPH/PBSPH in Phase 4 of
-// docs/todo/PLAN_physics_ownership_and_coupling_unification.md (force-based,
+// internal design notes (force-based,
 // same Two-Way mechanism as DFSPH).
 TEST(PhysicsSolverTest, SupportsTwoWayCoupling_DfsphPbsphAndWcsph) {
     PhysicsFluidFactory factory;

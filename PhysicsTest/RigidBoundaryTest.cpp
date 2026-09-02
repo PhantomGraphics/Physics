@@ -99,7 +99,7 @@ TEST(RigidBoundaryTest, Sync_CopiesPoseAndVelocityFromRigidBody) {
     EXPECT_NEAR(rb.getVelocity().y, -4.f, kTol);
 }
 
-// docs/todo/PLAN_sph_scale_invariance.md Phase 2 (#1): estimateStiffness()
+// internal design notes Phase 2 (#1): estimateStiffness()
 // should reproduce the historical fixed default (5000.f) exactly at this
 // codebase's default maxTimeStep/boundaryTimeStep (0.01f), so that calling it
 // is a pure opt-in with zero behavior change for existing scenes.
@@ -120,8 +120,8 @@ TEST(RigidBoundaryTest, SetStiffnessFromScale_AppliesEstimateStiffness) {
     EXPECT_NEAR(rb.getPenaltyStiffness(), 5000.f, 5000.f * 1.0e-4f);
 }
 
-// The core scale-invariance claim (see PLAN_sph_scale_invariance.md section
-// 4's #9 analysis for the failure mode this avoids): pick dt the way DFSPH's
+// The core scale-invariance claim (see the internal design notes' scale-invariance
+// analysis for the failure mode this avoids): pick dt the way DFSPH's
 // CFL estimate would (0.4 * diameter / characteristic velocity, with the
 // characteristic velocity taken as free-fall speed through one particle
 // radius under gravity), then estimateStiffness(dt) should keep the penalty

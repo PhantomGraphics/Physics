@@ -242,7 +242,7 @@ public:
 	 * raises the *numerator* (density) whenever a boundary is nearby, so
 	 * without the matching denominator term the solve computes an unbounded
 	 * stiffness for a density excess it cannot remove -- and slams the fluid
-	 * (docs/issue/CODEBASE_ISSUES.md 1.6). This is DFSPH's counterpart of
+	 * (internal design notes 1.6). This is DFSPH's counterpart of
 	 * PBSPHSolver::addBoundaryParticleConstraintGradient(), which has always
 	 * fed the boundary into PBSPH's own denominator.
 	 *
@@ -324,7 +324,7 @@ private:
 	 * @brief Returns the unit surface normal, or a zero vector if the raw
 	 * normal's magnitude -- nondimensionalized by the kernel's effect length,
 	 * so the same threshold applies regardless of scene scale (see
-	 * docs/todo/PLAN_sph_scale_invariance.md) -- is below a noise threshold,
+	 * internal design notes) -- is below a noise threshold,
 	 * i.e. this particle is judged interior rather than on the free surface.
 	 * @return Unit surface normal, or (0,0,0) for interior particles.
 	 */

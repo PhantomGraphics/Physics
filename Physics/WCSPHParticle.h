@@ -273,7 +273,7 @@ private:
 	 * @brief Returns the unit surface normal, or a zero vector if the raw
 	 * normal's magnitude -- nondimensionalized by the kernel's effect length,
 	 * so the same threshold applies regardless of scene scale (see
-	 * docs/todo/PLAN_sph_scale_invariance.md) -- is below a noise threshold,
+	 * internal design notes) -- is below a noise threshold,
 	 * i.e. this particle is judged interior rather than on the free surface.
 	 * @return Unit surface normal, or (0,0,0) for interior particles.
 	 */

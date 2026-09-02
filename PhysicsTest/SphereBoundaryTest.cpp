@@ -92,7 +92,7 @@ TEST(SphereBoundaryTest, OffCenterSphereSignedDistanceUsesCenter)
 // the penetration it absorbed, so an isolated particle bounces off the wall at
 // (slightly over) the speed it arrived with. The damped overload exists to
 // take that restitution off -- see boundaryPenaltyAcceleration() and
-// docs/issue/water_sphere_showcase_emitter_instability.md section 3.
+// internal design notes section 3.
 namespace
 {
 // Integrates one particle against the sphere wall exactly the way

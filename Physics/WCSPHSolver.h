@@ -45,7 +45,7 @@ public:
 	 * Precondition: the first registered fluid's effectLength must already
 	 * be set (via this solver's setEffectLength() or the fluid's own,
 	 * before add()/simulate()). It defaults to 0.f otherwise, in which case
-	 * this is a no-op (docs/todo/PLAN_sph_scale_invariance.md Phase 5) rather
+	 * this is a no-op (internal design notes Phase 5) rather
 	 * than feeding a garbage/UB search radius to the neighbor search.
 	 * @param dt      Time step (seconds), also stored via setTimeStep().
 	 * @param maxIter Unused by CSPH (single-pass solver, no constraint
@@ -101,7 +101,7 @@ public:
 	 * sphere" showcase's closed spherical container). See ISPHSolver's doc
 	 * comment for why this is on top of, not instead of, the box/planes.
 	 * DFSPH/PBSPH intentionally do not implement this -- see
-	 * docs/todo/PLAN_sph_showcase_water_sphere.md section 8-B: those solvers
+	 * internal design notes section 8-B: those solvers
 	 * must keep a boundary's density and its solver-specific alpha/constraint-
 	 * gradient contribution in lockstep, and a sphere-only density term would
 	 * violate that pairing (same reasoning as the DFSPH boundary-particle
@@ -164,7 +164,7 @@ public:
 	 * @brief Sets the kernel support radius. Kept for compatibility with the
 	 * 4 call sites that historically set both the fluid's and the solver's
 	 * effectLength to the same value; forwards to every registered fluid's
-	 * own setEffectLength() (docs/todo/PLAN_physics_ownership_and_coupling_unification.md,
+	 * own setEffectLength() (internal design notes,
 	 * Phase 4) rather than keeping a second, solver-local copy that simulate()
 	 * used to build its own throwaway SPHKernel from. Fluids added *after*
 	 * this call are unaffected -- call add() first, or call this again.
@@ -193,7 +193,7 @@ public:
 	/**
 	 * @brief WCSPH is force-based like DFSPH (as opposed to PBSPH's
 	 * position-based projection), so it implements Two-Way (Track B) coupling
-	 * the same way DFSPH does (docs/todo/PLAN_physics_ownership_and_coupling_unification.md,
+	 * the same way DFSPH does (internal design notes,
 	 * Phase 4).
 	 */
 	bool supportsTwoWayCoupling() const override { return true; }
@@ -289,8 +289,7 @@ private:
 	 * wall reuses the same poly6HalfSpaceFraction(d, h) as a plane, approximating
 	 * the curved wall by its tangent plane at distance d = R - |x - C|; this is
 	 * exact for planes and O(h/R) accurate for spheres, which is why
-	 * SphereBoundary's design requires R >= 10h (docs/todo/
-	 * PLAN_sph_showcase_water_sphere.md section 8-B).
+	 * SphereBoundary's design requires R >= 10h (internal design notes section 8-B).
 	 *
 	 * Planes and spheres are combined into a single contribution and capped at
 	 * restDensity once, at the end, rather than each capping its own subtotal

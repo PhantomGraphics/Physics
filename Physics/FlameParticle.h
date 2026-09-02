@@ -109,7 +109,7 @@ struct FlameParticleSoA {
  * age) plus vorticity-confinement bookkeeping. Deliberately independent of
  * WCSPHParticle: no surface tension or normal (flames need not cohere, see
  * idea doc section 2), and no Rigid/SoftBody boundary hooks (out of scope,
- * see docs/todo/sph_flame_plan.md).
+ * see internal design notes).
  */
 class FlameParticle
 {

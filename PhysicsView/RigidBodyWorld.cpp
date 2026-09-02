@@ -56,7 +56,7 @@ Physics::RigidBody* RigidBodyWorld::addSphere(const Math::Vector3df& pos, float 
     // to snapshots_.size(), see its doc comment) knows about this body too --
     // otherwise a body added after setPreset()'s own saveSnapshot() (e.g. via
     // AddSphere on a Custom scene) is silently skipped by Reset() and keeps
-    // whatever position the simulation carried it to (docs/issue/CODEBASE_ISSUES.md 1.4).
+    // whatever position the simulation carried it to (internal design notes 1.4).
     physicsSolver_.rigidSolver().saveSnapshot();
     return ptr;
 }

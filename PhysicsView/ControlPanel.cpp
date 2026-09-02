@@ -114,7 +114,7 @@ void ControlPanel::onImGui()
     // WCSPH's own pressure solve and DFSPH's Two-Way boundary coupling force
     // both derive pressureCoe as pressureCoeScale * effectLength instead of a
     // raw stiffness number (see FluidWorld::createWCSPH()/createDFSPH() and
-    // docs/todo/PLAN_sph_scale_invariance.md); PBSPH/GPU_CSPH still take the
+    // internal design notes); PBSPH/GPU_CSPH still take the
     // raw value directly.
     const auto simType = world_->getSimulationType();
     if (simType == FluidWorld::SimulationType::WCSPH ||

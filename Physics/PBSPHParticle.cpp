@@ -129,7 +129,7 @@ void PBSPHParticle::accumulateConstraintGradient(const PBSPHParticle& rhs)
 	// Without this, the density constraint C_i (mass-weighted) and its own
 	// gradient (previously unweighted) used inconsistent units, making
 	// lambda's natural magnitude scale as effectLength^8 instead of
-	// effectLength^2 -- see docs/todo/PLAN_sph_scale_invariance.md section 4.
+	// effectLength^2 -- see internal design notes section 4.
 	const auto weight = getKernel()->getPoly6KernelGradient(v) * rhs.getMass();
 	addConstraintGradient(weight);
 }
@@ -164,7 +164,7 @@ void PBSPHParticle::calculateLambda()
 	// same step produces a runaway feedback (confirmed empirically: a dam
 	// break collapsing against a wall diverges to +-1000s without this
 	// clamp, but settles into an ordinary, bounded puddle with it -- see
-	// docs/todo/PLAN_rigid_fluid_coupling_phase8_status.md, "problem B").
+	// internal design notes, "problem B").
 	constexpr float kLambdaCap = 1.0f;
 	lambda = std::max(-kLambdaCap, std::min(kLambdaCap, lambda));
 	setLambda(lambda);

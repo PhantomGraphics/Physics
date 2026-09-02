@@ -251,7 +251,7 @@ void PBSPHSolver::addBoundadryPressure(std::vector<PBSPHParticle>& particles)
 	// this correction, not the correction's strength by itself (confirmed
 	// empirically by reproducing the pre-Two-Way-coupling algorithm, which
 	// used this same full correction with a raw, non-lambda constraint and
-	// was stable -- see docs/todo/PLAN_rigid_fluid_coupling_phase8_status.md,
+	// was stable -- see internal design notes,
 	// "problem B").
 	// Uses the predicted (in-flight) position, not getPosition() (the
 	// position committed at the *previous* simulate() call and left

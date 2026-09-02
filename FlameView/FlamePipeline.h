@@ -21,7 +21,7 @@ namespace FlameView {
  * but deliberately a separate, new implementation: three vertex bindings
  * (position vec3, temperature float, size float) instead of position/color/size,
  * and an additive-blend pipeline instead of the opaque default. Independent of
- * Physics/PhysicsView/FluidRenderer & FluidPipeline (see docs/todo/sph_flame_plan.md
+ * Physics/PhysicsView/FluidRenderer & FluidPipeline (see internal design notes
  * -- that pair is referenced only, never modified or reused here). The size
  * attribute exists so cosmetic spark secondary particles (see
  * Phantom::Physics::FlameFluid::SecondaryParticle) can render smaller than the

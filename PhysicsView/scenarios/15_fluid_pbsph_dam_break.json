@@ -7,7 +7,7 @@
     { "label": "Low stiffness", "command": "SetFluidStiffness:0.001", "expect": "OK" },
     { "label": "Rest density", "command": "SetFluidDensity:1.0", "expect": "OK" },
     { "label": "Particle radius", "command": "SetFluidRadius:0.15", "expect": "OK" },
-    { "label": "No viscosity (FluidWorld::Params defaults viscosity to 5.0; combined with this scenario's large effectLength:1.0/small radius:0.15 that blows the artificial-viscosity term up to NaN within a handful of Step calls -- see docs/issue/CODEBASE_ISSUES.md 1.5)", "command": "SetFluidViscosity:0.0", "expect": "OK" },
+    { "label": "No viscosity (FluidWorld::Params defaults viscosity to 5.0; combined with this scenario's large effectLength:1.0/small radius:0.15 that blows the artificial-viscosity term up to NaN within a handful of Step calls -- see internal design notes 1.5)", "command": "SetFluidViscosity:0.0", "expect": "OK" },
     { "label": "Small time step", "command": "SetFluidTimeStep:0.005", "expect": "OK" },
     { "label": "Tall column flush against the left wall (the 'dam')", "command": "SetFluidBounds:-2.85:-2.85:-0.3:-2.25:-0.15:0.3", "expect": "OK" },
     { "label": "Container walls", "command": "SetFluidBoundary:-3:-3:-3:3:3:3", "expect": "OK" },

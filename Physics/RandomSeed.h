@@ -20,7 +20,7 @@
  *    water-sphere showcase (speedJitter = 0.02) was ~10% on peak speed and
  *    ~5% on rho_max -- larger than most of the parameter differences that
  *    investigation was trying to resolve. See
- *    docs/issue/water_sphere_showcase_emitter_instability.md section 11.4.
+ *    internal design notes section 11.4.
  *  - FluidDeterministicTest never caught it, because none of its scenes used
  *    an emitter.
  *

@@ -13,8 +13,7 @@ namespace Phantom {
  * @brief Converts a Volume::SparseVolumef (as produced by FluidVolumeConverter)
  * into a triangle mesh via Volume::MCSurfaceBuilder (Marching Cubes), and
  * optionally writes the result out as an .obj file -- the live-simulation
- * counterpart to FluidStudio's offline VDB->Mesh conversion
- * (CGApp/FluidStudio/FSVDBMeshConverter).
+ * counterpart to an offline VDB->Mesh conversion.
  */
 class FluidMeshConverter {
 public:

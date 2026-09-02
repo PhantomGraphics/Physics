@@ -13,7 +13,7 @@ namespace Phantom {
  * @brief A circular emission region that spawns new particles over time.
  *
  * Shared data model used by WCSPHFluid/DFSPHFluid/PBSPHFluid's
- * updateEmitters() (docs/todo/PLAN_physics_fluid_emitter.md). Mirrors
+ * updateEmitters() (internal design notes). Mirrors
  * FlameFluid::Emitter's center/radius/rate/accumulator, plus an initial
  * emission direction/speed since (unlike Flame's buoyancy-driven particles)
  * plain SPH particles need an explicit initial velocity to look like a jet
@@ -33,8 +33,7 @@ struct Emitter {
 	// DFSPHFluid::updateEmitters()'s own diameter^3 formula). If this
 	// doesn't match the radius the rest of the scene's particles were
 	// created with, spawned particles carry a wildly different mass than
-	// the density/pressure solve was calibrated for (docs/todo/
-	// PLAN_sph_scale_invariance.md) and the solver can diverge trying to
+	// the density/pressure solve was calibrated for (internal design notes) and the solver can diverge trying to
 	// reconcile the mismatch -- this is exactly what happened when this
 	// field defaulted to 0.05 against a default scene radius of 1.0 (a
 	// ~1:8000 mass ratio). Defaults to 1.0 to match FluidWorld::Params::
@@ -103,7 +102,7 @@ inline int accumulateEmission(Emitter& e, const float dt, const int maxToEmit)
  * along a non-Y direction therefore spawned its particles on a zero-thickness
  * ribbon standing edge-on to the flow instead of a disk across it, and the SPH
  * density of the resulting column had nothing to do with the intended one
- * (docs/todo/PLAN_sph_showcase_water_sphere.md section 2.3). For
+ * (internal design notes section 2.3). For
  * normal = (0,1,0) the returned distribution is statistically identical to the
  * old one -- the same disk, merely rotated within its own plane.
  *
@@ -160,7 +159,7 @@ inline std::vector<Math::Vector3df> makeDiskLatticeOffsets(
  * every one of those pairs starts at rho >> rho0, and WCSPH's
  * p = k*max(0, rho-rho0) blows them apart on the spot -- the jet shreds itself
  * into spray the instant it is created instead of falling as a column
- * (docs/todo/PLAN_sph_showcase_water_sphere.md section 12 predicted this and
+ * (internal design notes section 12 predicted this and
  * proposed stratified sampling; a lattice is the stronger form of the same fix).
  *
  * Cycling through the lattice also produces the correct *three-dimensional*

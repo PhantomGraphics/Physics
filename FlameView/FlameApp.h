@@ -19,7 +19,7 @@ namespace FlameView {
  * Deliberately independent of Physics/PhysicsView: owns only a FlameFluid and
  * a FlameSolver (no RigidBodyWorld/SoftBodyWorld/PhysicsSolver), and its own
  * FlameRenderer/FlamePipeline (no FluidRenderer/FluidPipeline). See
- * docs/todo/sph_flame_plan.md Phase 3.
+ * internal design notes Phase 3.
  */
 class FlameApp : public ::VKG::VkAppBase
 {

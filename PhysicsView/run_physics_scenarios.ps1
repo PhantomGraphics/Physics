@@ -5,8 +5,7 @@
 #
 # Renamed from run_fluid_scenarios.ps1 (2026-08) -- the scenario suite has covered
 # PhysicsView as a whole (fluid + rigid + soft-body + coupling) since the
-# RigidBodyView/SoftBodyView merges, not just the fluid solver. See
-# docs/todo/PLAN_physics_scenario_test_rebuild.md Phase 1.
+# RigidBodyView/SoftBodyView merges, not just the fluid solver.
 #
 # Examples:
 #   .\run_physics_scenarios.ps1                       # everything except tags:["known-fail"]
@@ -52,8 +51,7 @@ if ($allFiles.Count -eq 0) {
 }
 
 # Reads the JSON's top-level "tags" array (PowerShell side only -- the C++
-# ScenarioRunner ignores unknown top-level keys, see
-# docs/todo/PLAN_physics_scenario_test_rebuild.md 2.2/Phase 1). Malformed
+# ScenarioRunner ignores unknown top-level keys). Malformed
 # JSON or a missing/absent "tags" field both just mean "no tags".
 function Get-ScenarioTags([string]$path) {
     try {

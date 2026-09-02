@@ -60,7 +60,7 @@ public:
 	 *      for ordinary contact once (3) below is in place.
 	 *   3. PBSPHParticle::calculateLambda()'s lambda clamp is what actually
 	 *      makes (1) safe to apply at full strength. This was investigated
-	 *      at length (docs/todo/PLAN_rigid_fluid_coupling_phase8_status.md,
+	 *      at length (internal design notes,
 	 *      "problem B"): a dam break settling against a wall diverged to the
 	 *      thousands with the *unclamped* PBF-normalized lambda, even though
 	 *      the pre-Two-Way-coupling algorithm (a raw, non-lambda density
@@ -127,7 +127,7 @@ public:
 	 * proximity. Call once per iteration, after the fluid-fluid density
 	 * accumulation and before calculatePressure(). Shared by rigid and
 	 * SoftBody boundary particle sets alike
-	 * (docs/todo/PLAN_physics_ownership_and_coupling_unification.md, Phase 3).
+	 * (internal design notes, Phase 3).
 	 * @param particles  Fluid particles to accumulate density onto.
 	 * @param boundaries Boundary particle sets to couple against (rigid or SoftBody).
 	 */
@@ -204,7 +204,7 @@ private:
 	std::vector<PBSPHFluid*> fluids;
 	Math::Vector3df externalForce;
 	// See DFSPHSolver.h's identical field for the CFL/default-scene
-	// calibration note (docs/todo/PLAN_sph_scale_invariance.md Phase 6) --
+	// calibration note (internal design notes Phase 6) --
 	// same role here (upper bound on calculateTimeStep()'s adaptive dt,
 	// normally overwritten via setTimeStep()).
 	float maxTimeStep;

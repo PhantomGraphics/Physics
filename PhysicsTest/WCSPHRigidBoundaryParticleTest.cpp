@@ -7,7 +7,7 @@
 #include <cmath>
 
 // Mirrors DFSPHRigidBoundaryParticleTest.cpp: WCSPH joined DFSPH/PBSPH in
-// Phase 4 of docs/todo/PLAN_physics_ownership_and_coupling_unification.md,
+// Phase 4 of internal design notes,
 // so it must accumulate the same "pushed away, reaction on the boundary"
 // behavior via addBoundaryParticlePressure() -- same regression this test
 // suite provides for DFSPH.

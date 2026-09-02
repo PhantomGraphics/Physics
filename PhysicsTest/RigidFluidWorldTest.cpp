@@ -162,7 +162,7 @@ TEST(RigidFluidSolverTest, TwoWayBinding_AccumulatedReactionMovesBody) {
     EXPECT_NEAR(body->linearVelocity.y, 100.f * 0.016f, kTol);
 }
 
-// 2.3-A (docs/todo/PLAN_physics_ownership_and_coupling_unification.md): callers
+// 2.3-A (internal design notes): callers
 // register `&binding.boundary`/`&binding.particles` with the fluid solver(s)
 // immediately after bind() returns. Because bindings_ used to be a
 // std::vector<RigidFluidBinding> held by value, a later bind() could

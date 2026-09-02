@@ -106,7 +106,7 @@ void DFSPHParticle::calculateVelocityInDensityError(const float dt, const std::v
 	//   v_i    -= dt * sum_j m_j (kappa_i/rho_i + kappa_j/rho_j) gradW_ij
 	// getAlpha() stores only the denominator, so kappa_i/rho_i is exactly the
 	// k_i below and no further division by rho is due. Dividing by rho^2 here
-	// (as this did until docs/issue/CODEBASE_ISSUES.md 1.6) made the solve's
+	// (as this did until internal design notes 1.6) made the solve's
 	// effective stiffness scale as 1/rho_0^2 -- and rho_0 scales as radius^6 at
 	// a fixed effectLength/radius ratio, so the same scene at particle radius
 	// 0.3 over-corrected by ~500x (diverging on any boundary-induced density
@@ -152,7 +152,7 @@ Vector3df DFSPHParticle::surfaceNormalHat() const
 	const auto effectLength = fluid_->getKernel()->getEffectLength();
 	// See WCSPHParticle::surfaceNormalHat() -- nondimensionalize by
 	// effectLength^2 so the same threshold applies at every scene scale
-	// (docs/todo/PLAN_sph_scale_invariance.md).
+	// (internal design notes).
 	constexpr float kSurfaceThresholdSq = 1.0e-4f;
 	if (Math::getLengthSquared(normal) * effectLength * effectLength < kSurfaceThresholdSq) {
 		return Vector3df(0.0f, 0.0f, 0.0f);

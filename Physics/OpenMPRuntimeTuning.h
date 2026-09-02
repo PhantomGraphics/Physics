@@ -12,7 +12,7 @@ namespace Phantom {
 		// WCSPHSolver/PBSPHSolver/DFSPHSolver::simulate() -- measured to make
 		// those serial phases grow *with* thread count instead of staying
 		// flat, which is why throughput peaks around 8 threads and regresses
-		// above it (docs/issue/wcsph_parallel_scaling_profile.md section 5).
+		// above it (internal design notes section 5).
 		// Must run before the first #pragma omp parallel region the calling
 		// process executes -- every simulate() below calls it as its first
 		// statement for exactly that reason.

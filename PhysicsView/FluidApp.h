@@ -59,7 +59,7 @@ protected:
 
 private:
     // Owns both the fluid and (via world_.rigid()) the rigid-body world,
-    // plus their optional coupling (see docs/todo/PLAN_rigid_fluid_coupling.md
+    // plus their optional coupling (see internal design notes
     // Phase 7/8).
     FluidWorld world_;
 
@@ -81,7 +81,7 @@ private:
 
     // Independent SoftBody (cloth/rope/jelly) scene, added alongside fluid/
     // rigid without any physical coupling between the three (see
-    // docs/todo/PLAN_softbody_physics_integration.md) -- purely code
+    // internal design notes) -- purely code
     // placement + minimal scenario-command wiring.
     SoftBodyWorld    softWorld_;
     SoftBodyWireRenderer  softRenderer_;

@@ -73,7 +73,7 @@ void PhysicsSolver::step()
 // each other (Gauss-Seidel-style), unlike RigidFluidSolver's Two-Way, where
 // syncBoundaries() snapshots the boundary before the fluid step so both
 // directions see the same frame's pose. Acceptable for the SDF-penalty
-// approximation this bridges uses (see docs/todo/PLAN_physicssolver_rigid_soft_coupling.md).
+// approximation this bridges uses (see internal design notes).
 void PhysicsSolver::stepUnconditional()
 {
     rigidFluid_.syncBoundaries();

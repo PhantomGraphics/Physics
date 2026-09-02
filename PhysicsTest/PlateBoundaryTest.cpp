@@ -23,7 +23,7 @@ PlateBoundary makeAxisAlignedPlate()
 // ---- OBB signed-distance convention -------------------------------------
 // getSignedDistance() >= 0 is the valid/exterior region, matching
 // PlaneBoundary and SphereBoundary; the deepest interior point is exactly
-// -halfThickness (docs/todo/PLAN_sph_showcase_waterfall.md section 3.1).
+// -halfThickness (internal design notes section 3.1).
 
 TEST(PlateBoundaryTest, SignedDistanceIsPositiveOutsideAndNegativeInside)
 {

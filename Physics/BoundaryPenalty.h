@@ -33,7 +33,7 @@ inline float clampBoundaryDampingRatio(const float ratio)
  * invisible under a settled pool, where the weight of the water above and the
  * viscous coupling to it eat the rebound, but a jet hitting an *empty*
  * container has nothing above it, so the whole rebound turns into upward
- * spray (docs/issue/water_sphere_showcase_emitter_instability.md section 3).
+ * spray (internal design notes section 3).
  *
  * The damper term removes that energy instead: it opposes motion along the
  * normal while the particle is in contact, giving an explicitly controllable

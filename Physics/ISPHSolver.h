@@ -35,9 +35,7 @@ struct SPHSolveStats {
 
 /**
  * @brief Common interface implemented by the CPU SPH fluid solvers
- * (DFSPHSolver, PBSPHSolver, CSPHSolver). (MVCSolver formerly implemented
- * this interface too; its development is paused and the sources have been
- * moved out of the build -- see Physics/_paused_MVC/.)
+ * (DFSPHSolver, PBSPHSolver, CSPHSolver).
  *
  * Before this interface existed, each solver had its own simulate() arity
  * (DFSPHSolver::simulate(searchRadius, maxIter), PBSPHSolver::simulate(dt,
@@ -146,7 +144,7 @@ public:
 	 * restitution is ~1: the wall gives back every bit of the impact. That is
 	 * harmless under a settled pool but turns a jet landing in an *empty*
 	 * container into upward spray -- see boundaryPenaltyAcceleration() and
-	 * docs/issue/water_sphere_showcase_emitter_instability.md section 3.
+	 * internal design notes section 3.
 	 * Values are clamped to [0, 0.5] (clampBoundaryDampingRatio()).
 	 *
 	 * No-op where unsupported: PBSPHSolver has no use for it (it hard-clamps

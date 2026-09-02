@@ -211,8 +211,7 @@ void SoftBodyWorld::applyPreset() {
         // solver; two whole overlapping JellyBody cubes settle without ever
         // re-approaching each other once resting on the shared floor, so
         // self-collision never has anything left to correct by the time the
-        // scenario samples it -- both tried first, see
-        // docs/todo/PLAN_physics_scenario_test_rebuild.md's
+        // scenario samples it -- both tried first, see the internal design notes and
         // 40_soft_self_collision.json) any change in the markers' separation
         // can only be self-collision's own doing.
         Physics::JellyBodyParams p;

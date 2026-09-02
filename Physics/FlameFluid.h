@@ -17,7 +17,7 @@ namespace Phantom {
  * Mirrors WCSPHFluid's material parameters (density/pressureCoe/viscosityCoe/
  * effectLength) and adds combustion/buoyancy/vorticity/curl-noise parameters
  * plus a simple particle-emitter and lifetime management (idea doc sections
- * 1-3). See docs/todo/sph_flame_plan.md for the design rationale.
+ * 1-3). See internal design notes for the design rationale.
  */
 class FlameFluid : private UnCopyable
 {

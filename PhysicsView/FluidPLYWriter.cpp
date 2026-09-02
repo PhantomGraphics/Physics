@@ -26,8 +26,7 @@ bool writeFluidParticlesToPLY(const std::filesystem::path& path,
         << "end_header\n";
 
     // One buffered pass rather than a stream call per particle -- matters at
-    // the several-hundred-thousand-particle scale the showcase scenarios use
-    // (mirrors CGApp/blender/PyFluid/PyFluid.cpp's writeFluidsToPLY()).
+    // the several-hundred-thousand-particle scale the showcase scenarios use.
     std::vector<char> blob(positions.size() * sizeof(float) * 3);
     char* out = blob.data();
     for (const auto& p : positions) {

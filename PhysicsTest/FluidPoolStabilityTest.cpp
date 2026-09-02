@@ -65,7 +65,7 @@ TEST(FluidPoolStabilityTest, WCSPH_PoolSettlesInBoxWithoutExploding) {
 }
 
 // The water-sphere showcase's core failure mode: a pool resting against a
-// *curved* wall for the whole shot (docs/todo/PLAN_sph_showcase_water_sphere.md
+// *curved* wall for the whole shot (internal design notes
 // sections 2.2, 2.4 and 11-2). Two independent things have to hold at once:
 //
 //   1. The sphere wall contributes density, not just a penalty force. A wall

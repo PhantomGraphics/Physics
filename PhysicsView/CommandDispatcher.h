@@ -18,7 +18,7 @@ namespace Phantom {
     // Single IScenarioDispatcher for FluidApp, covering the fluid world,
     // (since the RigidBodyView -> FluidView merge) the rigid-body scene, and
     // (since the SoftBody -> Physics integration, see
-    // docs/todo/PLAN_softbody_physics_integration.md) the soft-body scene.
+    // internal design notes) the soft-body scene.
     // The three worlds are not physically coupled -- this class only routes
     // scenario command strings to whichever world they belong to.
     //
@@ -35,7 +35,7 @@ namespace Phantom {
     // scenario command strings keep working too.
     //
     // "SetCoupling*" commands drive FluidWorld's Rigid-Fluid coupling
-    // (docs/todo/PLAN_rigid_fluid_coupling.md Phase 8) -- see FluidWorld's
+    // (internal design notes Phase 8) -- see FluidWorld's
     // class doc. "SetSoftFluidCouplingEnabled"/"IsSoftFluidCouplingEnabled"
     // drive the analogous SoftBody-Fluid coupling (always Two-Way; no mode
     // toggle) added alongside it.
@@ -46,8 +46,7 @@ namespace Phantom {
     // independent of rigid()/the coupling commands above.
     //
     // "AddEmitter:cx,cy,cz,radius,rate,dirX,dirY,dirZ,speed"/"ClearEmitters"/
-    // "GetEmitterCount" drive FluidWorld::addEmitter() (docs/todo/
-    // PLAN_physics_fluid_emitter.md) -- continuous particle generation on
+    // "GetEmitterCount" drive FluidWorld::addEmitter() (internal design notes) -- continuous particle generation on
     // whichever fluid type is currently active.
     //
     // "AddOutflowRegion:minX,minY,minZ,maxX,maxY,maxZ"/"ClearOutflowRegions"/
@@ -70,11 +69,9 @@ namespace Phantom {
     // "Set{Volume,Mesh}RenderEnabled"/"Is{Volume,Mesh}RenderEnabled" toggle
     // FluidVolumeRenderer/FluidMeshRenderer's on-screen visibility.
     //
-    // ---- SPH showcase porting surface (docs/todo/PLAN_sph_showcase_water_sphere.md,
-    // scenarios/showcase/*.json) -- lets a scenario reproduce one of the
-    // Blender crystal_sph_addon showcase presets natively and export the
-    // resulting per-frame particle positions as PLY, without going through
-    // Blender/Python at all. ----
+    // ---- SPH showcase porting surface (scenarios/showcase/*.json) -- lets a
+    // scenario reproduce one of the SPH showcase presets natively and export the
+    // resulting per-frame particle positions as PLY. ----
     //
     // "AddBoundarySphere:cx,cy,cz,radius,maxPenetration"/"ClearBoundarySpheres"/
     // "GetBoundarySphereCount" drive FluidWorld::addBoundarySphere() (WCSPH
@@ -150,7 +147,7 @@ namespace Phantom {
         // response then; see CommandDispatcher::processQueue()). Delegating
         // this call to rigidDispatcher_.signalScreenshotDone() left the
         // response stranded there forever, hanging the scenario runner on
-        // every SaveScreenshot step (docs/issue/CODEBASE_ISSUES.md 1.8).
+        // every SaveScreenshot step (internal design notes 1.8).
         void signalScreenshotDone(bool ok, const std::string& path) {
             std::lock_guard<std::mutex> lk(mutex_);
             outputQueue_.push(ok ? "OK" : "FAIL:" + path);

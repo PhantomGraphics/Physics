@@ -4,7 +4,7 @@
     { "label": "Set RopePendulum preset (20-particle chain repositioned horizontally, pinned only at the start)", "command": "SetPreset:RopePendulum", "expect": "OK" },
     { "label": "Precondition: 1 body", "command": "GetSoftBodyCount", "expect": "Count:1" },
     { "label": "Precondition: 20 particles", "command": "GetSoftParticleCount", "expect": "Particles:20" },
-    { "label": "Precondition: chain starts flat along y=0 (pin at particle 0, tip at particle 19) -- this is exactly the always-on floor collider's height, so unlike a free-hanging pendulum this chain has no room to swing downward in Y (any downward swing is immediately blocked by the floor); only lateral (X/Z) swinging is possible, which this dispatcher has no getter for (see docs/todo/PLAN_physics_scenario_test_rebuild.md)", "command": "GetSoftParticlePositionY:0:19", "expect": "0.000000", "store_as": "tip_y0" },
+    { "label": "Precondition: chain starts flat along y=0 (pin at particle 0, tip at particle 19) -- this is exactly the always-on floor collider's height, so unlike a free-hanging pendulum this chain has no room to swing downward in Y (any downward swing is immediately blocked by the floor); only lateral (X/Z) swinging is possible, which this dispatcher has no getter for (see internal design notes)", "command": "GetSoftParticlePositionY:0:19", "expect": "0.000000", "store_as": "tip_y0" },
     { "label": "Simulate 150 steps", "command": "Step:150", "expect": "OK" },
     { "label": "Change: continuing another 50 steps confirms the floor-constrained rest configuration is a stable fixed point, not just momentarily static", "command": "Step:50", "expect": "OK" },
     { "label": "Tip Y after 200 total steps", "command": "GetSoftParticlePositionY:0:19", "store_as": "tip_y1" },

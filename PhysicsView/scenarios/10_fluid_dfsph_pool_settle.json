@@ -2,7 +2,7 @@
   "name": "10_fluid_dfsph_pool_settle",
   "steps": [
     { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
-    { "label": "DFSPH at FluidWorld::Params defaults (radius 1.0/effectLength 2.25/density 1.0/stiffness 20/viscosity 5.0/dt 0.01 -- known-stable scale, see docs/todo/PLAN_physics_scenario_test_rebuild.md 1.5)", "command": "SetSimulationType:DFSPH", "expect": "OK" },
+    { "label": "DFSPH at FluidWorld::Params defaults (radius 1.0/effectLength 2.25/density 1.0/stiffness 20/viscosity 5.0/dt 0.01 -- known-stable scale, see internal design notes 1.5)", "command": "SetSimulationType:DFSPH", "expect": "OK" },
     { "label": "Resting 3x3x3 block at the default radius (spacing 2.0), y in [8,12]", "command": "SetFluidBounds:-2:8:-2:2:12:2", "expect": "OK" },
     { "label": "Container walls sized for the default-scale block", "command": "SetFluidBoundary:-8:-8:-8:8:14:8", "expect": "OK" },
     { "label": "Rebuild fluid", "command": "Reset", "expect": "OK" },

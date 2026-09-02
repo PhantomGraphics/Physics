@@ -12,7 +12,7 @@ namespace Physics {
  * Shared by RigidBoundaryParticles and SoftBoundaryParticles (see
  * IBoundaryParticles) so DFSPHSolver/PBSPHSolver can couple against either
  * through one code path instead of duplicating it per boundary kind
- * (docs/todo/PLAN_physics_ownership_and_coupling_unification.md, Phase 3).
+ * (internal design notes, Phase 3).
  * RigidBoundaryParticles additionally keeps each sample's shape-local rest
  * position in a parallel array (RigidBoundaryParticles::localPositions()),
  * since that is rigid-specific (a SoftBody particle has no separate

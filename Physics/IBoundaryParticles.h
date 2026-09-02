@@ -15,7 +15,7 @@ namespace Physics {
  * near-identical copies of their density/constraint-gradient/pressure
  * coupling loops -- one iterating `std::vector<RigidBoundaryParticles*>`,
  * the other `std::vector<SoftBoundaryParticles*>`, differing only in the
- * element type's name (docs/todo/PLAN_physics_ownership_and_coupling_unification.md,
+ * element type's name (internal design notes,
  * 2.2 節). Both element types already exposed the same worldPos/psi/accumForce
  * shape (BoundaryParticle), so routing both through `particles()` here lets
  * those loops be written once against `IBoundaryParticles*`.

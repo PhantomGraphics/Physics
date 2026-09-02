@@ -137,7 +137,7 @@ std::string RigidBodyCommandDispatcher::route(const std::string& cmd) {
         // populates via AddSphere/AddBox/AddFloor -- see scenarios/26_rigid_add_bodies.json),
         // accepted here same as any other named preset. Anything else is a typo,
         // not a scene: silently falling back to Custom would make a mistyped
-        // preset name pass forever (see docs/todo/PLAN_physics_scenario_test_rebuild.md 1.4).
+        // preset name pass forever (see internal design notes 1.4).
         else if (name == "Custom")             p = ScenePreset::Custom;
         else return "Error:unknown preset '" + std::string(name) + "'";
         world_->setPreset(p);

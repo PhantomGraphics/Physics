@@ -47,7 +47,7 @@ bool isFinite3(const Vector3df& v)
 // enough particles (and enough shared-neighbor pairs) that a data race
 // would show up as run-to-run divergence if one were reintroduced (see
 // WCSPHSolver.cpp / PBSPHSolver.cpp "gather" comments, §2.7 of
-// docs/todo/PLAN_sph_addon_showcase_simulations.md).
+// internal design notes).
 std::vector<Vector3df> makeParticleGrid(const int n, const float spacing, const float originY)
 {
   std::vector<Vector3df> positions;
@@ -191,7 +191,7 @@ TEST(FluidSolverBaseline, PBSPHParticleLifecycleAndFlags)
 }
 
 // ---------------------------------------------------------------------------
-// G0 (docs/todo/PLAN_sph_addon_showcase_simulations.md §2.7): repeat-run
+// G0 (internal design notes §2.7): repeat-run
 // determinism. Each solver's OpenMP-parallel density/pressure passes used to
 // be parallelized over neighbor *pairs*, letting two pairs sharing a
 // particle land on different threads and race on that particle's
@@ -435,7 +435,7 @@ TEST(FluidDeterminism, PBSPHRepeatedRunsMatch)
 // std::random_device{}(), which made every emitter-driven scene -- including
 // all three SPH showcase bakes -- give a different result on every run, with
 // none of the tests above noticing. See Physics/Physics/RandomSeed.h and
-// docs/issue/water_sphere_showcase_emitter_instability.md section 11.4.
+// internal design notes section 11.4.
 //
 // A non-zero speedJitter is the whole point of these: with jitter at 0 the
 // RNG is never consulted, so a repeat-run check would pass even with

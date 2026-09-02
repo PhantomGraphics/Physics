@@ -16,7 +16,7 @@ namespace {
 // Physics/PhysicsView/scenarios/showcase/showcase_water_sphere{,_preview}.json
 // configure them. viscosityCoe is part of the tier because getting it wrong per
 // tier is exactly what kept the production tier unstable after the 2026-08-26
-// fixes -- see docs/issue/water_sphere_showcase_emitter_instability.md
+// fixes -- see internal design notes
 // section 11.
 struct ShowcaseTier {
     float particleRadius;
@@ -30,7 +30,7 @@ constexpr ShowcaseTier kProductionTier{ 0.0025f, 0.01f, 1.5e-4f, 0.010f };
 
 // A scaled-down stand-in for the water-sphere showcase's opening shot: a jet
 // pouring from an emitter into a *dry* spherical container
-// (docs/issue/water_sphere_showcase_emitter_instability.md). Same particle
+// (internal design notes). Same particle
 // spacing, effect length, time step, stiffness, viscosity and jet speed as the
 // scenario for the given tier -- only the container (R = 0.20 = the design's
 // 10h floor), the drop height and the jet's cross-section are shrunk, which
@@ -180,7 +180,7 @@ TEST(WaterSphereEmitterStabilityTest, JetIntoDrySphereDoesNotOutrunItsOwnFall) {
 // (m^2/s) -- the same value produces the same damping at either resolution
 // (measured: velocity decay agrees within ~5% across a 2x resolution change on
 // an identical physical scene) -- so it must NOT be rescaled with the radius.
-// See docs/issue/water_sphere_showcase_emitter_instability.md section 11.
+// See internal design notes section 11.
 TEST(WaterSphereEmitterStabilityTest, ProductionTierJetDoesNotOutrunItsOwnFall) {
     JetIntoDrySphere scene;
     scene.build(0.35f, kProductionTier);
