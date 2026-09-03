@@ -83,6 +83,16 @@ endif()
 target_compile_options(PhysicsCore PRIVATE ${PHANTOM_WARN_FLAGS})
 
 # ---------------------------------------------------------------------------
+# examples/ -- headless (no Vulkan/ImGui) sample programs linking only
+# PhysicsCore. An onboarding entry point for the open-source release; see
+# Physics/examples/README.md. Independent of the Vulkan/GLFW discovery below.
+# ---------------------------------------------------------------------------
+option(PHYSICS_BUILD_EXAMPLES "Build the headless Physics/examples/ programs" ON)
+if(PHYSICS_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
+
+# ---------------------------------------------------------------------------
 # PhysicsTest (GoogleTest) -- PhysicsTest.vcxproj explicitly overrides
 # <LanguageStandard> to stdcpp20 (unlike PhysicsCore's Physics.vcxproj, which
 # doesn't and falls back to BuildConfig.props' repo-wide C++17 default) --

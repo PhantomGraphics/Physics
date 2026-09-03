@@ -1,0 +1,5 @@
+# PLY frame sequences written by the examples when run.
+out_dam_break/
+out_faucet/
+out_*/
+*.ply
