@@ -75,6 +75,10 @@ int main(int argc, char** argv)
     solver.setTimeStep(dt);
     solver.setExternalForce(Vector3df(0.f, -9.8f, 0.f));
     solver.setBoundary(container, dt);
+    // An undamped WCSPH penalty wall has restitution close to one.  A jet
+    // landing in an initially empty basin therefore rebounds indefinitely;
+    // damping makes this an actual pooling/draining faucet scene.
+    solver.setBoundaryDampingRatio(0.2f);
 
     std::printf("faucet: emitting into '%s/' (drain removes particles below y=-2.6)\n",
                 outDir.c_str());

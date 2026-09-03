@@ -81,9 +81,9 @@ Debug ビルドは Release の 10 倍以上遅いので、サンプルを回す�
 `03` の出力例:
 
 ```
-27-particle block settling in a box, 240 steps, one ISPHSolver* loop:
-  WCSPH   n=27  minY 0.60 -> -1.47  restDensity 1.000  peakSpeed 8.48  0.02s
-  PBSPH   n=27  minY 0.60 -> -3.00  restDensity 1.000  peakSpeed 9.02  0.07s
+27-particle block settling in a box, 600 steps, one ISPHSolver* loop:
+  WCSPH   n=27  minY 0.60 -> -3.00  restDensity 1.000  peakSpeed 8.46  finalSpeed 0.00  0.05s
+  PBSPH   n=27  minY 0.60 -> -3.00  restDensity 1.000  peakSpeed 9.02  finalSpeed 0.00  0.10s
 ```
 
 PLY 連番を Blender で開くには「File → Import → Stanford PLY」で

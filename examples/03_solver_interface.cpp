@@ -37,7 +37,7 @@ namespace scene {
     constexpr float effectLength = 1.0f;
     constexpr float restDensity  = 1.0f;
     constexpr float dt           = 0.005f;
-    constexpr int   steps        = 240;
+    constexpr int   steps        = 600;
     const Box3df container(Vector3df(-3.f, -3.f, -3.f), Vector3df(3.f, 3.f, 3.f));
     const Box3df block    (Vector3df(-0.3f, 0.6f, -0.3f), Vector3df(0.3f, 1.2f, 0.3f));
     const Vector3df gravity(0.f, -9.8f, 0.f);
@@ -95,6 +95,11 @@ static void run(const std::string& name, Sim sim)
     sim->setTimeStep(scene::dt);
     sim->setExternalForce(scene::gravity);
     sim->setBoundary(scene::container, scene::dt);
+    // A little wall-normal damping is part of the scene, not a material
+    // parameter.  Without it PBSPH's hard positional wall constraint and
+    // WCSPH's penalty wall retain very different amounts of impact energy,
+    // so this example compared boundary transients rather than the solvers.
+    sim->setBoundaryDampingRatio(0.2f);
 
     const int   n0 = sim->getParticleCount();
     const float y0 = minY(sim->getParticlePositions());
@@ -107,10 +112,11 @@ static void run(const std::string& name, Sim sim)
     }
 
     const auto pos = sim->getParticlePositions();
+    const float finalSpeed = maxSpeed(sim->getParticleVelocities());
     std::printf("  %-6s  n=%d  minY %.2f -> %.2f  restDensity %.3f  "
-                "peakSpeed %.2f  %.2fs\n",
+                "peakSpeed %.2f  finalSpeed %.2f  %.2fs\n",
                 name.c_str(), n0, y0, minY(pos),
-                sim->getRestDensity(), worstSpeed, clock.seconds());
+                sim->getRestDensity(), worstSpeed, finalSpeed, clock.seconds());
 }
 
 int main()

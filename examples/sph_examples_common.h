@@ -10,11 +10,13 @@
 #include "CGLib/Math/Box3d.h"
 
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -113,8 +115,14 @@ struct Stopwatch {
 inline float maxSpeed(const std::vector<Vector3df>& velocities)
 {
     float m = 0.0f;
-    for (const auto& v : velocities)
-        m = std::max(m, Phantom::Math::getLength(v));
+    for (const auto& v : velocities) {
+        const float speed = Phantom::Math::getLength(v);
+        // std::max(m, NaN) returns m, which used to make this diagnostic hide
+        // the very solver failure it was intended to expose.
+        if (!std::isfinite(speed))
+            return std::numeric_limits<float>::infinity();
+        m = std::max(m, speed);
+    }
     return m;
 }
 

@@ -69,6 +69,7 @@ int main(int argc, char** argv)
     // The domain container: internally 6 inward-facing planes that push
     // particles back in with a penalty force.
     solver.setBoundary(container, dt);
+    solver.setBoundaryDampingRatio(0.2f);       // dissipate wall-impact energy
 
     std::printf("dam break: %d particles -> frames in '%s/'\n",
                 fluid.getNumParticles(), outDir.c_str());
