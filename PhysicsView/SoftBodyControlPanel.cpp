@@ -43,33 +43,33 @@ void SoftBodyControlPanel::onImGui() {
     if (!world_ || !visible_) return;
     initWidgets();
 
-    ImGui::SetNextWindowPos(ImVec2(10.f, 35.f), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(300.f, 560.f), ImGuiCond_Once);
-    if (!ImGui::Begin("Soft Body Control", &visible_)) { ImGui::End(); return; }
+    UI::Immediate::setNextWindowPosition(10.f, 35.f);
+    UI::Immediate::setNextWindowSize(300.f, 560.f);
+    if (!UI::Immediate::beginWindow("Soft Body Control", &visible_)) { UI::Immediate::endWindow(); return; }
 
     {
         int cur = static_cast<int>(world_->currentPreset());
-        if (ImGui::Combo("Preset", &cur, kPresetNames, kNumPresets)) {
+        if (UI::Immediate::combo("Preset", cur, kPresetNames, kNumPresets)) {
             world_->setPreset(kPresetValues[cur]);
             if (onWorldChanged_) onWorldChanged_();
         }
     }
 
     runButton_.show();
-    ImGui::SameLine();
+    UI::Immediate::sameLine();
     stepButton_.show();
-    ImGui::SameLine();
+    UI::Immediate::sameLine();
     resetButton_.show();
 
     {
         auto& wp = world_->getWorld();
-        ImGui::Text("Bodies:%zu  Particles:%zu",
+        UI::Immediate::text("Bodies:%zu  Particles:%zu",
                     wp.getBodyCount(), wp.getParticleCount());
-        ImGui::Text("Running: %s", world_->isRunning() ? "Yes" : "No");
+        UI::Immediate::text("Running: %s", world_->isRunning() ? "Yes" : "No");
     }
 
-    ImGui::Separator();
-    ImGui::Text("Solver");
+    UI::Immediate::separator();
+    UI::Immediate::text("Solver");
     {
         auto& sp = world_->getWorld().solverParams();
 
@@ -90,12 +90,12 @@ void SoftBodyControlPanel::onImGui() {
         sp.gravity.y = gravYView_.getValue();
     }
 
-    ImGui::Separator();
-    ImGui::Text("Sphere Collider");
+    UI::Immediate::separator();
+    UI::Immediate::text("Sphere Collider");
     {
         auto& wp = world_->getWorld().params();
         bool sphereEnabled = wp.sphereEnabled;
-        if (ImGui::Checkbox("Enabled##sphere", &sphereEnabled))
+        if (UI::Immediate::checkbox("Enabled##sphere", sphereEnabled))
             wp.sphereEnabled = sphereEnabled;
 
         sphereXView_.setValue(wp.sphereCenter.x);
@@ -115,12 +115,12 @@ void SoftBodyControlPanel::onImGui() {
         wp.sphereRadius = sphereRView_.getValue();
     }
 
-    ImGui::Separator();
-    ImGui::Text("Self-Collision");
+    UI::Immediate::separator();
+    UI::Immediate::text("Self-Collision");
     {
         auto& sp = world_->getWorld().solverParams();
         bool enabled = sp.selfCollisionEnabled;
-        if (ImGui::Checkbox("Enabled##selfcol", &enabled))
+        if (UI::Immediate::checkbox("Enabled##selfcol", enabled))
             sp.selfCollisionEnabled = enabled;
 
         selfColThicknessView_.setValue(sp.selfCollisionThickness);
@@ -128,7 +128,7 @@ void SoftBodyControlPanel::onImGui() {
         sp.selfCollisionThickness = selfColThicknessView_.getValue();
     }
 
-    ImGui::End();
+    UI::Immediate::endWindow();
 }
 
 } // namespace Phantom

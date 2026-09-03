@@ -169,27 +169,27 @@ void FluidRenderer::onCleanup(VkDevice device)
 void FluidRenderer::onImGui()
 {
     if (!settingsVisible_) return;
-    if (!ImGui::Begin("Fluid Renderer", &settingsVisible_)) {
-        ImGui::End();
+    if (!UI::Immediate::beginWindow("Fluid Renderer", &settingsVisible_)) {
+        UI::Immediate::endWindow();
         return;
     }
-    if (ImGui::CollapsingHeader("Camera")) {
-        ImGui::SliderFloat("Yaw", &yaw_, -3.14159f, 3.14159f);
-        ImGui::SliderFloat("Pitch", &pitch_, 0.05f, 3.09f);
-        ImGui::SliderFloat("Distance", &distance_, 5.0f, 300.0f);
+    if (UI::Immediate::collapsingHeader("Camera")) {
+        UI::Immediate::sliderFloat("Yaw", yaw_, -3.14159f, 3.14159f);
+        UI::Immediate::sliderFloat("Pitch", pitch_, 0.05f, 3.09f);
+        UI::Immediate::sliderFloat("Distance", distance_, 5.0f, 300.0f);
     }
-    if (ImGui::CollapsingHeader("Fluid Color Map")) {
-        ImGui::TextUnformatted(hasDensity_ ? "Quantity: (Density - Rest Density) / Rest Density"
+    if (UI::Immediate::collapsingHeader("Fluid Color Map")) {
+        UI::Immediate::textUnformatted(hasDensity_ ? "Quantity: (Density - Rest Density) / Rest Density"
                                            : "Quantity: unavailable (fixed color)");
-        ImGui::Checkbox("Auto Contrast", &autoDensityRange_);
+        UI::Immediate::checkbox("Auto Contrast", autoDensityRange_);
         if (hasDensity_) {
-            ImGui::Text("Observed robust range: +/- %.5f", observedDensityRange_);
+            UI::Immediate::text("Observed robust range: +/- %.5f", observedDensityRange_);
         }
-        ImGui::SliderFloat("Density Difference Min", &densityRangeMin_, -0.5f, 0.0f, "%.3f");
-        ImGui::SliderFloat("Density Difference Max", &densityRangeMax_, 0.0f, 0.5f, "%.3f");
+        UI::Immediate::sliderFloat("Density Difference Min", densityRangeMin_, -0.5f, 0.0f, "%.3f");
+        UI::Immediate::sliderFloat("Density Difference Max", densityRangeMax_, 0.0f, 0.5f, "%.3f");
         densityRangeMax_ = std::max(densityRangeMax_, densityRangeMin_ + 0.001f);
     }
-    ImGui::End();
+    UI::Immediate::endWindow();
 }
 
 void FluidRenderer::uploadVertices(const std::vector<glm::vec3>& pts,

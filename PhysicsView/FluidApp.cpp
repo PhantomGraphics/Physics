@@ -293,36 +293,36 @@ void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
 
 void FluidApp::onImGui()
 {
-    if (ImGui::BeginMainMenuBar()) {
-        if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("Quit")) {
+    if (UI::Immediate::beginMainMenuBar()) {
+        if (UI::Immediate::beginMenu("File")) {
+            if (UI::Immediate::menuItem("Quit")) {
                 glfwSetWindowShouldClose(getWindow().get(), GLFW_TRUE);
             }
-            ImGui::EndMenu();
+            UI::Immediate::endMenu();
         }
 
-        if (ImGui::BeginMenu("View")) {
-            if (ImGui::MenuItem("Fluid Control", nullptr, controlPanel_.isVisible()))
+        if (UI::Immediate::beginMenu("View")) {
+            if (UI::Immediate::menuItem("Fluid Control", controlPanel_.isVisible()))
                 controlPanel_.setVisible(!controlPanel_.isVisible());
-            if (ImGui::MenuItem("Fluid Renderer", nullptr, fluidRenderer_.isSettingsVisible()))
+            if (UI::Immediate::menuItem("Fluid Renderer", fluidRenderer_.isSettingsVisible()))
                 fluidRenderer_.setSettingsVisible(!fluidRenderer_.isSettingsVisible());
-            if (ImGui::MenuItem("SSFR Control", nullptr, ssfrPanel_.isVisible()))
+            if (UI::Immediate::menuItem("SSFR Control", ssfrPanel_.isVisible()))
                 ssfrPanel_.setVisible(!ssfrPanel_.isVisible());
-            if (ImGui::MenuItem("SSFR Test", nullptr, ssfrTestPanel_.isVisible()))
+            if (UI::Immediate::menuItem("SSFR Test", ssfrTestPanel_.isVisible()))
                 ssfrTestPanel_.setVisible(!ssfrTestPanel_.isVisible());
-            ImGui::Separator();
-            if (ImGui::MenuItem("Rigid Body Control", nullptr, rigidControlPanel_.isVisible()))
+            UI::Immediate::separator();
+            if (UI::Immediate::menuItem("Rigid Body Control", rigidControlPanel_.isVisible()))
                 rigidControlPanel_.setVisible(!rigidControlPanel_.isVisible());
-            if (ImGui::MenuItem("Soft Body Control", nullptr, softControlPanel_.isVisible()))
+            if (UI::Immediate::menuItem("Soft Body Control", softControlPanel_.isVisible()))
                 softControlPanel_.setVisible(!softControlPanel_.isVisible());
-            if (ImGui::MenuItem("Volume Conversion", nullptr, volumeConvertPanel_.isVisible()))
+            if (UI::Immediate::menuItem("Volume Conversion", volumeConvertPanel_.isVisible()))
                 volumeConvertPanel_.setVisible(!volumeConvertPanel_.isVisible());
-            if (ImGui::MenuItem("Scenario Browser", nullptr, scenarioBrowser_.isVisible()))
+            if (UI::Immediate::menuItem("Scenario Browser", scenarioBrowser_.isVisible()))
                 scenarioBrowser_.setVisible(!scenarioBrowser_.isVisible());
-            ImGui::EndMenu();
+            UI::Immediate::endMenu();
         }
 
-        ImGui::EndMainMenuBar();
+        UI::Immediate::endMainMenuBar();
     }
 
     ::VKG::VkAppBase::onImGui();

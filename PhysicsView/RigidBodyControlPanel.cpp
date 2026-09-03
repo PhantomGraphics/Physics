@@ -49,33 +49,33 @@ void RigidBodyControlPanel::onImGui() {
     if (!world_ || !visible_) return;
     initWidgets();
 
-    ImGui::SetNextWindowPos(ImVec2(700.f, 35.f), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(300.f, 640.f), ImGuiCond_Once);
-    if (!ImGui::Begin("Rigid Body Control", &visible_)) { ImGui::End(); return; }
+    UI::Immediate::setNextWindowPosition(700.f, 35.f);
+    UI::Immediate::setNextWindowSize(300.f, 640.f);
+    if (!UI::Immediate::beginWindow("Rigid Body Control", &visible_)) { UI::Immediate::endWindow(); return; }
 
     {
         int cur = static_cast<int>(world_->currentPreset());
-        if (ImGui::Combo("Preset", &cur, kPresetNames, 7)) {
+        if (UI::Immediate::combo("Preset", cur, kPresetNames, 7)) {
             world_->setPreset(kPresetValues[cur]);
             if (onWorldChanged_) onWorldChanged_();
         }
     }
 
     runButton_.show();
-    ImGui::SameLine();
+    UI::Immediate::sameLine();
     stepButton_.show();
-    ImGui::SameLine();
+    UI::Immediate::sameLine();
     resetButton_.show();
 
     {
         int n = static_cast<int>(world_->getWorld().getBodies().size());
         int c = static_cast<int>(world_->getWorld().getContacts().size());
-        ImGui::Text("Bodies:%d  Contacts:%d", n, c);
-        ImGui::Text("Running: %s", world_->isRunning() ? "Yes" : "No");
+        UI::Immediate::text("Bodies:%d  Contacts:%d", n, c);
+        UI::Immediate::text("Running: %s", world_->isRunning() ? "Yes" : "No");
     }
 
-    ImGui::Separator();
-    ImGui::Text("Simulation");
+    UI::Immediate::separator();
+    UI::Immediate::text("Simulation");
     {
         auto& wp = world_->getWorld();
         timeStepView_.setValue(wp.timeStep);
@@ -95,22 +95,22 @@ void RigidBodyControlPanel::onImGui() {
         wp.params().gravity.y = gravYView_.getValue();
     }
 
-    ImGui::Separator();
-    ImGui::Text("Add Sphere (drops from y=3)");
+    UI::Immediate::separator();
+    UI::Immediate::text("Add Sphere (drops from y=3)");
     sphereRadView_.show();
     sphereMassView_.show();
     sphereRestView_.show();
     addSphereBtn_.show();
 
-    ImGui::Separator();
-    ImGui::Text("Add Box (drops from y=3)");
+    UI::Immediate::separator();
+    UI::Immediate::text("Add Box (drops from y=3)");
     boxHxView_.show();
     boxHyView_.show();
     boxHzView_.show();
     boxMassView_.show();
     addBoxBtn_.show();
 
-    ImGui::End();
+    UI::Immediate::endWindow();
 }
 
 } // namespace Phantom

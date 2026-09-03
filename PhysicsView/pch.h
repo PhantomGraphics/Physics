@@ -10,8 +10,8 @@
 // Vulkan
 #include <vulkan/vulkan.h>
 
-// ImGui
-#include "imgui.h"
+// Application UI facade (keeps Dear ImGui out of PhysicsView sources)
+#include "CGLib/UIWidgets/Immediate.h"
 
 // Standard library
 #include <algorithm>

@@ -85,24 +85,24 @@ void FluidVolumeConvertPanel::onImGui()
 
     initWidgets();
 
-    ImGui::SetNextWindowPos(ImVec2(1010.f, 35.f), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(280.f, 520.f), ImGuiCond_Once);
-    if (!ImGui::Begin("Volume Conversion", &visible_)) {
-        ImGui::End();
+    UI::Immediate::setNextWindowPosition(1010.f, 35.f);
+    UI::Immediate::setNextWindowSize(280.f, 520.f);
+    if (!UI::Immediate::beginWindow("Volume Conversion", &visible_)) {
+        UI::Immediate::endWindow();
         return;
     }
 
-    ImGui::TextUnformatted("Particle -> SparseVolume");
-    ImGui::Separator();
+    UI::Immediate::textUnformatted("Particle -> SparseVolume");
+    UI::Immediate::separator();
     particleRadiusView_.show();
     cellLengthView_.show();
     kernelCombo_.show();
     convertButton_.show();
 
-    ImGui::Text("Particles: %llu",
+    UI::Immediate::text("Particles: %llu",
                 static_cast<unsigned long long>(world_->getParticleCount()));
     if (converter_->getVolume())
-        ImGui::Text("Active voxels: %d", converter_->getVoxelCount());
+        UI::Immediate::text("Active voxels: %d", converter_->getVoxelCount());
 
     saveFileView_.show();
     saveButton_.show();
@@ -112,37 +112,37 @@ void FluidVolumeConvertPanel::onImGui()
         // separate BoolView, so the checkbox and scenario command can't
         // fight each other by both writing every frame.
         bool show = volumeRenderer_->isEnabled();
-        if (ImGui::Checkbox("Show Volume Points", &show))
+        if (UI::Immediate::checkbox("Show Volume Points", show))
             volumeRenderer_->setEnabled(show);
     }
 
     if (!statusMessage_.empty())
-        ImGui::TextWrapped("%s", statusMessage_.c_str());
+        UI::Immediate::textWrapped("%s", statusMessage_.c_str());
 
     if (meshConverter_) {
-        ImGui::Separator();
-        ImGui::TextUnformatted("SparseVolume -> Mesh");
-        ImGui::Separator();
+        UI::Immediate::separator();
+        UI::Immediate::textUnformatted("SparseVolume -> Mesh");
+        UI::Immediate::separator();
         isoLevelView_.show();
         convertMeshButton_.show();
 
         if (meshConverter_->getTriangleCount() > 0)
-            ImGui::Text("Triangles: %llu",
+            UI::Immediate::text("Triangles: %llu",
                         static_cast<unsigned long long>(meshConverter_->getTriangleCount()));
 
         saveMeshFileView_.show();
         saveMeshButton_.show();
         if (meshRenderer_) {
             bool show = meshRenderer_->isEnabled();
-            if (ImGui::Checkbox("Show Mesh", &show))
+            if (UI::Immediate::checkbox("Show Mesh", show))
                 meshRenderer_->setEnabled(show);
         }
 
         if (!meshStatusMessage_.empty())
-            ImGui::TextWrapped("%s", meshStatusMessage_.c_str());
+            UI::Immediate::textWrapped("%s", meshStatusMessage_.c_str());
     }
 
-    ImGui::End();
+    UI::Immediate::endWindow();
 }
 
 } // namespace Phantom

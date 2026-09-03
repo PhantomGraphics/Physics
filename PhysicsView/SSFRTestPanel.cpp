@@ -96,8 +96,8 @@ void SSFRTestPanel::onImGuiComparison()
 {
     if (!ssfrRenderer_) return;
 
-    ImGui::Separator();
-    ImGui::TextDisabled("--- Anisotropic Comparison ---");
+    UI::Immediate::separator();
+    UI::Immediate::textDisabled("--- Anisotropic Comparison ---");
 
     anisoView_.setValue(ssfrRenderer_->getAnisotropicSmoothing());
     anisoView_.show();
@@ -107,25 +107,25 @@ void SSFRTestPanel::onImGuiComparison()
     depthSmoothView_.show();
     ssfrRenderer_->setDepthSmoothing(depthSmoothView_.getValue());
 
-    ImGui::Spacing();
-    ImGui::TextDisabled("Compare modes:");
+    UI::Immediate::spacing();
+    UI::Immediate::textDisabled("Compare modes:");
 
     rawDepthButton_.show();
-    ImGui::SameLine();
+    UI::Immediate::sameLine();
     smoothDepthButton_.show();
 
     rawThickButton_.show();
-    ImGui::SameLine();
+    UI::Immediate::sameLine();
     smoothThickButton_.show();
 
     reflectionButton_.show();
-    ImGui::SameLine();
+    UI::Immediate::sameLine();
     fullSSFRButton_.show();
 
-    ImGui::Spacing();
-    ImGui::TextWrapped("1. Enable Test Mode with Sphere preset");
-    ImGui::TextWrapped("2. Click 'Raw Depth' then 'Smooth Depth' to see depth filter");
-    ImGui::TextWrapped("3. In 'Reflection' mode, toggle 'Anisotropic ON' to see normal change");
+    UI::Immediate::spacing();
+    UI::Immediate::textWrapped("1. Enable Test Mode with Sphere preset");
+    UI::Immediate::textWrapped("2. Click 'Raw Depth' then 'Smooth Depth' to see depth filter");
+    UI::Immediate::textWrapped("3. In 'Reflection' mode, toggle 'Anisotropic ON' to see normal change");
 }
 
 void SSFRTestPanel::onImGui()
@@ -134,10 +134,10 @@ void SSFRTestPanel::onImGui()
 
     initWidgets();
 
-    ImGui::SetNextWindowPos(ImVec2(380.f, 35.f), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(300.f, 420.f), ImGuiCond_Once);
-    if (!ImGui::Begin("SSFR Test", &show_)) {
-        ImGui::End();
+    UI::Immediate::setNextWindowPosition(380.f, 35.f);
+    UI::Immediate::setNextWindowSize(300.f, 420.f);
+    if (!UI::Immediate::beginWindow("SSFR Test", &show_)) {
+        UI::Immediate::endWindow();
         return;
     }
 
@@ -163,17 +163,17 @@ void SSFRTestPanel::onImGui()
         }
 
         const char* szLabel = (preset_ == Preset::DamBreak) ? "Half-Width" : "Radius";
-        ImGui::SliderFloat(szLabel, &radius_, 4.f, 25.f);
-        ImGui::SliderInt("Target", &count_, 500, 8000);
+        UI::Immediate::sliderFloat(szLabel, radius_, 4.f, 25.f);
+        UI::Immediate::sliderInt("Target", count_, 500, 8000);
 
         generateButton_.show();
-        ImGui::SameLine();
-        ImGui::Text("(%d particles)", static_cast<int>(positions_.size()));
+        UI::Immediate::sameLine();
+        UI::Immediate::text("(%d particles)", static_cast<int>(positions_.size()));
     }
 
     onImGuiComparison();
 
-    ImGui::End();
+    UI::Immediate::endWindow();
 }
 
 } // namespace Phantom

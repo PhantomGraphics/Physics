@@ -25,10 +25,10 @@ void SSFRPanel::onImGui()
     if (!visible_) return;
     initWidgets();
 
-    ImGui::SetNextWindowPos(ImVec2(10.f, 500.f), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(360.f, 480.f), ImGuiCond_Once);
-    if (!ImGui::Begin("SSFR Control", &visible_)) {
-        ImGui::End();
+    UI::Immediate::setNextWindowPosition(10.f, 500.f);
+    UI::Immediate::setNextWindowSize(360.f, 480.f);
+    if (!UI::Immediate::beginWindow("SSFR Control", &visible_)) {
+        UI::Immediate::endWindow();
         return;
     }
 
@@ -76,55 +76,55 @@ void SSFRPanel::onImGui()
         }
 
         if (renderer_) {
-            ImGui::TextDisabled("--- Thickness Bilateral ---");
+            UI::Immediate::textDisabled("--- Thickness Bilateral ---");
             float thickSigmaS = renderer_->getThicknessSmoothingSigmaS();
-            if (ImGui::SliderFloat("Thickness SigmaS", &thickSigmaS, 0.5f, 6.0f))
+            if (UI::Immediate::sliderFloat("Thickness SigmaS", thickSigmaS, 0.5f, 6.0f))
                 renderer_->setThicknessSmoothingSigmaS(thickSigmaS);
 
             float thickSigmaR = renderer_->getThicknessSmoothingSigmaR();
-            if (ImGui::SliderFloat("Thickness SigmaR", &thickSigmaR, 0.01f, 0.25f))
+            if (UI::Immediate::sliderFloat("Thickness SigmaR", thickSigmaR, 0.01f, 0.25f))
                 renderer_->setThicknessSmoothingSigmaR(thickSigmaR);
 
-            ImGui::Separator();
-            ImGui::TextDisabled("--- Anisotropic (Thickness + Depth) ---");
+            UI::Immediate::separator();
+            UI::Immediate::textDisabled("--- Anisotropic (Thickness + Depth) ---");
             anisoCheck_.setValue(renderer_->getAnisotropicSmoothing());
             anisoCheck_.show();
             renderer_->setAnisotropicSmoothing(anisoCheck_.getValue());
 
             float aniso = renderer_->getAnisotropy();
-            if (ImGui::SliderFloat("Anisotropy", &aniso, 0.0f, 3.0f))
+            if (UI::Immediate::sliderFloat("Anisotropy", aniso, 0.0f, 3.0f))
                 renderer_->setAnisotropy(aniso);
 
             float gradScale = renderer_->getAnisotropicGradientScale();
-            if (ImGui::SliderFloat("Aniso Grad Scale", &gradScale, 0.0f, 20.0f))
+            if (UI::Immediate::sliderFloat("Aniso Grad Scale", gradScale, 0.0f, 20.0f))
                 renderer_->setAnisotropicGradientScale(gradScale);
 
-            ImGui::Separator();
-            ImGui::TextDisabled("--- Depth Bilateral (Surface Normals) ---");
+            UI::Immediate::separator();
+            UI::Immediate::textDisabled("--- Depth Bilateral (Surface Normals) ---");
             depthSmoothCheck_.setValue(renderer_->getDepthSmoothing());
             depthSmoothCheck_.show();
             renderer_->setDepthSmoothing(depthSmoothCheck_.getValue());
 
             float depthSigmaS = renderer_->getDepthSmoothingSigmaS();
-            if (ImGui::SliderFloat("Depth SigmaS", &depthSigmaS, 0.5f, 6.0f))
+            if (UI::Immediate::sliderFloat("Depth SigmaS", depthSigmaS, 0.5f, 6.0f))
                 renderer_->setDepthSmoothingSigmaS(depthSigmaS);
 
             float depthSigmaR = renderer_->getDepthSmoothingSigmaR();
-            if (ImGui::SliderFloat("Depth SigmaR", &depthSigmaR, 0.005f, 0.2f))
+            if (UI::Immediate::sliderFloat("Depth SigmaR", depthSigmaR, 0.005f, 0.2f))
                 renderer_->setDepthSmoothingSigmaR(depthSigmaR);
 
-            ImGui::Separator();
+            UI::Immediate::separator();
             float sprayOp = renderer_->getSprayOpacity();
-            if (ImGui::SliderFloat("Spray Opacity", &sprayOp, 0.0f, 1.0f))
+            if (UI::Immediate::sliderFloat("Spray Opacity", sprayOp, 0.0f, 1.0f))
                 renderer_->setSprayOpacity(sprayOp);
 
             float foamOp = renderer_->getFoamOpacity();
-            if (ImGui::SliderFloat("Foam Opacity", &foamOp, 0.0f, 1.0f))
+            if (UI::Immediate::sliderFloat("Foam Opacity", foamOp, 0.0f, 1.0f))
                 renderer_->setFoamOpacity(foamOp);
         }
     }
 
-    ImGui::End();
+    UI::Immediate::endWindow();
 }
 
 } // namespace Phantom
