@@ -273,7 +273,7 @@ void CSPHSolver::addBoundaryDensity(const std::vector<CSPHParticle*>& particles)
 // than by sampling the walls with Akinci boundary particles.
 void WCSPHSolver::addBoundaryDensity(std::vector<WCSPHParticle>& particles)
 {
-	if ((boundaryPlanes_.empty() && boundarySpheres_.empty() && boundaryPlates_.empty() && boundaryShapes_.empty()) || particles.empty()) return;
+	if ((boundaryPlanes_.empty() && boundarySpheres_.empty() && boundaryPlates_.empty() && boundaryCylinders_.empty() && boundaryShapes_.empty()) || particles.empty()) return;
 
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
@@ -303,6 +303,7 @@ void WCSPHSolver::addBoundaryDensity(std::vector<WCSPHParticle>& particles)
 		// like planes and spheres -- the clamp is what keeps overlapping plates
 		// at a 9-plate seam from summing past rest density.
 		for (const auto& plate : boundaryPlates_) if (plate) addShapeDensity(*plate);
+		for (const auto& cylinder : boundaryCylinders_) if (cylinder) addShapeDensity(*cylinder);
 		for (const auto& shape : boundaryShapes_) if (shape) addShapeDensity(*shape);
 		// The wall stands in for the neighbors a particle is *missing* because
 		// the wall is where they would have been -- so it may only ever fill
@@ -334,7 +335,7 @@ void WCSPHSolver::addBoundaryDensity(std::vector<WCSPHParticle>& particles)
 }
 
 void WCSPHSolver::addBoundaryForce(std::vector<WCSPHParticle>& particles) {
-	if (boundaryPlanes_.empty() && boundarySpheres_.empty() && boundaryPlates_.empty() && boundaryShapes_.empty()) return;
+	if (boundaryPlanes_.empty() && boundarySpheres_.empty() && boundaryPlates_.empty() && boundaryCylinders_.empty() && boundaryShapes_.empty()) return;
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
 		Vector3df force(0.0f, 0.0f, 0.0f);
@@ -353,6 +354,7 @@ void WCSPHSolver::addBoundaryForce(std::vector<WCSPHParticle>& particles) {
 		// isActiveAt(pos, 0) exactly bounds the plate's OBB; getBoundaryForce()
 		// still does the precise inside test, so this is only an early-out.
 		for (const auto& plate : boundaryPlates_) if (plate) addShapeForce(*plate);
+		for (const auto& cylinder : boundaryCylinders_) if (cylinder) addShapeForce(*cylinder);
 		for (const auto& shape : boundaryShapes_) if (shape) addShapeForce(*shape);
 		particles[i].addForce(force * particles[i].getDensity());
 	}

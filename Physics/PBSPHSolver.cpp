@@ -314,7 +314,7 @@ void PBSPHSolver::addBoundadryPressure(std::vector<PBSPHParticle>& particles)
 	// every iteration, amplifying the correction by ~maxIter.
 	const float dt2 = maxTimeStep * maxTimeStep;
 	const std::vector<std::shared_ptr<IShapeBoundary>>* lists[] = {
-		&boundaryPlanes_, &boundarySpheres_, &boundaryPlates_, &boundaryShapes_
+		&boundaryPlanes_, &boundarySpheres_, &boundaryPlates_, &boundaryCylinders_, &boundaryShapes_
 	};
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
@@ -336,7 +336,7 @@ void PBSPHSolver::clampToBoundary(std::vector<PBSPHParticle>& particles)
 		return;
 	}
 	const std::vector<std::shared_ptr<IShapeBoundary>>* lists[] = {
-		&boundaryPlanes_, &boundarySpheres_, &boundaryPlates_, &boundaryShapes_
+		&boundaryPlanes_, &boundarySpheres_, &boundaryPlates_, &boundaryCylinders_, &boundaryShapes_
 	};
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
@@ -363,7 +363,7 @@ void PBSPHSolver::addShapeBoundaryConstraint(std::vector<PBSPHParticle>& particl
 	if (!hasShapeBoundaries() || particles.empty()) return;
 
 	const std::vector<std::shared_ptr<IShapeBoundary>>* lists[] = {
-		&boundaryPlanes_, &boundarySpheres_, &boundaryPlates_, &boundaryShapes_
+		&boundaryPlanes_, &boundarySpheres_, &boundaryPlates_, &boundaryCylinders_, &boundaryShapes_
 	};
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {

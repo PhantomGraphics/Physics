@@ -9,6 +9,7 @@
 #include "PlaneBoundary.h"
 #include "SphereBoundary.h"
 #include "PlateBoundary.h"
+#include "CylinderBoundary.h"
 #include "IShapeBoundary.h"
 #include "RigidBoundary.h"
 #include "RigidBoundaryParticles.h"
@@ -121,6 +122,10 @@ public:
 		this->boundaryTimeStep = timeStep;
 		this->boundaryPlates_ = ownShapeBoundaries(std::move(plates));
 	}
+	void setBoundaryCylinders(std::vector<CylinderBoundary> cylinders, const float timeStep) override {
+		this->boundaryTimeStep = timeStep;
+		this->boundaryCylinders_ = ownShapeBoundaries(std::move(cylinders));
+	}
 
 	/**
 	 * @brief Registers arbitrary analytic boundaries through their common
@@ -147,6 +152,7 @@ public:
 		boundaryPlanes_.clear();
 		boundarySpheres_.clear();
 		boundaryPlates_.clear();
+		boundaryCylinders_.clear();
 		boundaryShapes_.clear();
 	}
 
@@ -326,7 +332,7 @@ private:
 	/** True while at least one analytic shape boundary of any kind is registered. */
 	bool hasShapeBoundaries() const {
 		return !boundaryPlanes_.empty() || !boundarySpheres_.empty() ||
-		       !boundaryPlates_.empty() || !boundaryShapes_.empty();
+		       !boundaryPlates_.empty() || !boundaryCylinders_.empty() || !boundaryShapes_.empty();
 	}
 
 	void addRigidBoundaryPressure(std::vector<PBSPHParticle>& particles);
@@ -345,6 +351,7 @@ private:
 	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlanes_;
 	std::vector<std::shared_ptr<IShapeBoundary>> boundarySpheres_;
 	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlates_;
+	std::vector<std::shared_ptr<IShapeBoundary>> boundaryCylinders_;
 	std::vector<std::shared_ptr<IShapeBoundary>> boundaryShapes_;
 	// Fallback used only before setBoundary()/setBoundaryPlanes() is called
 	// (both overwrite it); see DFSPHSolver.h's identical field for the

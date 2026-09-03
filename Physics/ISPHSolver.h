@@ -8,6 +8,7 @@
 #include "PlaneBoundary.h"
 #include "SphereBoundary.h"
 #include "PlateBoundary.h"
+#include "CylinderBoundary.h"
 #include "IShapeBoundary.h"
 
 namespace Phantom {
@@ -126,6 +127,9 @@ public:
 	 * @param timeStep Ignored -- see setBoundaryPlanes().
 	 */
 	virtual void setBoundaryPlates(std::vector<PlateBoundary> plates, const float timeStep) { (void)plates; (void)timeStep; }
+
+	/** Sets finite capped cylindrical container boundaries. */
+	virtual void setBoundaryCylinders(std::vector<CylinderBoundary> cylinders, const float timeStep) { (void)cylinders; (void)timeStep; }
 
 	/** Sets arbitrary analytic boundaries through their common interface. */
 	virtual void setShapeBoundaries(std::vector<std::shared_ptr<IShapeBoundary>> boundaries,

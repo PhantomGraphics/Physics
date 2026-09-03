@@ -6,6 +6,7 @@
 #include "PlaneBoundary.h"
 #include "SphereBoundary.h"
 #include "PlateBoundary.h"
+#include "CylinderBoundary.h"
 #include "RigidBoundary.h"
 #include "RigidBoundaryParticles.h"
 #include "SoftBoundaryParticles.h"
@@ -126,6 +127,10 @@ public:
 		(void)timeStep;
 		this->boundaryPlates_ = ownShapeBoundaries(std::move(plates));
 	}
+	void setBoundaryCylinders(std::vector<CylinderBoundary> cylinders, const float timeStep) override {
+		(void)timeStep;
+		boundaryCylinders_ = ownShapeBoundaries(std::move(cylinders));
+	}
 
 	void setShapeBoundaries(std::vector<std::shared_ptr<IShapeBoundary>> boundaries,
 	                        const float timeStep) override {
@@ -136,7 +141,7 @@ public:
 		if (boundary) boundaryShapes_.push_back(std::move(boundary));
 	}
 	void clearShapeBoundaries() override {
-		boundaryPlanes_.clear(); boundarySpheres_.clear(); boundaryPlates_.clear(); boundaryShapes_.clear();
+		boundaryPlanes_.clear(); boundarySpheres_.clear(); boundaryPlates_.clear(); boundaryCylinders_.clear(); boundaryShapes_.clear();
 	}
 	SPHSolveStats getLastSolveStats() const override { return lastSolveStats_; }
 
@@ -256,6 +261,7 @@ private:
 	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlanes_;
 	std::vector<std::shared_ptr<IShapeBoundary>> boundarySpheres_;
 	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlates_;
+	std::vector<std::shared_ptr<IShapeBoundary>> boundaryCylinders_;
 	std::vector<std::shared_ptr<IShapeBoundary>> boundaryShapes_;
 	// No boundaryTimeStep member on purpose: addBoundaryForce() uses timeStep,
 	// the step simulate() is integrating. See setBoundaryPlanes().

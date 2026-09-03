@@ -369,7 +369,7 @@ float DFSPHSolver::calculateAverageDpDt(const std::vector<DFSPHParticle>& partic
 void DFSPHSolver::addBoundaryDensity(std::vector<DFSPHParticle>& particles)
 {
 	if (boundaryPlanes_.empty() && boundarySpheres_.empty() &&
-	    boundaryPlates_.empty() && boundaryShapes_.empty()) {
+	    boundaryPlates_.empty() && boundaryCylinders_.empty() && boundaryShapes_.empty()) {
 		return;
 	}
 
@@ -420,6 +420,7 @@ void DFSPHSolver::addBoundaryDensity(std::vector<DFSPHParticle>& particles)
 		for (const auto& plane : boundaryPlanes_) if (plane) addShapeConstraint(*plane);
 		for (const auto& sphere : boundarySpheres_) if (sphere) addShapeConstraint(*sphere);
 		for (const auto& plate : boundaryPlates_) if (plate) addShapeConstraint(*plate);
+		for (const auto& cylinder : boundaryCylinders_) if (cylinder) addShapeConstraint(*cylinder);
 		for (const auto& shape : boundaryShapes_) if (shape) addShapeConstraint(*shape);
 	}
 }
@@ -492,7 +493,7 @@ Vector3df clampToPassiveWall(const Vector3df& penaltyAcceleration, const IShapeB
 void DFSPHSolver::addBoundaryPressure(std::vector<DFSPHParticle>& particles, const float dt)
 {
 	if (boundaryPlanes_.empty() && boundarySpheres_.empty() &&
-	    boundaryPlates_.empty() && boundaryShapes_.empty()) return;
+	    boundaryPlates_.empty() && boundaryCylinders_.empty() && boundaryShapes_.empty()) return;
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
 		auto& p = particles[i];
@@ -508,6 +509,7 @@ void DFSPHSolver::addBoundaryPressure(std::vector<DFSPHParticle>& particles, con
 		for (const auto& plane : boundaryPlanes_) if (plane) addShapeForce(*plane);
 		for (const auto& sphere : boundarySpheres_) if (sphere) addShapeForce(*sphere);
 		for (const auto& plate : boundaryPlates_) if (plate) addShapeForce(*plate);
+		for (const auto& cylinder : boundaryCylinders_) if (cylinder) addShapeForce(*cylinder);
 		for (const auto& shape : boundaryShapes_) if (shape) addShapeForce(*shape);
 		p.addForce(force * p.getMass());
 	}
