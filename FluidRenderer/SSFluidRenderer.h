@@ -88,6 +88,14 @@ public:
     /// Disable GPU buffer mode and revert to CPU upload mode.
     void clearParticleBuffer();
     void setExtent(VkExtent2D ext) { extent_ = ext; }
+
+    /// Recreates the offscreen targets + sub-passes at a new resolution. Unlike
+    /// setExtent() (which only records the size for the next projection), this
+    /// actually rebuilds targets_ so screen-space passes render at `width` x
+    /// `height`. Call after onInit; no-op if unchanged or not yet initialized.
+    /// Used by FluidStudio's offscreen sequence renderer (independent output
+    /// resolution) and safe to call on a normal window resize.
+    void resize(uint32_t width, uint32_t height);
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
 
@@ -160,6 +168,7 @@ private:
 
     uint32_t framesInFlight_ = 0;
     VkExtent2D extent_ = { 1280, 720 };
+    VkRenderPass mainRenderPass_ = VK_NULL_HANDLE; // for resize()'s recreate
 
     bool enabled_ = false;
     Mode mode_ = Mode::SSFRMain;

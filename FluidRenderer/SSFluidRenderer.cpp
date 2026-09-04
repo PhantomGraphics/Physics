@@ -140,6 +140,7 @@ void SSFluidRenderer::onInit(GlobalVulkanContext& ctx,
     ctx_ = &ctx;
     pool_ = &pool;
     framesInFlight_ = framesInFlight;
+    mainRenderPass_ = renderPass;
 
     if (!createPassResources(renderPass)) {
         destroyPassResources(ctx.getDevice());
@@ -148,6 +149,23 @@ void SSFluidRenderer::onInit(GlobalVulkanContext& ctx,
         framesInFlight_ = 0;
         enabled_ = false;
         std::cerr << "[VKSSFR] Disabled: failed to create pass resources" << std::endl;
+    }
+}
+
+void SSFluidRenderer::resize(uint32_t width, uint32_t height)
+{
+    width = width ? width : 1;
+    height = height ? height : 1;
+    if (extent_.width == width && extent_.height == height) return;
+    if (!ctx_) { extent_ = { width, height }; return; }
+
+    vkDeviceWaitIdle(ctx_->getDevice());
+    destroyPassResources(ctx_->getDevice());
+    extent_ = { width, height };
+    if (!createPassResources(mainRenderPass_)) {
+        destroyPassResources(ctx_->getDevice());
+        enabled_ = false;
+        std::cerr << "[VKSSFR] resize: failed to recreate pass resources; disabled" << std::endl;
     }
 }
 
