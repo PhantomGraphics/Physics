@@ -27,6 +27,16 @@ void SSRefractionRenderer::create(const Phantom::VKG::VulkanContext& ctx,
     uboBinding.descriptorCount = 1;
     uboBinding.stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+    std::vector<VkDescriptorSetLayoutBinding> bindings{ depthBinding, thickBinding, uboBinding };
+    for (uint32_t binding = 3; binding <= 5; ++binding) {
+        VkDescriptorSetLayoutBinding imageBinding{};
+        imageBinding.binding = binding;
+        imageBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        imageBinding.descriptorCount = 1;
+        imageBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        bindings.push_back(imageBinding);
+    }
+
     SSFRPassConfig cfg;
     cfg.vertSpv            = std::move(vertSpv);
     cfg.fragSpv            = std::move(fragSpv);
@@ -36,7 +46,7 @@ void SSRefractionRenderer::create(const Phantom::VKG::VulkanContext& ctx,
     cfg.additiveBlend      = false;
     cfg.framesInFlight     = framesInFlight;
     cfg.uboSize            = sizeof(UBO);
-    cfg.descriptorBindings = { depthBinding, thickBinding, uboBinding };
+    cfg.descriptorBindings = std::move(bindings);
 
     pipeline_.create(ctx, renderPass, cfg);
 }
@@ -50,8 +60,22 @@ void SSRefractionRenderer::render(const Phantom::VKG::VulkanContext& ctx,
                                     VkCommandBuffer cmd,
                                     uint32_t frameIndex,
                                     SSFROffscreenSet& targets,
-                                    VkImageView depthView)
+                                    VkImageView depthView,
+                                    VkImageView sceneColor, VkImageView sceneDepth, VkSampler sceneSampler,
+                                    VkImageView envMap, VkSampler envSampler,
+                                    const glm::mat4& invProj, const glm::mat4& invViewRot,
+                                    VkExtent2D extent, float nearPlane, float farPlane,
+                                    bool hasScene, bool hasEnvMap, float ior,
+                                    const glm::vec3& absorptionColor)
 {
+    ubo_.hasScene = hasScene ? 1 : 0;
+    ubo_.hasEnvMap = hasEnvMap ? 1 : 0;
+    ubo_.invProj = invProj;
+    ubo_.invViewRot = invViewRot;
+    ubo_.ior = ior;
+    ubo_.absorptionColor = glm::vec4(absorptionColor, 1.0f);
+    ubo_.viewportNearFar = glm::vec4(static_cast<float>(extent.width), static_cast<float>(extent.height),
+                                     nearPlane, farPlane);
     pipeline_.updateUBO(frameIndex, &ubo_, sizeof(ubo_));
 
     VkDescriptorImageInfo depthInfo{};
@@ -64,7 +88,20 @@ void SSRefractionRenderer::render(const Phantom::VKG::VulkanContext& ctx,
     thickInfo.imageView   = targets.smoothed().getColorImageView();
     thickInfo.sampler     = targets.getSampler();
 
-    VkWriteDescriptorSet writes[2]{};
+    VkDescriptorImageInfo sceneColorInfo{ targets.getSampler(), targets.reflection().getColorImageView(),
+                                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+    VkDescriptorImageInfo sceneDepthInfo{ targets.getSampler(), depthView,
+                                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+    VkDescriptorImageInfo envInfo{ envSampler, envMap,
+                                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+    if (hasScene) {
+        sceneColorInfo.sampler = sceneSampler;
+        sceneColorInfo.imageView = sceneColor;
+        sceneDepthInfo.sampler = sceneSampler;
+        sceneDepthInfo.imageView = sceneDepth;
+        sceneDepthInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    }
+    VkWriteDescriptorSet writes[5]{};
     writes[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     writes[0].dstBinding      = 0;
     writes[0].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -77,7 +114,17 @@ void SSRefractionRenderer::render(const Phantom::VKG::VulkanContext& ctx,
     writes[1].descriptorCount = 1;
     writes[1].pImageInfo      = &thickInfo;
 
-    pipeline_.writeDescriptors(ctx.getDevice(), frameIndex, { writes[0], writes[1] });
+    const VkDescriptorImageInfo* extraInfos[] = { &sceneColorInfo, &sceneDepthInfo, &envInfo };
+    for (uint32_t i = 0; i < 3; ++i) {
+        writes[i + 2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[i + 2].dstBinding = i + 3;
+        writes[i + 2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[i + 2].descriptorCount = 1;
+        writes[i + 2].pImageInfo = extraInfos[i];
+    }
+
+    pipeline_.writeDescriptors(ctx.getDevice(), frameIndex,
+                               { writes[0], writes[1], writes[2], writes[3], writes[4] });
 
     auto& offscreen = targets.refraction();
     offscreen.beginRenderPass(cmd, {0.f, 0.f, 0.f, 0.f}, 1.0f);

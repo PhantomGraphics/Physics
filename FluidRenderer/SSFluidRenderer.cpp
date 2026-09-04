@@ -105,6 +105,33 @@ void SSFluidRenderer::setCamera(const glm::mat4& proj, const glm::mat4& view)
     view_ = view;
 }
 
+void SSFluidRenderer::setSceneInput(VkImageView color, VkImageView depth, VkSampler sampler,
+                                    float nearPlane, float farPlane)
+{
+    sceneColor_ = color;
+    sceneDepth_ = depth;
+    sceneSampler_ = sampler;
+    nearPlane_ = nearPlane;
+    farPlane_ = farPlane;
+}
+
+void SSFluidRenderer::clearSceneInput()
+{
+    sceneColor_ = VK_NULL_HANDLE;
+    sceneDepth_ = VK_NULL_HANDLE;
+    sceneSampler_ = VK_NULL_HANDLE;
+}
+
+void SSFluidRenderer::setFluidMaterial(const glm::vec3& absorptionColor, float absorptionDistance,
+                                       float ior, float roughness, float thicknessScale)
+{
+    absorptionColor_ = glm::clamp(absorptionColor, glm::vec3(0.0f), glm::vec3(1.0f));
+    absorptionDistance_ = glm::max(absorptionDistance, 0.001f);
+    ior_ = glm::clamp(ior, 1.0f, 2.5f);
+    roughness_ = glm::clamp(roughness, 0.0f, 1.0f);
+    thicknessScale_ = glm::max(thicknessScale, 0.0f);
+}
+
 void SSFluidRenderer::onInit(GlobalVulkanContext& ctx,
                              const GlobalVulkanCommandPool& pool,
                              VkRenderPass renderPass,
@@ -253,6 +280,14 @@ bool SSFluidRenderer::createPassResources(VkRenderPass mainRenderPass)
     uboBinding.descriptorCount = 1;
     uboBinding.stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+    VkDescriptorSetLayoutBinding sceneColorBinding{};
+    sceneColorBinding.binding = 8;
+    sceneColorBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    sceneColorBinding.descriptorCount = 1;
+    sceneColorBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    VkDescriptorSetLayoutBinding sceneDepthBinding = sceneColorBinding;
+    sceneDepthBinding.binding = 9;
+
     SSFRPassConfig cfg;
     cfg.vertSpv            = std::move(shaders_.compositeVert);
     cfg.fragSpv            = std::move(shaders_.compositeFrag);
@@ -264,7 +299,8 @@ bool SSFluidRenderer::createPassResources(VkRenderPass mainRenderPass)
     cfg.uboSize            = sizeof(CompositeUBO);
     cfg.descriptorBindings = {
         depthBinding, thickBinding, smoothBinding,
-        reflBinding, refrBinding, sprayBinding, foamBinding, uboBinding
+        reflBinding, refrBinding, sprayBinding, foamBinding, uboBinding,
+        sceneColorBinding, sceneDepthBinding
     };
 
     if (!compositePipeline_.create(*ctx_, mainRenderPass, cfg))
@@ -411,7 +447,12 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
                            envView, envSampler, hasEnvMap_);
     gpuMark("ssfr.reflection");
 
-    refractionPass_.render(*ctx_, cmd, frameIndex, targets_, depthForNormals);
+    const bool hasScene = sceneColor_ != VK_NULL_HANDLE && sceneDepth_ != VK_NULL_HANDLE &&
+                          sceneSampler_ != VK_NULL_HANDLE;
+    refractionPass_.render(*ctx_, cmd, frameIndex, targets_, depthForNormals,
+                           sceneColor_, sceneDepth_, sceneSampler_, envView, envSampler,
+                           glm::inverse(proj_), glm::mat4(glm::transpose(glm::mat3(view_))),
+                           extent_, nearPlane_, farPlane_, hasScene, hasEnvMap_, ior_, absorptionColor_);
     gpuMark("ssfr.refraction");
     sprayPass_.render(cmd, frameIndex, targets_, proj_, view_,
                       particleRadius_ * 0.55f, viewportHeight, 0.5f);
@@ -422,12 +463,14 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
 
 void SSFluidRenderer::onRender(VkCommandBuffer cmd, uint32_t frameIndex)
 {
-    if (!enabled_) {
+    const bool hasScene = sceneColor_ != VK_NULL_HANDLE && sceneDepth_ != VK_NULL_HANDLE &&
+                          sceneSampler_ != VK_NULL_HANDLE;
+    if (!enabled_ && !hasScene) {
         return;
     }
 
     // Skybox: render before composite pass, displayed in areas without fluid.
-    if (hasEnvMap_ && skyBoxRenderer_) {
+    if (!hasScene && hasEnvMap_ && skyBoxRenderer_) {
         Phantom::VKG::VkSkyBoxRenderer::Buffer buf;
         buf.projectionMatrix = proj_;
         buf.viewMatrix       = glm::mat4(glm::mat3(view_));  // Strip translation
@@ -436,11 +479,18 @@ void SSFluidRenderer::onRender(VkCommandBuffer cmd, uint32_t frameIndex)
     }
 
     CompositeUBO ubo{};
-    ubo.mode = static_cast<int>(mode_);
+    ubo.mode = enabled_ ? static_cast<int>(mode_) : -1;
     ubo.foamOpacity = foamOpacity_;
     ubo.sprayOpacity = sprayOpacity_;
     ubo.showSpray = showSpray_ ? 1 : 0;
     ubo.showFoam = showFoam_ ? 1 : 0;
+    ubo.hasScene = hasScene ? 1 : 0;
+    ubo.exposure = exposure_;
+    ubo.absorptionColor = glm::vec4(absorptionColor_, 1.0f);
+    ubo.absorptionDistance = absorptionDistance_;
+    ubo.thicknessScale = thicknessScale_;
+    ubo.ior = ior_;
+    ubo.roughness = roughness_;
     compositePipeline_.updateUBO(frameIndex, &ubo, sizeof(ubo));
 
     const VkSampler sampler = targets_.getSampler();
@@ -482,7 +532,18 @@ void SSFluidRenderer::onRender(VkCommandBuffer cmd, uint32_t frameIndex)
     foamInfo.imageView   = targets_.foam().getColorImageView();
     foamInfo.sampler     = sampler;
 
-    VkWriteDescriptorSet writes[7]{};
+    VkDescriptorImageInfo sceneColorInfo{};
+    sceneColorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    sceneColorInfo.imageView = hasScene ? sceneColor_ : targets_.reflection().getColorImageView();
+    sceneColorInfo.sampler = hasScene ? sceneSampler_ : sampler;
+
+    VkDescriptorImageInfo sceneDepthInfo{};
+    sceneDepthInfo.imageLayout = hasScene ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                                          : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    sceneDepthInfo.imageView = hasScene ? sceneDepth_ : targets_.depth().getColorImageView();
+    sceneDepthInfo.sampler = hasScene ? sceneSampler_ : sampler;
+
+    VkWriteDescriptorSet writes[9]{};
 
     writes[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     writes[0].dstBinding      = 0;
@@ -526,8 +587,21 @@ void SSFluidRenderer::onRender(VkCommandBuffer cmd, uint32_t frameIndex)
     writes[6].descriptorCount = 1;
     writes[6].pImageInfo      = &foamInfo;
 
+    writes[7].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[7].dstBinding = 8;
+    writes[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[7].descriptorCount = 1;
+    writes[7].pImageInfo = &sceneColorInfo;
+
+    writes[8].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[8].dstBinding = 9;
+    writes[8].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[8].descriptorCount = 1;
+    writes[8].pImageInfo = &sceneDepthInfo;
+
     compositePipeline_.writeDescriptors(ctx_->getDevice(), frameIndex,
-                                        { writes[0], writes[1], writes[2], writes[3], writes[4], writes[5], writes[6] });
+                                        { writes[0], writes[1], writes[2], writes[3], writes[4], writes[5], writes[6],
+                                          writes[7], writes[8] });
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, compositePipeline_.getPipeline());
     VkDescriptorSet ds = compositePipeline_.getDescriptorSet(frameIndex);

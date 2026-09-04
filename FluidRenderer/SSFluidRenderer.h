@@ -66,9 +66,16 @@ public:
         float sprayOpacity = 0.6f;
         int showSpray = 1;
         int showFoam = 1;
-        float _pad[3]{};
+        int hasScene = 0;
+        float exposure = 1.0f;
+        float _pad0 = 0.0f;
+        glm::vec4 absorptionColor = glm::vec4(0.12f, 0.62f, 0.72f, 1.0f);
+        float absorptionDistance = 6.0f;
+        float thicknessScale = 1.0f;
+        float ior = 1.333f;
+        float roughness = 0.08f;
     };
-    static_assert(sizeof(CompositeUBO) == 32, "UBO layout mismatch");
+    static_assert(sizeof(CompositeUBO) == 64, "UBO layout mismatch");
 
     void setParticles(const std::vector<glm::vec3>& positions);
     void setSprayParticles(const std::vector<glm::vec3>& positions);
@@ -125,6 +132,12 @@ public:
     void setGpuProfiler(Phantom::VKG::IGpuProfiler* p) { gpuProfiler_ = p; }
 
     void setCamera(const glm::mat4& proj, const glm::mat4& view);
+    void setSceneInput(VkImageView color, VkImageView depth, VkSampler sampler,
+                       float nearPlane = 0.1f, float farPlane = 1000.0f);
+    void clearSceneInput();
+    void setFluidMaterial(const glm::vec3& absorptionColor, float absorptionDistance,
+                          float ior, float roughness, float thicknessScale);
+    void setExposure(float exposure) { exposure_ = glm::max(exposure, 0.001f); }
     void setParticleRadius(float radius) { particleRadius_ = glm::max(radius, 0.001f); }
     float getParticleRadius() const { return particleRadius_; }
 
@@ -188,6 +201,18 @@ private:
     bool  showSpray_ = true;
     bool  showFoam_ = true;
     float particleRadius_ = 1.0f;
+
+    VkImageView sceneColor_ = VK_NULL_HANDLE;
+    VkImageView sceneDepth_ = VK_NULL_HANDLE;
+    VkSampler sceneSampler_ = VK_NULL_HANDLE;
+    float nearPlane_ = 0.1f;
+    float farPlane_ = 1000.0f;
+    glm::vec3 absorptionColor_{0.12f, 0.62f, 0.72f};
+    float absorptionDistance_ = 6.0f;
+    float ior_ = 1.333f;
+    float roughness_ = 0.08f;
+    float thicknessScale_ = 1.0f;
+    float exposure_ = 1.0f;
 
     // Environment map / skybox
     GlobalVulkanCubeMap                                envMap_;
