@@ -366,12 +366,18 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
         return;
     }
 
+    const auto gpuMark = [this, cmd](const char* label) {
+        if (gpuProfiler_) gpuProfiler_->gpuMark(cmd, label);
+    };
+
     const float surfaceRadius = particleRadius_ * 1.35f;
     const float viewportHeight = static_cast<float>(extent_.height);
     depthPass_.render(cmd, frameIndex, targets_, proj_, view_,
                       surfaceRadius, viewportHeight);
+    gpuMark("ssfr.depth");
     thicknessPass_.render(cmd, frameIndex, targets_, proj_, view_,
                           surfaceRadius, viewportHeight);
+    gpuMark("ssfr.thickness");
 
     bilateralPass_.setParams(bilateralSigmaS_, bilateralSigmaR_,
                              bilateralUseAnisotropic_,
@@ -387,6 +393,7 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
                                targets_.depth().getColorImageView(),
                                targets_.getSampler(),
                                targets_.smoothedDepth());
+    gpuMark("ssfr.bilateral");
 
     VkImageView envView    = hasEnvMap_ ? envMap_.getImageView()   : dummyCubeMap_.getImageView();
     VkSampler   envSampler = hasEnvMap_ ? envMap_.getSampler()     : dummyCubeMap_.getSampler();
@@ -400,12 +407,15 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
                            glm::inverse(proj_),
                            glm::mat4(glm::transpose(glm::mat3(view_))),
                            envView, envSampler, hasEnvMap_);
+    gpuMark("ssfr.reflection");
 
     refractionPass_.render(*ctx_, cmd, frameIndex, targets_, depthForNormals);
+    gpuMark("ssfr.refraction");
     sprayPass_.render(cmd, frameIndex, targets_, proj_, view_,
                       particleRadius_ * 0.55f, viewportHeight, 0.5f);
     foamPass_.render(cmd, frameIndex, targets_, proj_, view_,
                      particleRadius_ * 0.9f, viewportHeight, 0.35f);
+    gpuMark("ssfr.spray_foam");
 }
 
 void SSFluidRenderer::onRender(VkCommandBuffer cmd, uint32_t frameIndex)

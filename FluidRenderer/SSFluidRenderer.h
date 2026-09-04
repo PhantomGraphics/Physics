@@ -18,6 +18,7 @@
 #include "SSFRPipeline.h"
 
 #include "../../CGLib/VulkanGraphics/VulkanCubeMap.h"
+#include "../../CGLib/VulkanGraphics/IGpuProfiler.h"
 #include "../../CGLib/Renderer/VkRenderer/VkSkyBoxRenderer.h"
 
 #include <array>
@@ -117,6 +118,12 @@ public:
     void setFoamOpacity(float v) { foamOpacity_ = v; }
     float getFoamOpacity() const { return foamOpacity_; }
 
+    // Optional GPU-timing hook. When set, onPreRender() calls gpuMark() at
+    // each sub-pass boundary (depth / thickness / bilateral / reflection /
+    // refraction / spray / foam). Null by default -- no behaviour change.
+    // See docs/todo/PLAN_fluidstudio_fast_rendering.md Phase 0.
+    void setGpuProfiler(Phantom::VKG::IGpuProfiler* p) { gpuProfiler_ = p; }
+
     void setCamera(const glm::mat4& proj, const glm::mat4& view);
     void setParticleRadius(float radius) { particleRadius_ = glm::max(radius, 0.001f); }
     float getParticleRadius() const { return particleRadius_; }
@@ -146,6 +153,8 @@ private:
 
     glm::mat4 proj_ = glm::mat4(1.0f);
     glm::mat4 view_ = glm::mat4(1.0f);
+
+    Phantom::VKG::IGpuProfiler* gpuProfiler_ = nullptr;
 
     std::vector<glm::vec3> pendingPositions_;
     std::vector<glm::vec3> pendingSprayPositions_;
