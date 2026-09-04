@@ -18,6 +18,10 @@ int main(int argc, char* argv[])
     Phantom::FluidApp app(1280, 720, "Vulkan Fluid View");
 
     if (!scenarioPath.empty()) {
+        // Command-line scenario runs are non-interactive and must not read or
+        // write the GUI layout file. Scenario Browser runs remain interactive
+        // and therefore keep layout persistence enabled.
+        app.disableInteractiveLayoutPersistence();
         if (!app.loadScenario(scenarioPath)) {
             fprintf(stderr, "[Scenario] Failed to load: %s\n", scenarioPath.c_str());
             return 1;

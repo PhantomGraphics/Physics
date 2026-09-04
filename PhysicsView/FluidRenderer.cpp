@@ -166,17 +166,6 @@ void FluidRenderer::onCleanup(VkDevice device)
     pipeline_.destroy(device);
 }
 
-void FluidRenderer::onImGui()
-{
-    if (!settingsVisible_) return;
-    if (!UI::Immediate::beginWindow("Fluid Renderer", &settingsVisible_)) {
-        UI::Immediate::endWindow();
-        return;
-    }
-    drawContents();
-    UI::Immediate::endWindow();
-}
-
 void FluidRenderer::drawContents()
 {
     if (UI::Immediate::collapsingHeader("Camera")) {

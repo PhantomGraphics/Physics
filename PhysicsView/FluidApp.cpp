@@ -97,10 +97,6 @@ void FluidApp::registerControlPages()
 }
 
 bool FluidApp::loadScenario(const std::string& jsonPath) {
-    // Headless scenario runs must not read or write the interactive GUI
-    // layout file (it would leave a stray ini in the working directory and
-    // let one run's page selection leak into the next).
-    controlHost_.setLayoutFile({});
     return runner_.load(jsonPath);
 }
 
@@ -365,10 +361,6 @@ void FluidApp::onImGui()
         if (UI::Immediate::beginMenu("View")) {
             if (UI::Immediate::menuItem("Control Window", controlHost_.isVisible()))
                 controlHost_.setVisible(!controlHost_.isVisible());
-            UI::Immediate::separator();
-            if (UI::Immediate::menuItem("Fluid Renderer (debug window)",
-                                        fluidRenderer_.isSettingsVisible()))
-                fluidRenderer_.setSettingsVisible(!fluidRenderer_.isSettingsVisible());
             UI::Immediate::endMenu();
         }
 

@@ -42,6 +42,7 @@ public:
 
     // Scenario runner control (call before run()).
     bool loadScenario(const std::string& jsonPath) override;
+    void disableInteractiveLayoutPersistence() { controlHost_.setLayoutFile({}); }
     void setExitOnScenarioComplete(bool v) override { exitOnComplete_ = v; }
     int  getExitCode() const               { return exitCode_; }
 

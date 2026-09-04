@@ -34,8 +34,6 @@ public:
     void setExtent(VkExtent2D ext) { extent_ = ext; }
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
-    void setSettingsVisible(bool visible) { settingsVisible_ = visible; }
-    bool isSettingsVisible() const { return settingsVisible_; }
 
     glm::mat4 getViewMatrix() const;
     glm::mat4 getProjMatrix() const;
@@ -49,7 +47,6 @@ public:
     void onUpdate(uint32_t frameIndex) override;
     void onRender(VkCommandBuffer cmd, uint32_t frameIndex) override;
     void onCleanup(VkDevice device) override;
-    void onImGui() override;
     void drawContents() override;
 
 private:
@@ -80,10 +77,6 @@ private:
     glm::vec2 lastMouse_{ 0.f, 0.f };
     bool mouseDown_ = false;
     bool enabled_ = true;
-    // Off by default: the settings live in the shared Control window's
-    // "Fluid Rendering" page (drawContents()). The standalone window remains
-    // available for debugging but is not shown unless explicitly enabled.
-    bool settingsVisible_ = false;
     VkExtent2D extent_ = { 1280, 720 };
 
     glm::mat4 computeMVP() const;
