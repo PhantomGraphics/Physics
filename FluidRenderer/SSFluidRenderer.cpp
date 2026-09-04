@@ -306,16 +306,18 @@ void SSFluidRenderer::loadEnvMap(const std::array<std::string, 6>& facePaths)
         return;
     }
 
-    if (envMap_.isValid()) envMap_.destroy(ctx_->getDevice());
-    if (!envMap_.create(*ctx_, *pool_, facePaths)) {
+    Phantom::VKG::VulkanCubeMap replacement;
+    if (!replacement.create(*ctx_, *pool_, facePaths)) {
         std::cerr << "[VKSSFR] loadEnvMap failed" << std::endl;
         return;
     }
     if (skyBoxRenderer_) {
         skyBoxRenderer_->setCubeMap(ctx_->getDevice(),
-                                    envMap_.getImageView(),
-                                    envMap_.getSampler());
+                                    replacement.getImageView(),
+                                    replacement.getSampler());
     }
+    envMap_.swap(replacement);
+    if (replacement.isValid()) replacement.destroy(ctx_->getDevice());
     hasEnvMap_ = true;
 }
 
