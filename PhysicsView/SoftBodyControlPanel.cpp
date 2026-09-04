@@ -41,11 +41,17 @@ void SoftBodyControlPanel::initWidgets() {
 
 void SoftBodyControlPanel::onImGui() {
     if (!world_ || !visible_) return;
-    initWidgets();
 
     UI::Immediate::setNextWindowPosition(10.f, 35.f);
     UI::Immediate::setNextWindowSize(300.f, 560.f);
     if (!UI::Immediate::beginWindow("Soft Body Control", &visible_)) { UI::Immediate::endWindow(); return; }
+    drawContents();
+    UI::Immediate::endWindow();
+}
+
+void SoftBodyControlPanel::drawContents() {
+    if (!world_) return;
+    initWidgets();
 
     {
         int cur = static_cast<int>(world_->currentPreset());
@@ -127,8 +133,6 @@ void SoftBodyControlPanel::onImGui() {
         selfColThicknessView_.show();
         sp.selfCollisionThickness = selfColThicknessView_.getValue();
     }
-
-    UI::Immediate::endWindow();
 }
 
 } // namespace Phantom

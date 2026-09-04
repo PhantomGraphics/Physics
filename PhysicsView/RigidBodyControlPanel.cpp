@@ -47,11 +47,17 @@ void RigidBodyControlPanel::initWidgets() {
 
 void RigidBodyControlPanel::onImGui() {
     if (!world_ || !visible_) return;
-    initWidgets();
 
     UI::Immediate::setNextWindowPosition(700.f, 35.f);
     UI::Immediate::setNextWindowSize(300.f, 640.f);
     if (!UI::Immediate::beginWindow("Rigid Body Control", &visible_)) { UI::Immediate::endWindow(); return; }
+    drawContents();
+    UI::Immediate::endWindow();
+}
+
+void RigidBodyControlPanel::drawContents() {
+    if (!world_) return;
+    initWidgets();
 
     {
         int cur = static_cast<int>(world_->currentPreset());
@@ -109,8 +115,6 @@ void RigidBodyControlPanel::onImGui() {
     boxHzView_.show();
     boxMassView_.show();
     addBoxBtn_.show();
-
-    UI::Immediate::endWindow();
 }
 
 } // namespace Phantom

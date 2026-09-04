@@ -15,6 +15,8 @@
 #include "VolumeRenderer.h"
 #include "FluidMeshRenderer.h"
 #include "FluidVolumeConvertPanel.h"
+#include "ControlPanelHost.h"
+#include "IEmbeddedPanel.h"
 #include "CommandDispatcher.h"
 #include "../FluidRenderer/SSFluidRenderer.h"
 
@@ -90,6 +92,14 @@ private:
     CommandDispatcher dispatcher_;
     ScenarioRunner           runner_;
     ScenarioBrowserPanel     scenarioBrowser_;
+    // ScenarioBrowserPanel lives in CGLib and cannot derive from the
+    // PhysicsView-local IEmbeddedPanel, so bridge it through a callable.
+    FnEmbeddedPanel          scenarioBrowserEmbed_{
+        [this]() { scenarioBrowser_.drawEmbedded(); } };
+
+    // The single shared "Control" window: the Physics menu picks its page,
+    // this host renders the selected embedded panel plus a common status area.
+    ControlPanelHost         controlHost_;
     bool exitOnComplete_ = true;
     int  exitCode_       = 0;
 
@@ -97,6 +107,9 @@ private:
     std::string screenshotPendingPath_;
 
     void setupCallbacks();
+    void registerControlPages();
+    void drawStatusArea();
+    void drawPhysicsMenu();
     void syncParticlesToRenderer();
     void syncGpuCsphBufferToRenderer();
     void syncRigidRenderer();

@@ -83,14 +83,21 @@ void FluidVolumeConvertPanel::onImGui()
 {
     if (!world_ || !converter_ || !visible_) return;
 
-    initWidgets();
-
     UI::Immediate::setNextWindowPosition(1010.f, 35.f);
     UI::Immediate::setNextWindowSize(280.f, 520.f);
     if (!UI::Immediate::beginWindow("Volume Conversion", &visible_)) {
         UI::Immediate::endWindow();
         return;
     }
+    drawContents();
+    UI::Immediate::endWindow();
+}
+
+void FluidVolumeConvertPanel::drawContents()
+{
+    if (!world_ || !converter_) return;
+
+    initWidgets();
 
     UI::Immediate::textUnformatted("Particle -> SparseVolume");
     UI::Immediate::separator();
@@ -141,8 +148,6 @@ void FluidVolumeConvertPanel::onImGui()
         if (!meshStatusMessage_.empty())
             UI::Immediate::textWrapped("%s", meshStatusMessage_.c_str());
     }
-
-    UI::Immediate::endWindow();
 }
 
 } // namespace Phantom

@@ -11,6 +11,7 @@
 #include "FluidMeshConverter.h"
 #include "VolumeRenderer.h"
 #include "FluidMeshRenderer.h"
+#include "IEmbeddedPanel.h"
 
 #include <functional>
 
@@ -25,7 +26,7 @@ namespace Phantom {
  * FluidMeshRenderer -- the live-simulation counterpart to FluidStudio's
  * offline PLY->VDB and VDB->Mesh conversion panels.
  */
-class FluidVolumeConvertPanel : public ::VKG::IVkUIPanel {
+class FluidVolumeConvertPanel : public ::VKG::IVkUIPanel, public IEmbeddedPanel {
 public:
     void bindWorld(FluidWorld* w) { world_ = w; }
     void bindConverter(FluidVolumeConverter* c) { converter_ = c; }
@@ -42,6 +43,7 @@ public:
     bool isVisible() const { return visible_; }
 
     void onImGui() override;
+    void drawContents() override;
 
 private:
     FluidWorld* world_ = nullptr;

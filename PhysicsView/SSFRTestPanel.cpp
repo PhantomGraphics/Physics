@@ -132,14 +132,21 @@ void SSFRTestPanel::onImGui()
 {
     if (!show_) return;
 
-    initWidgets();
-
     UI::Immediate::setNextWindowPosition(380.f, 35.f);
     UI::Immediate::setNextWindowSize(300.f, 420.f);
     if (!UI::Immediate::beginWindow("SSFR Test", &show_)) {
         UI::Immediate::endWindow();
         return;
     }
+    drawContents();
+    UI::Immediate::endWindow();
+}
+
+void SSFRTestPanel::drawContents()
+{
+    initWidgets();
+
+    UI::Immediate::textDisabled("Test-only page -- synthetic particle sets for SSFR debugging.");
 
     const bool wasActive = active_;
     activeView_.setValue(active_);
@@ -172,8 +179,6 @@ void SSFRTestPanel::onImGui()
     }
 
     onImGuiComparison();
-
-    UI::Immediate::endWindow();
 }
 
 } // namespace Phantom

@@ -5,11 +5,12 @@
 #include "../../CGLib/UIWidgets/ComboBox.h"
 
 #include "FluidWorld.h"
+#include "IEmbeddedPanel.h"
 
 namespace Phantom {
     class SSFluidRenderer;
 
-class SSFRPanel : public ::VKG::IVkUIPanel {
+class SSFRPanel : public ::VKG::IVkUIPanel, public IEmbeddedPanel {
 public:
     void bindRenderer(SSFluidRenderer* r) { renderer_ = r; }
     void bindWorld(FluidWorld* w) { world_ = w; }
@@ -20,6 +21,7 @@ public:
     bool isVisible() const { return visible_; }
 
     void onImGui() override;
+    void drawContents() override;
 
 private:
     SSFluidRenderer* renderer_ = nullptr;

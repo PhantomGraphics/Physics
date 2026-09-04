@@ -6,12 +6,13 @@
 #include "CGLib/UIWidgets/IntView.h"
 
 #include "RigidBodyWorld.h"
+#include "IEmbeddedPanel.h"
 
 #include <functional>
 
 namespace Phantom {
 
-class RigidBodyControlPanel : public ::VKG::IVkUIPanel {
+class RigidBodyControlPanel : public ::VKG::IVkUIPanel, public IEmbeddedPanel {
 public:
     explicit RigidBodyControlPanel(RigidBodyWorld* w) : world_(w) {}
 
@@ -20,6 +21,7 @@ public:
     bool isVisible() const { return visible_; }
 
     void onImGui() override;
+    void drawContents() override;
 
 private:
     RigidBodyWorld*  world_ = nullptr;

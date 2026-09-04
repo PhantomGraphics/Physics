@@ -8,10 +8,11 @@
 #include "../../CGLib/UIWidgets/Box3dView.h"
 
 #include "FluidWorld.h"
+#include "IEmbeddedPanel.h"
 
 namespace Phantom {
 
-class ControlPanel : public ::VKG::IVkUIPanel {
+class ControlPanel : public ::VKG::IVkUIPanel, public IEmbeddedPanel {
 public:
     explicit ControlPanel(FluidWorld* world) : world_(world) {}
 
@@ -20,6 +21,7 @@ public:
     bool isVisible() const { return visible_; }
 
     void onImGui() override;
+    void drawContents() override;
 
 private:
     FluidWorld* world_ = nullptr;

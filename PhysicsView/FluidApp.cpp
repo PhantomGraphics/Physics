@@ -70,16 +70,37 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     add(&softRenderer_);
     add(&volumeRenderer_);
     add(&meshRenderer_);
-    add(&controlPanel_);
-    add(&rigidControlPanel_);
-    add(&softControlPanel_);
-    add(&ssfrPanel_);
-    add(&ssfrTestPanel_);
-    add(&volumeConvertPanel_);
-    add(&scenarioBrowser_);
+
+    // The per-domain control panels are no longer registered as standalone
+    // UI panels -- they are embedded into controlHost_ (one shared "Control"
+    // window, selected from the Physics menu), which is the only control-side
+    // IVkUIPanel added here. This also prevents the double-draw described in
+    // GUI_RESTRUCTURING_PLAN.md section 11.
+    registerControlPages();
+    controlHost_.setStatusDrawer([this]() { drawStatusArea(); });
+    // Remembers the last active page + window-visible flag across runs (the
+    // window geometry and section fold state are handled by imgui.ini).
+    controlHost_.setLayoutFile("physicsview_control_layout.ini");
+    add(&controlHost_);
+}
+
+void FluidApp::registerControlPages()
+{
+    controlHost_.registerPage(ControlPage::Fluid,            &controlPanel_);
+    controlHost_.registerPage(ControlPage::RigidBody,        &rigidControlPanel_);
+    controlHost_.registerPage(ControlPage::SoftBody,         &softControlPanel_);
+    controlHost_.registerPage(ControlPage::FluidRendering,   &fluidRenderer_);
+    controlHost_.registerPage(ControlPage::SSFR,             &ssfrPanel_);
+    controlHost_.registerPage(ControlPage::VolumeConversion, &volumeConvertPanel_);
+    controlHost_.registerPage(ControlPage::ScenarioBrowser,  &scenarioBrowserEmbed_);
+    controlHost_.registerPage(ControlPage::SSFRTest,         &ssfrTestPanel_);
 }
 
 bool FluidApp::loadScenario(const std::string& jsonPath) {
+    // Headless scenario runs must not read or write the interactive GUI
+    // layout file (it would leave a stray ini in the working directory and
+    // let one run's page selection leak into the next).
+    controlHost_.setLayoutFile({});
     return runner_.load(jsonPath);
 }
 
@@ -183,6 +204,10 @@ void FluidApp::onSwapChainCreated()
 void FluidApp::onUpdate(uint32_t frameIndex)
 {
     dispatcher_.processQueue();
+
+    // Keep the Scenario Browser's GUI run-queue advancing every frame, even
+    // when its page is not the one currently shown in the Control window.
+    scenarioBrowser_.pumpQueue();
     ssfrRenderer_.setParticleRadius(world_.params().radius);
 
     const bool testActive = ssfrTestPanel_.isActive();
@@ -291,6 +316,40 @@ void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
     ssfrRenderer_.onPreRender(cmd, frameIndex);
 }
 
+void FluidApp::drawPhysicsMenu()
+{
+    // One entry per ControlPage: selecting it makes that page active in the
+    // shared Control window and shows the window if it was hidden. The order
+    // matches the ControlPage enum; SSFRTest sits last, after a separator, so
+    // it reads as test-only (GUI_RESTRUCTURING_PLAN.md 5.4/6.8).
+    auto pageItem = [this](ControlPage page) {
+        const bool selected = (controlHost_.getPage() == page) && controlHost_.isVisible();
+        const bool enabled  = controlHost_.isPageEnabled(page);
+        if (UI::Immediate::menuItem(toString(page), selected, enabled)) {
+            controlHost_.setPage(page);
+            controlHost_.setVisible(true);
+        }
+        if (!enabled) {
+            const std::string& reason = controlHost_.pageDisabledReason(page);
+            if (!reason.empty())
+                UI::Immediate::tooltipOnHover(reason.c_str());
+        }
+    };
+
+    if (UI::Immediate::beginMenu("Physics")) {
+        pageItem(ControlPage::Fluid);
+        pageItem(ControlPage::RigidBody);
+        pageItem(ControlPage::SoftBody);
+        pageItem(ControlPage::FluidRendering);
+        pageItem(ControlPage::SSFR);
+        pageItem(ControlPage::VolumeConversion);
+        pageItem(ControlPage::ScenarioBrowser);
+        UI::Immediate::separator();
+        pageItem(ControlPage::SSFRTest);
+        UI::Immediate::endMenu();
+    }
+}
+
 void FluidApp::onImGui()
 {
     if (UI::Immediate::beginMainMenuBar()) {
@@ -301,24 +360,15 @@ void FluidApp::onImGui()
             UI::Immediate::endMenu();
         }
 
+        drawPhysicsMenu();
+
         if (UI::Immediate::beginMenu("View")) {
-            if (UI::Immediate::menuItem("Fluid Control", controlPanel_.isVisible()))
-                controlPanel_.setVisible(!controlPanel_.isVisible());
-            if (UI::Immediate::menuItem("Fluid Renderer", fluidRenderer_.isSettingsVisible()))
-                fluidRenderer_.setSettingsVisible(!fluidRenderer_.isSettingsVisible());
-            if (UI::Immediate::menuItem("SSFR Control", ssfrPanel_.isVisible()))
-                ssfrPanel_.setVisible(!ssfrPanel_.isVisible());
-            if (UI::Immediate::menuItem("SSFR Test", ssfrTestPanel_.isVisible()))
-                ssfrTestPanel_.setVisible(!ssfrTestPanel_.isVisible());
+            if (UI::Immediate::menuItem("Control Window", controlHost_.isVisible()))
+                controlHost_.setVisible(!controlHost_.isVisible());
             UI::Immediate::separator();
-            if (UI::Immediate::menuItem("Rigid Body Control", rigidControlPanel_.isVisible()))
-                rigidControlPanel_.setVisible(!rigidControlPanel_.isVisible());
-            if (UI::Immediate::menuItem("Soft Body Control", softControlPanel_.isVisible()))
-                softControlPanel_.setVisible(!softControlPanel_.isVisible());
-            if (UI::Immediate::menuItem("Volume Conversion", volumeConvertPanel_.isVisible()))
-                volumeConvertPanel_.setVisible(!volumeConvertPanel_.isVisible());
-            if (UI::Immediate::menuItem("Scenario Browser", scenarioBrowser_.isVisible()))
-                scenarioBrowser_.setVisible(!scenarioBrowser_.isVisible());
+            if (UI::Immediate::menuItem("Fluid Renderer (debug window)",
+                                        fluidRenderer_.isSettingsVisible()))
+                fluidRenderer_.setSettingsVisible(!fluidRenderer_.isSettingsVisible());
             UI::Immediate::endMenu();
         }
 
@@ -334,6 +384,46 @@ void FluidApp::onCleanup()
     // the VulkanContext -- see FluidWorld::releaseGpuResources()'s doc comment.
     world_.releaseGpuResources();
     ::VKG::VkAppBase::onCleanup();
+}
+
+void FluidApp::drawStatusArea()
+{
+    // Common status shown above every Control page (GUI_RESTRUCTURING_PLAN.md
+    // section 7) so simulation state stays visible regardless of which page is
+    // open.
+    static const char* kMethodNames[] = { "DFSPH", "PBSPH", "WCSPH", "GPU CSPH" };
+    const int mi = static_cast<int>(world_.getSimulationType());
+    const char* method = (mi >= 0 && mi < 4) ? kMethodNames[mi] : "?";
+
+    auto runState = [](bool running) { return running ? "Running" : "Paused"; };
+
+    UI::Immediate::text("%s  |  Fluid: %s  |  Rigid: %s  |  Soft: %s",
+                        method,
+                        runState(world_.isRunning()),
+                        runState(world_.rigid().isRunning()),
+                        runState(softWorld_.isRunning()));
+
+    UI::Immediate::text("Particles: %llu   (spray %llu, foam %llu)",
+                        static_cast<unsigned long long>(world_.getParticleCount()),
+                        static_cast<unsigned long long>(world_.getSprayPositions().size()),
+                        static_cast<unsigned long long>(world_.getFoamPositions().size()));
+
+    {
+        const char* rigidCoupling = !world_.isCouplingEnabled()
+            ? "off"
+            : (world_.activeCouplingMode() == Phantom::Physics::CouplingMode::TwoWay
+                   ? "Two-Way" : "One-Way");
+        const char* softCoupling = world_.isSoftCouplingEnabled() ? "on" : "off";
+        UI::Immediate::text("Coupling  Rigid-Fluid: %s   Soft-Fluid: %s",
+                            rigidCoupling, softCoupling);
+    }
+
+    if (runner_.isActive()) {
+        UI::Immediate::text("Scenario: running (%llu steps)",
+                            static_cast<unsigned long long>(runner_.stepCount()));
+    } else if (runner_.hasFailed()) {
+        UI::Immediate::textWrapped("Scenario FAILED: %s", runner_.failMessage().c_str());
+    }
 }
 
 void FluidApp::setupCallbacks()

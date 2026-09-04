@@ -173,6 +173,12 @@ void FluidRenderer::onImGui()
         UI::Immediate::endWindow();
         return;
     }
+    drawContents();
+    UI::Immediate::endWindow();
+}
+
+void FluidRenderer::drawContents()
+{
     if (UI::Immediate::collapsingHeader("Camera")) {
         UI::Immediate::sliderFloat("Yaw", yaw_, -3.14159f, 3.14159f);
         UI::Immediate::sliderFloat("Pitch", pitch_, 0.05f, 3.09f);
@@ -189,7 +195,6 @@ void FluidRenderer::onImGui()
         UI::Immediate::sliderFloat("Density Difference Max", densityRangeMax_, 0.0f, 0.5f, "%.3f");
         densityRangeMax_ = std::max(densityRangeMax_, densityRangeMin_ + 0.001f);
     }
-    UI::Immediate::endWindow();
 }
 
 void FluidRenderer::uploadVertices(const std::vector<glm::vec3>& pts,

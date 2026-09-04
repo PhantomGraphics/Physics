@@ -4,6 +4,7 @@
 #include "../../CGLib/VulkanGraphics/VulkanBuffer.h"
 
 #include "FluidPipeline.h"
+#include "IEmbeddedPanel.h"
 
 namespace Phantom {
 
@@ -17,7 +18,7 @@ struct VkFluidVertex {
     static std::array<VkVertexInputAttributeDescription, 1> getAttributeDescriptions();
 };
 
-class FluidRenderer : public ::VKG::IVkSubRenderer {
+class FluidRenderer : public ::VKG::IVkSubRenderer, public IEmbeddedPanel {
 public:
     struct Shaders {
         std::vector<uint32_t> vertSpv;
@@ -49,6 +50,7 @@ public:
     void onRender(VkCommandBuffer cmd, uint32_t frameIndex) override;
     void onCleanup(VkDevice device) override;
     void onImGui() override;
+    void drawContents() override;
 
 private:
     const Phantom::VKG::VulkanContext* ctx_ = nullptr;
@@ -78,7 +80,10 @@ private:
     glm::vec2 lastMouse_{ 0.f, 0.f };
     bool mouseDown_ = false;
     bool enabled_ = true;
-    bool settingsVisible_ = true;
+    // Off by default: the settings live in the shared Control window's
+    // "Fluid Rendering" page (drawContents()). The standalone window remains
+    // available for debugging but is not shown unless explicitly enabled.
+    bool settingsVisible_ = false;
     VkExtent2D extent_ = { 1280, 720 };
 
     glm::mat4 computeMVP() const;

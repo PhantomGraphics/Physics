@@ -23,7 +23,6 @@ void SSFRPanel::initWidgets()
 void SSFRPanel::onImGui()
 {
     if (!visible_) return;
-    initWidgets();
 
     UI::Immediate::setNextWindowPosition(10.f, 500.f);
     UI::Immediate::setNextWindowSize(360.f, 480.f);
@@ -31,6 +30,13 @@ void SSFRPanel::onImGui()
         UI::Immediate::endWindow();
         return;
     }
+    drawContents();
+    UI::Immediate::endWindow();
+}
+
+void SSFRPanel::drawContents()
+{
+    initWidgets();
 
     enableCheck_.setValue(enabled_);
     enableCheck_.show();
@@ -123,8 +129,6 @@ void SSFRPanel::onImGui()
                 renderer_->setFoamOpacity(foamOp);
         }
     }
-
-    UI::Immediate::endWindow();
 }
 
 } // namespace Phantom

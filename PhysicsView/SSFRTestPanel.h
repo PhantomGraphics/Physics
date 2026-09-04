@@ -5,10 +5,12 @@
 #include "../../CGLib/UIWidgets/BoolView.h"
 #include "../../CGLib/UIWidgets/ComboBox.h"
 
+#include "IEmbeddedPanel.h"
+
 namespace Phantom {
     class SSFluidRenderer;
 
-class SSFRTestPanel : public ::VKG::IVkUIPanel {
+class SSFRTestPanel : public ::VKG::IVkUIPanel, public IEmbeddedPanel {
 public:
     enum class Preset { Sphere = 0, DamBreak = 1, Wave = 2 };
 
@@ -23,6 +25,7 @@ public:
     const std::vector<glm::vec3>& getPositions() const { return positions_; }
 
     void onImGui() override;
+    void drawContents() override;
 
 private:
     bool   show_   = false;

@@ -6,12 +6,13 @@
 #include "CGLib/UIWidgets/IntView.h"
 
 #include "SoftBodyWorld.h"
+#include "IEmbeddedPanel.h"
 
 #include <functional>
 
 namespace Phantom {
 
-class SoftBodyControlPanel : public ::VKG::IVkUIPanel {
+class SoftBodyControlPanel : public ::VKG::IVkUIPanel, public IEmbeddedPanel {
 public:
     explicit SoftBodyControlPanel(SoftBodyWorld* w) : world_(w) {}
 
@@ -20,6 +21,7 @@ public:
     bool isVisible() const { return visible_; }
 
     void onImGui() override;
+    void drawContents() override;
 
 private:
     SoftBodyWorld*    world_ = nullptr;
