@@ -3,7 +3,7 @@
 
 namespace Phantom {
 
-static const char* kPresetNames[] = {
+static const char* const kPresetNames[] = {
     "SphereDrop", "BoxDrop", "Stacking",
     "NewtonsCradle", "Billiards", "SphereBoxCollision", "Custom"
 };
@@ -12,37 +12,108 @@ static const ScenePreset kPresetValues[] = {
     ScenePreset::NewtonsCradle, ScenePreset::Billiards,
     ScenePreset::SphereBoxCollision, ScenePreset::Custom
 };
+static constexpr int kPresetCount = 7;
 
-void RigidBodyControlPanel::initWidgets() {
-    if (widgetsInitialized_) return;
-    widgetsInitialized_ = true;
+RigidBodyControlPanel::RigidBodyControlPanel(RigidBodyWorld* w) : world_(w) {
+    buildUi();
+}
 
-    runButton_.setFunction([this]() {
+void RigidBodyControlPanel::buildUi() {
+    if (uiBuilt_) return;
+    uiBuilt_ = true;
+
+    // --- Preset ---------------------------------------------------------
+    for (int i = 0; i < kPresetCount; ++i) presetCombo_.addItem(kPresetNames[i]);
+    presetCombo_.bind(
+        [this] { return static_cast<int>(world_->currentPreset()); },
+        [this](int i) {
+            if (i < 0 || i >= kPresetCount) return;
+            world_->setPreset(kPresetValues[i]);
+            notifyWorldChanged();
+        });
+
+    // --- Run / Step / Reset -------------------------------------------
+    runButton_.setFunction([this] {
         world_->setRunning(!world_->isRunning());
     });
-    stepButton_.setFunction([this]() {
+    stepButton_.setFunction([this] {
         world_->step();
-        if (onWorldChanged_) onWorldChanged_();
+        notifyWorldChanged();
     });
-    resetButton_.setFunction([this]() {
+    resetButton_.setFunction([this] {
         world_->reset();
-        if (onWorldChanged_) onWorldChanged_();
+        notifyWorldChanged();
     });
-    addSphereBtn_.setFunction([this]() {
+    actionsRow_.add(&runButton_);
+    actionsRow_.add(&stepButton_);
+    actionsRow_.add(&resetButton_);
+
+    // --- Simulation parameters --------------------------------------
+    // Fetched through world_ every frame: reset()/setPreset() keep the same
+    // RigidBodySolver and Params, so these stay valid across a scene switch.
+    timeStepView_.bind(
+        [this] { return world_->getWorld().timeStep; },
+        [this](float v) { world_->getWorld().timeStep = v; });
+    iterView_.bind(
+        [this] { return world_->getWorld().params().solverIterations; },
+        [this](int v) { world_->getWorld().params().solverIterations = v; });
+    betaView_.bind(
+        [this] { return world_->getWorld().params().baumgarteBeta; },
+        [this](float v) { world_->getWorld().params().baumgarteBeta = v; });
+    gravYView_.bind(
+        [this] { return world_->getWorld().params().gravity.y; },
+        [this](float v) { world_->getWorld().params().gravity.y = v; });
+    simSection_.add(&timeStepView_);
+    simSection_.add(&iterView_);
+    simSection_.add(&betaView_);
+    simSection_.add(&gravYView_);
+
+    // --- Add Sphere (draft values held in the sphere*View_ members) ----
+    addSphereBtn_.setFunction([this] {
         world_->addSphere(
             {0.f, 3.f, 0.f},
             sphereRadView_.getValue(),
             sphereMassView_.getValue(),
             sphereRestView_.getValue());
-        if (onWorldChanged_) onWorldChanged_();
+        notifyWorldChanged();
     });
-    addBoxBtn_.setFunction([this]() {
+    sphereSection_.add(&sphereRadView_);
+    sphereSection_.add(&sphereMassView_);
+    sphereSection_.add(&sphereRestView_);
+    sphereSection_.add(&addSphereBtn_);
+
+    // --- Add Box ------------------------------------------------------
+    addBoxBtn_.setFunction([this] {
         world_->addBox(
             {0.f, 3.f, 0.f},
             {boxHxView_.getValue(), boxHyView_.getValue(), boxHzView_.getValue()},
             boxMassView_.getValue());
-        if (onWorldChanged_) onWorldChanged_();
+        notifyWorldChanged();
     });
+    boxSection_.add(&boxHxView_);
+    boxSection_.add(&boxHyView_);
+    boxSection_.add(&boxHzView_);
+    boxSection_.add(&boxMassView_);
+    boxSection_.add(&addBoxBtn_);
+
+    // --- Assemble the content root ----------------------------------
+    contents_.add(&presetCombo_);
+    contents_.add(&actionsRow_);
+    contents_.add(&statusLabel_);
+    contents_.add(&simSection_);
+    contents_.add(&sphereSection_);
+    contents_.add(&boxSection_);
+}
+
+std::string RigidBodyControlPanel::statusText() const {
+    const auto& w = world_->getWorld();
+    char buf[128];
+    std::snprintf(buf, sizeof(buf),
+        "Bodies:%d  Contacts:%d\nRunning: %s",
+        static_cast<int>(w.getBodies().size()),
+        static_cast<int>(w.getContacts().size()),
+        w.isRunning() ? "Yes" : "No");
+    return buf;
 }
 
 void RigidBodyControlPanel::onImGui() {
@@ -50,71 +121,17 @@ void RigidBodyControlPanel::onImGui() {
 
     UI::Immediate::setNextWindowPosition(700.f, 35.f);
     UI::Immediate::setNextWindowSize(300.f, 640.f);
-    if (!UI::Immediate::beginWindow("Rigid Body Control", &visible_)) { UI::Immediate::endWindow(); return; }
+    if (!UI::Immediate::beginWindow("Rigid Body Control", &visible_)) {
+        UI::Immediate::endWindow();
+        return;
+    }
     drawContents();
     UI::Immediate::endWindow();
 }
 
 void RigidBodyControlPanel::drawContents() {
     if (!world_) return;
-    initWidgets();
-
-    {
-        int cur = static_cast<int>(world_->currentPreset());
-        if (UI::Immediate::combo("Preset", cur, kPresetNames, 7)) {
-            world_->setPreset(kPresetValues[cur]);
-            if (onWorldChanged_) onWorldChanged_();
-        }
-    }
-
-    runButton_.show();
-    UI::Immediate::sameLine();
-    stepButton_.show();
-    UI::Immediate::sameLine();
-    resetButton_.show();
-
-    {
-        int n = static_cast<int>(world_->getWorld().getBodies().size());
-        int c = static_cast<int>(world_->getWorld().getContacts().size());
-        UI::Immediate::text("Bodies:%d  Contacts:%d", n, c);
-        UI::Immediate::text("Running: %s", world_->isRunning() ? "Yes" : "No");
-    }
-
-    UI::Immediate::separator();
-    UI::Immediate::text("Simulation");
-    {
-        auto& wp = world_->getWorld();
-        timeStepView_.setValue(wp.timeStep);
-        timeStepView_.show();
-        wp.timeStep = timeStepView_.getValue();
-
-        iterView_.setValue(wp.params().solverIterations);
-        iterView_.show();
-        wp.params().solverIterations = iterView_.getValue();
-
-        betaView_.setValue(wp.params().baumgarteBeta);
-        betaView_.show();
-        wp.params().baumgarteBeta = betaView_.getValue();
-
-        gravYView_.setValue(wp.params().gravity.y);
-        gravYView_.show();
-        wp.params().gravity.y = gravYView_.getValue();
-    }
-
-    UI::Immediate::separator();
-    UI::Immediate::text("Add Sphere (drops from y=3)");
-    sphereRadView_.show();
-    sphereMassView_.show();
-    sphereRestView_.show();
-    addSphereBtn_.show();
-
-    UI::Immediate::separator();
-    UI::Immediate::text("Add Box (drops from y=3)");
-    boxHxView_.show();
-    boxHyView_.show();
-    boxHzView_.show();
-    boxMassView_.show();
-    addBoxBtn_.show();
+    contents_.show();
 }
 
 } // namespace Phantom
