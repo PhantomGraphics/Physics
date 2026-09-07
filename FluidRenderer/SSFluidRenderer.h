@@ -145,6 +145,12 @@ public:
     void clearSceneInput();
     void setFluidMaterial(const glm::vec3& absorptionColor, float absorptionDistance,
                           float ior, float roughness, float thicknessScale);
+    void setLight(const glm::vec3& direction, const glm::vec3& color, float intensity)
+    {
+        lightDirection_ = direction;
+        lightColor_ = color;
+        lightIntensity_ = glm::max(intensity, 0.0f);
+    }
     void setExposure(float exposure) { exposure_ = glm::max(exposure, 0.001f); }
     /// When true, the composite emits alpha = coverage (transparent background)
     /// instead of a solid alpha of 1. Used by FluidStudio's offscreen sequence
@@ -228,6 +234,9 @@ private:
     float thicknessScale_ = 1.0f;
     float exposure_ = 1.0f;
     bool  transparentBackground_ = false;
+    glm::vec3 lightDirection_{0.35f, 0.75f, 0.25f};
+    glm::vec3 lightColor_{1.0f};
+    float lightIntensity_ = 1.0f;
 
     // Environment map / skybox
     GlobalVulkanCubeMap                                envMap_;

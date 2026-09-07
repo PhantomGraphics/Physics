@@ -38,6 +38,8 @@ public:
     Phantom::VKG::VulkanOffscreen& smoothed()      { return smoothed_; }
     // Pass 3b: bilateral-filtered smoothed depth (R32_SFLOAT, for depth reconstruction)
     Phantom::VKG::VulkanOffscreen& smoothedDepth() { return smoothedDepth_; }
+    // Shared scratch target for the horizontal half of the separable filters.
+    Phantom::VKG::VulkanOffscreen& filterTemp()     { return filterTemp_; }
     // Pass 4a: environment reflection (RGBA8)
     Phantom::VKG::VulkanOffscreen& reflection()    { return reflection_; }
     // Pass 4b: refraction color (RGBA8)
@@ -51,6 +53,7 @@ public:
     const Phantom::VKG::VulkanOffscreen& thickness()     const { return thickness_; }
     const Phantom::VKG::VulkanOffscreen& smoothed()      const { return smoothed_; }
     const Phantom::VKG::VulkanOffscreen& smoothedDepth() const { return smoothedDepth_; }
+    const Phantom::VKG::VulkanOffscreen& filterTemp()     const { return filterTemp_; }
     const Phantom::VKG::VulkanOffscreen& reflection()    const { return reflection_; }
     const Phantom::VKG::VulkanOffscreen& refraction()    const { return refraction_; }
     const Phantom::VKG::VulkanOffscreen& spray()         const { return spray_; }
@@ -61,6 +64,7 @@ private:
     Phantom::VKG::VulkanOffscreen thickness_;
     Phantom::VKG::VulkanOffscreen smoothed_;
     Phantom::VKG::VulkanOffscreen smoothedDepth_;
+    Phantom::VKG::VulkanOffscreen filterTemp_;
     Phantom::VKG::VulkanOffscreen reflection_;
     Phantom::VKG::VulkanOffscreen refraction_;
     Phantom::VKG::VulkanOffscreen spray_;

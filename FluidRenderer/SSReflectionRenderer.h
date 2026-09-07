@@ -16,14 +16,15 @@ namespace Phantom {
 class SSReflectionRenderer {
 public:
     struct UBO {
-        glm::vec4 tint     = glm::vec4(0.18f, 0.36f, 0.85f, 1.0f);
-        float     strength = 1.0f;
+        glm::vec4 lightDirection = glm::vec4(0.35f, 0.75f, 0.25f, 0.0f);
+        glm::vec4 lightColorIntensity = glm::vec4(1.0f);
+        float     roughness = 0.08f;
         int       hasEnvMap = 0;
         float     _pad[2]{};
         glm::mat4 invProj{1.0f};
         glm::mat4 invViewRot{1.0f};
     };
-    static_assert(sizeof(UBO) == 160, "UBO layout mismatch");
+    static_assert(sizeof(UBO) == 176, "UBO layout mismatch");
 
     void create(const Phantom::VKG::VulkanContext& ctx,
                 const Phantom::VKG::VulkanCommandPool& pool,
@@ -43,7 +44,11 @@ public:
                 const glm::mat4& invViewRot,
                 VkImageView envMapView,
                 VkSampler   envMapSampler,
-                bool        hasEnvMap);
+                bool        hasEnvMap,
+                const glm::vec3& lightDirection,
+                const glm::vec3& lightColor,
+                float lightIntensity,
+                float roughness);
 
     bool isValid() const { return pipeline_.isValid(); }
 

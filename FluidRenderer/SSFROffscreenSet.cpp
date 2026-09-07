@@ -15,6 +15,7 @@ void SSFROffscreenSet::create(const Phantom::VKG::VulkanContext& ctx, uint32_t w
     thickness_.create    (ctx, width, height, VK_FORMAT_R32_SFLOAT,     kDepthFmt);
     smoothed_.create     (ctx, width, height, VK_FORMAT_R32_SFLOAT,     kDepthFmt);
     smoothedDepth_.create(ctx, width, height, VK_FORMAT_R32_SFLOAT,     kDepthFmt);
+    filterTemp_.create   (ctx, width, height, VK_FORMAT_R32_SFLOAT,     kDepthFmt);
     reflection_.create   (ctx, width, height, VK_FORMAT_R8G8B8A8_UNORM, kDepthFmt);
     refraction_.create   (ctx, width, height, VK_FORMAT_R8G8B8A8_UNORM, kDepthFmt);
     spray_.create        (ctx, width, height, VK_FORMAT_R32_SFLOAT,     kDepthFmt);
@@ -34,6 +35,7 @@ void SSFROffscreenSet::destroy(const Phantom::VKG::VulkanContext& ctx)
     spray_.destroy(ctx);
     refraction_.destroy(ctx);
     reflection_.destroy(ctx);
+    filterTemp_.destroy(ctx);
     smoothedDepth_.destroy(ctx);
     smoothed_.destroy(ctx);
     thickness_.destroy(ctx);

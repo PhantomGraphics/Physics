@@ -26,7 +26,7 @@ public:
         int useAnisotropic = 1;
         float anisotropy = 1.25f;
         float gradientScale = 8.0f;
-        float _pad = 0.0f;
+        int passAxis = 0; // 0 = 2-D fallback, 1 = horizontal, 2 = vertical
     };
     static_assert(sizeof(UBO) == 32, "UBO layout mismatch");
 
@@ -40,6 +40,7 @@ public:
 
     void setParams(float sigmaS, float sigmaR,
                    bool useAnisotropic, float anisotropy, float gradientScale);
+    void setPassAxis(int axis) { ubo_.passAxis = glm::clamp(axis, 0, 2); }
 
     void render(const Phantom::VKG::VulkanContext& ctx,
                 VkCommandBuffer cmd,

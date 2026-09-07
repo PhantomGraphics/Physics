@@ -84,6 +84,20 @@ void SSThicknessRenderer::render(
     float viewportHeight,
     float thicknessScale)
 {
+    render(cmd, frameIndex, targets.thickness(), proj, modelView,
+           particleRadius, viewportHeight, thicknessScale);
+}
+
+void SSThicknessRenderer::render(
+    VkCommandBuffer cmd,
+    uint32_t frameIndex,
+    Phantom::VKG::VulkanOffscreen& offscreen,
+    const glm::mat4& proj,
+    const glm::mat4& modelView,
+    float particleRadius,
+    float viewportHeight,
+    float thicknessScale)
+{
     UBO ubo{};
     ubo.proj           = proj;
     ubo.modelView      = modelView;
@@ -94,7 +108,6 @@ void SSThicknessRenderer::render(
     SSFRPipeline& activePipeline = useExternal_ ? pipelineVec4_ : pipeline_;
     activePipeline.updateUBO(frameIndex, &ubo, sizeof(ubo));
 
-    auto& offscreen = targets.thickness();
     offscreen.beginRenderPass(cmd, {0.f, 0.f, 0.f, 0.f}, 1.0f);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, activePipeline.getPipeline());

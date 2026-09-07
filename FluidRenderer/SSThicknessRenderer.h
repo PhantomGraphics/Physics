@@ -50,6 +50,15 @@ public:
                 float viewportHeight,
                 float thicknessScale = 0.6f);
 
+    void render(VkCommandBuffer cmd,
+                uint32_t frameIndex,
+                Phantom::VKG::VulkanOffscreen& target,
+                const glm::mat4& proj,
+                const glm::mat4& modelView,
+                float particleRadius,
+                float viewportHeight,
+                float thicknessScale = 0.6f);
+
     bool isValid() const { return pipeline_.isValid(); }
 
 private:

@@ -239,11 +239,19 @@ void SSReflectionRenderer::render(const Phantom::VKG::VulkanContext& ctx,
                                      const glm::mat4& invViewRot,
                                      VkImageView envMapView,
                                      VkSampler   envMapSampler,
-                                     bool        hasEnvMap)
+                                     bool        hasEnvMap,
+                                     const glm::vec3& lightDirection,
+                                     const glm::vec3& lightColor,
+                                     float lightIntensity,
+                                     float roughness)
 {
     ubo_.invProj    = invProj;
     ubo_.invViewRot = invViewRot;
     ubo_.hasEnvMap  = hasEnvMap ? 1 : 0;
+    ubo_.lightDirection = glm::vec4(glm::normalize(lightDirection), 0.0f);
+    ubo_.lightColorIntensity = glm::vec4(glm::max(lightColor, glm::vec3(0.0f)),
+                                         glm::max(lightIntensity, 0.0f));
+    ubo_.roughness = glm::clamp(roughness, 0.0f, 1.0f);
     pipeline_.updateUBO(frameIndex, &ubo_, sizeof(ubo_));
 
     VkDescriptorImageInfo depthInfo{};

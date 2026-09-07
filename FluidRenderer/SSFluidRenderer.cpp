@@ -42,11 +42,12 @@ void transitionOffscreenColorToShaderReadOnly(const GlobalVulkanCommandPool& poo
 void initializeSSFRTargetLayouts(const GlobalVulkanCommandPool& pool,
                                  SSFROffscreenSet& targets)
 {
-    const std::array<VkImage, 8> images = {
+    const std::array<VkImage, 9> images = {
         targets.depth().getColorImage(),
         targets.thickness().getColorImage(),
         targets.smoothed().getColorImage(),
         targets.smoothedDepth().getColorImage(),
+        targets.filterTemp().getColorImage(),
         targets.reflection().getColorImage(),
         targets.refraction().getColorImage(),
         targets.spray().getColorImage(),
@@ -426,7 +427,10 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
         if (gpuProfiler_) gpuProfiler_->gpuMark(cmd, label);
     };
 
-    const float surfaceRadius = particleRadius_ * 1.35f;
+    // The reconstruction kernel must overlap neighbouring particles at their
+    // rest spacing (normally 2*r).  1.35*r left a scalloped silhouette and
+    // visible vertical particle columns at close camera distances.
+    const float surfaceRadius = particleRadius_ * 1.5f;
     const float viewportHeight = static_cast<float>(extent_.height);
     depthPass_.render(cmd, frameIndex, targets_, proj_, view_,
                       surfaceRadius, viewportHeight);
@@ -435,18 +439,53 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
                           surfaceRadius, viewportHeight);
     gpuMark("ssfr.thickness");
 
+    // A single 5x5 pass truncated sigmaS=2.5 to less than one standard
+    // deviation and left the projected particle lattice in the normals.  Two
+    // separable passes cover 3*sigma while remaining much cheaper than a wide
+    // 2-D kernel.
     bilateralPass_.setParams(bilateralSigmaS_, bilateralSigmaR_,
                              bilateralUseAnisotropic_,
                              bilateralAnisotropy_,
                              bilateralGradientScale_);
-    bilateralPass_.render(*ctx_, cmd, frameIndex, targets_);
+    bilateralPass_.setPassAxis(1);
+    bilateralPass_.render(*ctx_, cmd, frameIndex,
+                          targets_.thickness().getColorImageView(),
+                          targets_.getSampler(), targets_.filterTemp());
+    bilateralPass_.setPassAxis(2);
+    bilateralPass_.render(*ctx_, cmd, frameIndex,
+                          targets_.filterTemp().getColorImageView(),
+                          targets_.getSampler(), targets_.smoothed());
 
+    // The depth field is the reconstructed liquid surface.  Applying the
+    // thickness-oriented anisotropic edge preservation here mistakes the
+    // periodic ridges of sphere splats for real surface edges and locks the
+    // particle columns into the reflected normal field.  The range term still
+    // preserves true depth discontinuities, so use isotropic spatial smoothing
+    // for depth while retaining anisotropy for thickness above.
     bilateralDepthPass_.setParams(bilateralDepthSigmaS_, bilateralDepthSigmaR_,
-                                  bilateralUseAnisotropic_,
-                                  bilateralAnisotropy_,
+                                  false, bilateralAnisotropy_,
                                   bilateralGradientScale_);
+    bilateralDepthPass_.setPassAxis(1);
     bilateralDepthPass_.render(*ctx_, cmd, frameIndex,
                                targets_.depth().getColorImageView(),
+                               targets_.getSampler(),
+                               targets_.filterTemp());
+    bilateralDepthPass_.setPassAxis(2);
+    bilateralDepthPass_.render(*ctx_, cmd, frameIndex,
+                               targets_.filterTemp().getColorImageView(),
+                               targets_.getSampler(),
+                               targets_.smoothedDepth());
+    // A second separable iteration removes the residual frequency at the
+    // projected particle spacing.  It reuses the same ping-pong target and is
+    // applied only to depth, where small ripples become large normal errors.
+    bilateralDepthPass_.setPassAxis(1);
+    bilateralDepthPass_.render(*ctx_, cmd, frameIndex,
+                               targets_.smoothedDepth().getColorImageView(),
+                               targets_.getSampler(),
+                               targets_.filterTemp());
+    bilateralDepthPass_.setPassAxis(2);
+    bilateralDepthPass_.render(*ctx_, cmd, frameIndex,
+                               targets_.filterTemp().getColorImageView(),
                                targets_.getSampler(),
                                targets_.smoothedDepth());
     gpuMark("ssfr.bilateral");
@@ -462,7 +501,8 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
                            depthForNormals,
                            glm::inverse(proj_),
                            glm::mat4(glm::transpose(glm::mat3(view_))),
-                           envView, envSampler, hasEnvMap_);
+                           envView, envSampler, hasEnvMap_,
+                           lightDirection_, lightColor_, lightIntensity_, roughness_);
     gpuMark("ssfr.reflection");
 
     const bool hasScene = sceneColor_ != VK_NULL_HANDLE && sceneDepth_ != VK_NULL_HANDLE &&
@@ -472,9 +512,9 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
                            glm::inverse(proj_), glm::mat4(glm::transpose(glm::mat3(view_))),
                            extent_, nearPlane_, farPlane_, hasScene, hasEnvMap_, ior_, absorptionColor_);
     gpuMark("ssfr.refraction");
-    sprayPass_.render(cmd, frameIndex, targets_, proj_, view_,
+    sprayPass_.render(cmd, frameIndex, targets_.spray(), proj_, view_,
                       particleRadius_ * 0.55f, viewportHeight, 0.5f);
-    foamPass_.render(cmd, frameIndex, targets_, proj_, view_,
+    foamPass_.render(cmd, frameIndex, targets_.foam(), proj_, view_,
                      particleRadius_ * 0.9f, viewportHeight, 0.35f);
     gpuMark("ssfr.spray_foam");
 }
@@ -516,7 +556,7 @@ void SSFluidRenderer::onRender(VkCommandBuffer cmd, uint32_t frameIndex)
 
     VkDescriptorImageInfo depthInfo{};
     depthInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    depthInfo.imageView   = (mode_ == Mode::SmoothedDepth)
+    depthInfo.imageView   = (useDepthSmoothing_ && mode_ != Mode::DepthOnly)
         ? targets_.smoothedDepth().getColorImageView()
         : targets_.depth().getColorImageView();
     depthInfo.sampler     = sampler;
