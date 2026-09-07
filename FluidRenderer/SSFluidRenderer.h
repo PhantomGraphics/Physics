@@ -68,7 +68,7 @@ public:
         int showFoam = 1;
         int hasScene = 0;
         float exposure = 1.0f;
-        float _pad0 = 0.0f;
+        int transparent = 0; // 1 => emit an RGBA coverage matte (FluidStudio Phase 6b)
         glm::vec4 absorptionColor = glm::vec4(0.12f, 0.62f, 0.72f, 1.0f);
         float absorptionDistance = 6.0f;
         float thicknessScale = 1.0f;
@@ -146,6 +146,11 @@ public:
     void setFluidMaterial(const glm::vec3& absorptionColor, float absorptionDistance,
                           float ior, float roughness, float thicknessScale);
     void setExposure(float exposure) { exposure_ = glm::max(exposure, 0.001f); }
+    /// When true, the composite emits alpha = coverage (transparent background)
+    /// instead of a solid alpha of 1. Used by FluidStudio's offscreen sequence
+    /// renderer for RGBA PNG output; the interactive path leaves it false.
+    void setTransparentBackground(bool v) { transparentBackground_ = v; }
+    bool getTransparentBackground() const { return transparentBackground_; }
     void setParticleRadius(float radius) { particleRadius_ = glm::max(radius, 0.001f); }
     float getParticleRadius() const { return particleRadius_; }
 
@@ -222,6 +227,7 @@ private:
     float roughness_ = 0.08f;
     float thicknessScale_ = 1.0f;
     float exposure_ = 1.0f;
+    bool  transparentBackground_ = false;
 
     // Environment map / skybox
     GlobalVulkanCubeMap                                envMap_;

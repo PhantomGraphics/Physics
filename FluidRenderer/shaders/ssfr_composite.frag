@@ -10,7 +10,7 @@ layout(set=0,binding=5) uniform sampler2D uSpray;
 layout(set=0,binding=6) uniform sampler2D uFoam;
 layout(set=0,binding=7) uniform Composite {
     int mode; float foamOpacity; float sprayOpacity; int showSpray;
-    int showFoam; int hasScene; float exposure; float _pad0;
+    int showFoam; int hasScene; float exposure; int transparent;
     vec4 absorptionColor;
     float absorptionDistance; float thicknessScale; float ior; float roughness;
 };
@@ -22,21 +22,28 @@ vec3 aces(vec3 x) {
     return clamp((x*(a*x+b))/(x*(c*x+d)+e),0.0,1.0);
 }
 void main() {
-    vec3 scene = hasScene != 0 ? texture(uSceneColor,vUV).rgb : vec3(0.0);
-    if (mode == -1) { outColor=vec4(aces(scene*exposure),1.0); return; }
+    // transparent != 0: emit an RGBA matte -- alpha follows coverage (opaque
+    // scene geometry via the HDR target's alpha, fluid via the depth/thickness
+    // test) so the sequence composites over a plate. Otherwise alpha is 1.
+    vec4 sceneTex = hasScene != 0 ? texture(uSceneColor,vUV) : vec4(0.0);
+    vec3 scene = sceneTex.rgb;
+    float sceneA = sceneTex.a;
+    float bgA = transparent != 0 ? sceneA : 1.0;
+    if (mode == -1) { outColor=vec4(aces(scene*exposure),bgA); return; }
     float depth=texture(uDepth,vUV).r;
     float raw=texture(uThicknessRaw,vUV).r;
     float thick=texture(uThicknessSmooth,vUV).r;
     float sceneDepth=hasScene!=0?texture(uSceneDepth,vUV).r:1.0;
     bool visible=depth>0.0 && (hasScene==0 || depth<sceneDepth-0.00005);
-    if (mode==0 || mode==6) { vec3 c=visible?vec3(depth):scene; outColor=vec4(aces(c*exposure),1.0); return; }
-    if (mode==1) { vec3 c=visible?vec3(raw*0.3):scene; outColor=vec4(aces(c*exposure),1.0); return; }
-    if (mode==2) { vec3 c=visible?vec3(thick*0.3):scene; outColor=vec4(aces(c*exposure),1.0); return; }
-    if (!visible || thick<=0.0001) { outColor=vec4(aces(scene*exposure),1.0); return; }
+    float coverA = transparent != 0 ? (visible ? 1.0 : sceneA) : 1.0;
+    if (mode==0 || mode==6) { vec3 c=visible?vec3(depth):scene; outColor=vec4(aces(c*exposure),coverA); return; }
+    if (mode==1) { vec3 c=visible?vec3(raw*0.3):scene; outColor=vec4(aces(c*exposure),coverA); return; }
+    if (mode==2) { vec3 c=visible?vec3(thick*0.3):scene; outColor=vec4(aces(c*exposure),coverA); return; }
+    if (!visible || thick<=0.0001) { outColor=vec4(aces(scene*exposure),bgA); return; }
     vec3 refl=texture(uReflection,vUV).rgb;
     vec3 refr=texture(uRefraction,vUV).rgb;
-    if(mode==3){outColor=vec4(aces(refl*exposure),1);return;}
-    if(mode==4){outColor=vec4(aces(refr*exposure),1);return;}
+    if(mode==3){outColor=vec4(aces(refl*exposure),coverA);return;}
+    if(mode==4){outColor=vec4(aces(refr*exposure),coverA);return;}
     float scaledThickness=max(thick*thicknessScale,0.0);
     vec3 transmittance=exp(-max(vec3(0.0),vec3(1.0)-absorptionColor.rgb)*scaledThickness/max(absorptionDistance,0.001));
     float cosTheta=clamp(1.0-scaledThickness*0.03,0.0,1.0);
@@ -46,5 +53,5 @@ void main() {
     vec3 color=mix(refr*transmittance,refl,clamp(fresnel,0.02,0.98));
     if(showFoam!=0) color=mix(color,vec3(0.95),clamp(texture(uFoam,vUV).r*foamOpacity,0.0,1.0));
     if(showSpray!=0) color+=vec3(0.95)*clamp(texture(uSpray,vUV).r*sprayOpacity,0.0,1.0);
-    outColor=vec4(aces(color*exposure),1.0);
+    outColor=vec4(aces(color*exposure),coverA);
 }

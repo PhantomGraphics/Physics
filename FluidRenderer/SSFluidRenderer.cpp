@@ -504,6 +504,7 @@ void SSFluidRenderer::onRender(VkCommandBuffer cmd, uint32_t frameIndex)
     ubo.showFoam = showFoam_ ? 1 : 0;
     ubo.hasScene = hasScene ? 1 : 0;
     ubo.exposure = exposure_;
+    ubo.transparent = transparentBackground_ ? 1 : 0;
     ubo.absorptionColor = glm::vec4(absorptionColor_, 1.0f);
     ubo.absorptionDistance = absorptionDistance_;
     ubo.thicknessScale = thicknessScale_;
