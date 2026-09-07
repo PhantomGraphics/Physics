@@ -3,10 +3,15 @@
 
 namespace Phantom {
 
-void FluidVolumeConvertPanel::initWidgets()
+void FluidVolumeConvertPanel::init()
 {
-    if (widgetsInitialized_) return;
-    widgetsInitialized_ = true;
+    buildUi();
+}
+
+void FluidVolumeConvertPanel::buildUi()
+{
+    if (uiBuilt_) return;
+    uiBuilt_ = true;
 
     kernelCombo_.addItem("Isotropic");
     kernelCombo_.addItem("Anisotropic");
@@ -15,7 +20,7 @@ void FluidVolumeConvertPanel::initWidgets()
     saveFileView_.addFilter("*.vdb");
     saveMeshFileView_.addFilter("*.obj");
 
-    convertButton_.setFunction([this]() {
+    convertButton_.setFunction([this] {
         if (!world_ || !converter_) return;
 
         auto& p = converter_->params();
@@ -33,7 +38,7 @@ void FluidVolumeConvertPanel::initWidgets()
         if (ok && onVolumeChanged_) onVolumeChanged_();
     });
 
-    saveButton_.setFunction([this]() {
+    saveButton_.setFunction([this] {
         if (!converter_) return;
 
         const std::string path = saveFileView_.getFileName();
@@ -41,12 +46,11 @@ void FluidVolumeConvertPanel::initWidgets()
             statusMessage_ = "Error: no output file selected";
             return;
         }
-
         const bool ok = converter_->saveToVdb(path);
         statusMessage_ = ok ? ("Saved: " + path) : ("Error: " + converter_->lastError());
     });
 
-    convertMeshButton_.setFunction([this]() {
+    convertMeshButton_.setFunction([this] {
         if (!converter_ || !meshConverter_) return;
 
         const auto* volume = converter_->getVolume();
@@ -54,7 +58,6 @@ void FluidVolumeConvertPanel::initWidgets()
             meshStatusMessage_ = "Error: no volume to convert -- run Convert to Volume first";
             return;
         }
-
         meshConverter_->params().isoLevel = isoLevelView_.getValue();
 
         const bool ok = meshConverter_->convert(*volume);
@@ -65,7 +68,7 @@ void FluidVolumeConvertPanel::initWidgets()
         if (ok && onMeshChanged_) onMeshChanged_();
     });
 
-    saveMeshButton_.setFunction([this]() {
+    saveMeshButton_.setFunction([this] {
         if (!meshConverter_) return;
 
         const std::string path = saveMeshFileView_.getFileName();
@@ -73,10 +76,74 @@ void FluidVolumeConvertPanel::initWidgets()
             meshStatusMessage_ = "Error: no output file selected";
             return;
         }
-
         const bool ok = meshConverter_->saveToObj(path);
         meshStatusMessage_ = ok ? ("Saved: " + path) : ("Error: " + meshConverter_->lastError());
     });
+
+    // Reads the renderer's live enabled state (a scenario command may also
+    // drive it) rather than owning a separate flag, so checkbox and command
+    // can't fight each other.
+    showVolumeCheck_.bind([this] { return volumeRenderer_ && volumeRenderer_->isEnabled(); },
+                          [this](bool v) { if (volumeRenderer_) volumeRenderer_->setEnabled(v); });
+    showVolumeCheck_.setVisibleWhen([this] { return volumeRenderer_ != nullptr; });
+    showMeshCheck_.bind([this] { return meshRenderer_ && meshRenderer_->isEnabled(); },
+                        [this](bool v) { if (meshRenderer_) meshRenderer_->setEnabled(v); });
+    showMeshCheck_.setVisibleWhen([this] { return meshRenderer_ != nullptr; });
+
+    activeVoxelsLabel_.setVisibleWhen([this] { return converter_ && converter_->getVolume() != nullptr; });
+    statusLabel_.setVisibleWhen([this] { return !statusMessage_.empty(); });
+    triangleCountLabel_.setVisibleWhen([this] { return meshConverter_ && meshConverter_->getTriangleCount() > 0; });
+    meshStatusLabel_.setVisibleWhen([this] { return !meshStatusMessage_.empty(); });
+
+    meshGroup_.add(&meshSeparator1_);
+    meshGroup_.add(&volumeToMeshHeader_);
+    meshGroup_.add(&meshSeparator2_);
+    meshGroup_.add(&isoLevelView_);
+    meshGroup_.add(&convertMeshButton_);
+    meshGroup_.add(&triangleCountLabel_);
+    meshGroup_.add(&saveMeshFileView_);
+    meshGroup_.add(&saveMeshButton_);
+    meshGroup_.add(&showMeshCheck_);
+    meshGroup_.add(&meshStatusLabel_);
+    meshGroup_.setVisibleWhen([this] { return meshConverter_ != nullptr; });
+
+    contents_.add(&particleToVolumeHeader_);
+    contents_.add(&headerSeparator_);
+    contents_.add(&particleRadiusView_);
+    contents_.add(&cellLengthView_);
+    contents_.add(&kernelCombo_);
+    contents_.add(&convertButton_);
+    contents_.add(&particlesLabel_);
+    contents_.add(&activeVoxelsLabel_);
+    contents_.add(&saveFileView_);
+    contents_.add(&saveButton_);
+    contents_.add(&showVolumeCheck_);
+    contents_.add(&statusLabel_);
+    contents_.add(&meshGroup_);
+}
+
+std::string FluidVolumeConvertPanel::particlesText() const
+{
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "Particles: %llu",
+        static_cast<unsigned long long>(world_ ? world_->getParticleCount() : 0));
+    return buf;
+}
+
+std::string FluidVolumeConvertPanel::activeVoxelsText() const
+{
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "Active voxels: %d",
+        converter_ ? converter_->getVoxelCount() : 0);
+    return buf;
+}
+
+std::string FluidVolumeConvertPanel::triangleCountText() const
+{
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "Triangles: %llu",
+        static_cast<unsigned long long>(meshConverter_ ? meshConverter_->getTriangleCount() : 0));
+    return buf;
 }
 
 void FluidVolumeConvertPanel::onImGui()
@@ -96,58 +163,8 @@ void FluidVolumeConvertPanel::onImGui()
 void FluidVolumeConvertPanel::drawContents()
 {
     if (!world_ || !converter_) return;
-
-    initWidgets();
-
-    UI::Immediate::textUnformatted("Particle -> SparseVolume");
-    UI::Immediate::separator();
-    particleRadiusView_.show();
-    cellLengthView_.show();
-    kernelCombo_.show();
-    convertButton_.show();
-
-    UI::Immediate::text("Particles: %llu",
-                static_cast<unsigned long long>(world_->getParticleCount()));
-    if (converter_->getVolume())
-        UI::Immediate::text("Active voxels: %d", converter_->getVoxelCount());
-
-    saveFileView_.show();
-    saveButton_.show();
-    if (volumeRenderer_) {
-        // Reads the renderer's live enabled state (which a scenario command
-        // -- SetVolumeRenderEnabled: -- may also drive) rather than owning a
-        // separate BoolView, so the checkbox and scenario command can't
-        // fight each other by both writing every frame.
-        bool show = volumeRenderer_->isEnabled();
-        if (UI::Immediate::checkbox("Show Volume Points", show))
-            volumeRenderer_->setEnabled(show);
-    }
-
-    if (!statusMessage_.empty())
-        UI::Immediate::textWrapped("%s", statusMessage_.c_str());
-
-    if (meshConverter_) {
-        UI::Immediate::separator();
-        UI::Immediate::textUnformatted("SparseVolume -> Mesh");
-        UI::Immediate::separator();
-        isoLevelView_.show();
-        convertMeshButton_.show();
-
-        if (meshConverter_->getTriangleCount() > 0)
-            UI::Immediate::text("Triangles: %llu",
-                        static_cast<unsigned long long>(meshConverter_->getTriangleCount()));
-
-        saveMeshFileView_.show();
-        saveMeshButton_.show();
-        if (meshRenderer_) {
-            bool show = meshRenderer_->isEnabled();
-            if (UI::Immediate::checkbox("Show Mesh", show))
-                meshRenderer_->setEnabled(show);
-        }
-
-        if (!meshStatusMessage_.empty())
-            UI::Immediate::textWrapped("%s", meshStatusMessage_.c_str());
-    }
+    if (!uiBuilt_) buildUi();
+    contents_.show();
 }
 
 } // namespace Phantom

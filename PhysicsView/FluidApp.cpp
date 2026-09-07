@@ -48,7 +48,9 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     });
     ssfrPanel_.bindRenderer(&ssfrRenderer_);
     ssfrPanel_.bindWorld(&world_);
+    ssfrPanel_.init();
     ssfrTestPanel_.bindSSFRRenderer(&ssfrRenderer_);
+    ssfrTestPanel_.init();
 
     volumeConvertPanel_.bindWorld(&world_);
     volumeConvertPanel_.bindConverter(&volumeConverter_);
@@ -57,6 +59,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     volumeConvertPanel_.bindMeshRenderer(&meshRenderer_);
     volumeConvertPanel_.setOnVolumeChanged([this]() { syncVolumeRenderer(); });
     volumeConvertPanel_.setOnMeshChanged([this]() { syncMeshRenderer(); });
+    volumeConvertPanel_.init();
     dispatcher_.setVolumeConverter(&volumeConverter_);
     dispatcher_.setMeshConverter(&meshConverter_);
     dispatcher_.setVolumeRenderer(&volumeRenderer_);
@@ -317,6 +320,16 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     ssfrRenderer_.setEnabled(useSSFR);
     fluidRenderer_.setEnabled(!useSSFR);
     ssfrRenderer_.setMode(static_cast<SSFluidRenderer::Mode>(ssfrPanel_.getModeIndex()));
+    {
+        // White-water spray/foam visibility follows the SSFRPanel checkboxes
+        // (whiteWaterParams()) but is force-off for GPU_CSPH (no CPU white
+        // water). Was a per-frame push inside SSFRPanel::drawContents();
+        // moved here so it stays in sync regardless of the active page.
+        const bool gpu = world_.getSimulationType() == FluidWorld::SimulationType::GPU_CSPH;
+        const auto& ww = world_.whiteWaterParams();
+        ssfrRenderer_.setShowSpray(gpu ? false : ww.enableSpray);
+        ssfrRenderer_.setShowFoam(gpu ? false : ww.enableFoam);
+    }
     ssfrRenderer_.setCamera(fluidRenderer_.getProjMatrix(), fluidRenderer_.getViewMatrix());
     rigidRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
     softRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());

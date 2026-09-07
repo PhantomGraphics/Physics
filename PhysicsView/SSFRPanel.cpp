@@ -5,19 +5,81 @@
 
 namespace Phantom {
 
-void SSFRPanel::initWidgets()
+void SSFRPanel::init()
 {
-    if (widgetsInitialized_) return;
-    widgetsInitialized_ = true;
+    buildUi();
+}
 
-    modeCombo_.addItem("DepthOnly");
-    modeCombo_.addItem("ThicknessRaw");
-    modeCombo_.addItem("ThicknessBilateral");
-    modeCombo_.addItem("Reflection");
-    modeCombo_.addItem("Refraction");
-    modeCombo_.addItem("SSFRMain");
-    modeCombo_.addItem("SmoothedDepth");
-    modeCombo_.setSelected(modeIndex_);
+void SSFRPanel::buildUi()
+{
+    if (uiBuilt_) return;
+    uiBuilt_ = true;
+
+    enableCheck_.bind([this] { return enabled_; },
+                      [this](bool v) { enabled_ = v; });
+
+    static const char* const kModeLabels[] = {
+        "DepthOnly", "ThicknessRaw", "ThicknessBilateral",
+        "Reflection", "Refraction", "SSFRMain", "SmoothedDepth"
+    };
+    for (auto* m : kModeLabels) modeCombo_.addItem(m);
+    modeCombo_.bind([this] { return modeIndex_; },
+                    [this](int v) { modeIndex_ = v; });
+
+    sprayCheck_.bind([this] { return world_->whiteWaterParams().enableSpray; },
+                     [this](bool v) { world_->whiteWaterParams().enableSpray = v; });
+    foamCheck_.bind([this] { return world_->whiteWaterParams().enableFoam; },
+                    [this](bool v) { world_->whiteWaterParams().enableFoam = v; });
+    sprayCheck_.setVisibleWhen([this] { return world_ != nullptr; });
+    foamCheck_.setVisibleWhen([this] { return world_ != nullptr; });
+
+    thicknessSigmaSSlider_.bind([this] { return renderer_->getThicknessSmoothingSigmaS(); },
+                                [this](float v) { renderer_->setThicknessSmoothingSigmaS(v); });
+    thicknessSigmaRSlider_.bind([this] { return renderer_->getThicknessSmoothingSigmaR(); },
+                                [this](float v) { renderer_->setThicknessSmoothingSigmaR(v); });
+    anisoCheck_.bind([this] { return renderer_->getAnisotropicSmoothing(); },
+                     [this](bool v) { renderer_->setAnisotropicSmoothing(v); });
+    anisotropySlider_.bind([this] { return renderer_->getAnisotropy(); },
+                           [this](float v) { renderer_->setAnisotropy(v); });
+    anisoGradScaleSlider_.bind([this] { return renderer_->getAnisotropicGradientScale(); },
+                               [this](float v) { renderer_->setAnisotropicGradientScale(v); });
+    depthSmoothCheck_.bind([this] { return renderer_->getDepthSmoothing(); },
+                           [this](bool v) { renderer_->setDepthSmoothing(v); });
+    depthSigmaSSlider_.bind([this] { return renderer_->getDepthSmoothingSigmaS(); },
+                            [this](float v) { renderer_->setDepthSmoothingSigmaS(v); });
+    depthSigmaRSlider_.bind([this] { return renderer_->getDepthSmoothingSigmaR(); },
+                            [this](float v) { renderer_->setDepthSmoothingSigmaR(v); });
+    sprayOpacitySlider_.bind([this] { return renderer_->getSprayOpacity(); },
+                             [this](float v) { renderer_->setSprayOpacity(v); });
+    foamOpacitySlider_.bind([this] { return renderer_->getFoamOpacity(); },
+                            [this](float v) { renderer_->setFoamOpacity(v); });
+
+    rendererGroup_.add(&thickHeader_);
+    rendererGroup_.add(&thicknessSigmaSSlider_);
+    rendererGroup_.add(&thicknessSigmaRSlider_);
+    rendererGroup_.add(&sep1_);
+    rendererGroup_.add(&anisoHeader_);
+    rendererGroup_.add(&anisoCheck_);
+    rendererGroup_.add(&anisotropySlider_);
+    rendererGroup_.add(&anisoGradScaleSlider_);
+    rendererGroup_.add(&sep2_);
+    rendererGroup_.add(&depthHeader_);
+    rendererGroup_.add(&depthSmoothCheck_);
+    rendererGroup_.add(&depthSigmaSSlider_);
+    rendererGroup_.add(&depthSigmaRSlider_);
+    rendererGroup_.add(&sep3_);
+    rendererGroup_.add(&sprayOpacitySlider_);
+    rendererGroup_.add(&foamOpacitySlider_);
+    rendererGroup_.setVisibleWhen([this] { return renderer_ != nullptr; });
+
+    enabledGroup_.add(&modeCombo_);
+    enabledGroup_.add(&sprayCheck_);
+    enabledGroup_.add(&foamCheck_);
+    enabledGroup_.add(&rendererGroup_);
+    enabledGroup_.setVisibleWhen([this] { return enabled_; });
+
+    contents_.add(&enableCheck_);
+    contents_.add(&enabledGroup_);
 }
 
 void SSFRPanel::onImGui()
@@ -36,99 +98,8 @@ void SSFRPanel::onImGui()
 
 void SSFRPanel::drawContents()
 {
-    initWidgets();
-
-    enableCheck_.setValue(enabled_);
-    enableCheck_.show();
-    enabled_ = enableCheck_.getValue();
-
-    if (enabled_) {
-        static const char* kModeLabels[] = {
-            "DepthOnly", "ThicknessRaw", "ThicknessBilateral",
-            "Reflection", "Refraction", "SSFRMain", "SmoothedDepth"
-        };
-
-        modeCombo_.setSelected(modeIndex_);
-        modeCombo_.show();
-        const std::string selMode = modeCombo_.getSelectedItem();
-        for (int i = 0; i < 7; ++i) {
-            if (selMode == kModeLabels[i]) {
-                modeIndex_ = i;
-                break;
-            }
-        }
-
-        if (world_) {
-            auto& ww = world_->whiteWaterParams();
-
-            sprayCheck_.setValue(ww.enableSpray);
-            sprayCheck_.show();
-            if (sprayCheck_.getValue() != ww.enableSpray) {
-                ww.enableSpray = sprayCheck_.getValue();
-            }
-
-            foamCheck_.setValue(ww.enableFoam);
-            foamCheck_.show();
-            if (foamCheck_.getValue() != ww.enableFoam) {
-                ww.enableFoam = foamCheck_.getValue();
-            }
-
-            if (renderer_) {
-                const bool gpuCsph =
-                    (world_->getSimulationType() == FluidWorld::SimulationType::GPU_CSPH);
-                renderer_->setShowSpray(gpuCsph ? false : ww.enableSpray);
-                renderer_->setShowFoam(gpuCsph ? false : ww.enableFoam);
-            }
-        }
-
-        if (renderer_) {
-            UI::Immediate::textDisabled("--- Thickness Bilateral ---");
-            float thickSigmaS = renderer_->getThicknessSmoothingSigmaS();
-            if (UI::Immediate::sliderFloat("Thickness SigmaS", thickSigmaS, 0.5f, 6.0f))
-                renderer_->setThicknessSmoothingSigmaS(thickSigmaS);
-
-            float thickSigmaR = renderer_->getThicknessSmoothingSigmaR();
-            if (UI::Immediate::sliderFloat("Thickness SigmaR", thickSigmaR, 0.01f, 0.25f))
-                renderer_->setThicknessSmoothingSigmaR(thickSigmaR);
-
-            UI::Immediate::separator();
-            UI::Immediate::textDisabled("--- Anisotropic (Thickness + Depth) ---");
-            anisoCheck_.setValue(renderer_->getAnisotropicSmoothing());
-            anisoCheck_.show();
-            renderer_->setAnisotropicSmoothing(anisoCheck_.getValue());
-
-            float aniso = renderer_->getAnisotropy();
-            if (UI::Immediate::sliderFloat("Anisotropy", aniso, 0.0f, 3.0f))
-                renderer_->setAnisotropy(aniso);
-
-            float gradScale = renderer_->getAnisotropicGradientScale();
-            if (UI::Immediate::sliderFloat("Aniso Grad Scale", gradScale, 0.0f, 20.0f))
-                renderer_->setAnisotropicGradientScale(gradScale);
-
-            UI::Immediate::separator();
-            UI::Immediate::textDisabled("--- Depth Bilateral (Surface Normals) ---");
-            depthSmoothCheck_.setValue(renderer_->getDepthSmoothing());
-            depthSmoothCheck_.show();
-            renderer_->setDepthSmoothing(depthSmoothCheck_.getValue());
-
-            float depthSigmaS = renderer_->getDepthSmoothingSigmaS();
-            if (UI::Immediate::sliderFloat("Depth SigmaS", depthSigmaS, 0.5f, 6.0f))
-                renderer_->setDepthSmoothingSigmaS(depthSigmaS);
-
-            float depthSigmaR = renderer_->getDepthSmoothingSigmaR();
-            if (UI::Immediate::sliderFloat("Depth SigmaR", depthSigmaR, 0.005f, 0.2f))
-                renderer_->setDepthSmoothingSigmaR(depthSigmaR);
-
-            UI::Immediate::separator();
-            float sprayOp = renderer_->getSprayOpacity();
-            if (UI::Immediate::sliderFloat("Spray Opacity", sprayOp, 0.0f, 1.0f))
-                renderer_->setSprayOpacity(sprayOp);
-
-            float foamOp = renderer_->getFoamOpacity();
-            if (UI::Immediate::sliderFloat("Foam Opacity", foamOp, 0.0f, 1.0f))
-                renderer_->setFoamOpacity(foamOp);
-        }
-    }
+    if (!uiBuilt_) buildUi();
+    contents_.show();
 }
 
 } // namespace Phantom

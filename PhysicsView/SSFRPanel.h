@@ -1,8 +1,12 @@
-﻿#pragma once
+#pragma once
 
 #include "../../CGLib/VkAppBase/IVkSubRenderer.h"
+#include "../../CGLib/UIWidgets/IView.h"
 #include "../../CGLib/UIWidgets/BoolView.h"
 #include "../../CGLib/UIWidgets/ComboBox.h"
+#include "../../CGLib/UIWidgets/FloatSlider.h"
+#include "../../CGLib/UIWidgets/Label.h"
+#include "../../CGLib/UIWidgets/Separator.h"
 
 #include "FluidWorld.h"
 #include "IEmbeddedPanel.h"
@@ -10,10 +14,21 @@
 namespace Phantom {
     class SSFluidRenderer;
 
+/**
+ * @brief SSFR (screen-space fluid rendering) controls, assembled declaratively.
+ *
+ * buildUi() is run once from init() (after bindRenderer()/bindWorld()).
+ * drawContents() is just contents_.show(). The SSFR-enabled flag and mode
+ * index are panel fields that FluidApp reads via isEnabled()/getModeIndex();
+ * everything else binds straight to the SSFluidRenderer's getters/setters or
+ * whiteWaterParams(). The old per-frame renderer_->setShowSpray()/setShowFoam()
+ * push moved to FluidApp::onUpdate (Phase 4).
+ */
 class SSFRPanel : public ::VKG::IVkUIPanel, public IEmbeddedPanel {
 public:
     void bindRenderer(SSFluidRenderer* r) { renderer_ = r; }
     void bindWorld(FluidWorld* w) { world_ = w; }
+    void init();
 
     bool isEnabled() const { return enabled_; }
     int  getModeIndex() const { return modeIndex_; }
@@ -31,15 +46,34 @@ private:
     bool visible_ = true;
     int modeIndex_ = 5;
 
-    Phantom::UI::BoolView  enableCheck_      { "SSFR" };
-    Phantom::UI::ComboBox  modeCombo_        { "SSFR Mode" };
-    Phantom::UI::BoolView  sprayCheck_       { "Use Spray" };
-    Phantom::UI::BoolView  foamCheck_        { "Use Foam" };
-    Phantom::UI::BoolView  anisoCheck_       { "Anisotropic Smoothing" };
-    Phantom::UI::BoolView  depthSmoothCheck_ { "Depth Smoothing" };
+    bool uiBuilt_ = false;
+    void buildUi();
 
-    bool widgetsInitialized_ = false;
-    void initWidgets();
+    UI::IView    contents_    {"SSFRControl"};
+    UI::BoolView enableCheck_ {"SSFR"};
+
+    UI::IView    enabledGroup_ {"SSFREnabled"};
+    UI::ComboBox modeCombo_    {"SSFR Mode"};
+    UI::BoolView sprayCheck_   {"Use Spray"};
+    UI::BoolView foamCheck_    {"Use Foam"};
+
+    UI::IView    rendererGroup_ {"SSFRRenderer"};
+    UI::Label       thickHeader_          {std::string("--- Thickness Bilateral ---"), UI::Label::Style::Disabled};
+    UI::FloatSlider thicknessSigmaSSlider_ {"Thickness SigmaS", 0.5f, 6.0f};
+    UI::FloatSlider thicknessSigmaRSlider_ {"Thickness SigmaR", 0.01f, 0.25f};
+    UI::Separator   sep1_;
+    UI::Label       anisoHeader_          {std::string("--- Anisotropic (Thickness + Depth) ---"), UI::Label::Style::Disabled};
+    UI::BoolView    anisoCheck_           {"Anisotropic Smoothing"};
+    UI::FloatSlider anisotropySlider_     {"Anisotropy", 0.0f, 3.0f};
+    UI::FloatSlider anisoGradScaleSlider_ {"Aniso Grad Scale", 0.0f, 20.0f};
+    UI::Separator   sep2_;
+    UI::Label       depthHeader_          {std::string("--- Depth Bilateral (Surface Normals) ---"), UI::Label::Style::Disabled};
+    UI::BoolView    depthSmoothCheck_     {"Depth Smoothing"};
+    UI::FloatSlider depthSigmaSSlider_    {"Depth SigmaS", 0.5f, 6.0f};
+    UI::FloatSlider depthSigmaRSlider_    {"Depth SigmaR", 0.005f, 0.2f};
+    UI::Separator   sep3_;
+    UI::FloatSlider sprayOpacitySlider_   {"Spray Opacity", 0.0f, 1.0f};
+    UI::FloatSlider foamOpacitySlider_    {"Foam Opacity", 0.0f, 1.0f};
 };
 
 } // namespace Phantom

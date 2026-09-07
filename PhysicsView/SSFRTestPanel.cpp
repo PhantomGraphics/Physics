@@ -16,25 +16,93 @@ bool SSFRTestPanel::consumeDirty()
     return d;
 }
 
-void SSFRTestPanel::initWidgets()
+void SSFRTestPanel::init()
 {
-    if (widgetsInitialized_) return;
-    widgetsInitialized_ = true;
+    buildUi();
+}
 
-    presetCombo_.addItem("Sphere");
-    presetCombo_.addItem("Dam Break");
-    presetCombo_.addItem("Wave");
-    presetCombo_.setSelected(0);
+void SSFRTestPanel::buildUi()
+{
+    if (uiBuilt_) return;
+    uiBuilt_ = true;
 
-    generateButton_.setFunction([this]() { generate(); });
+    activeView_.bind([this] { return active_; },
+        [this](bool v) {
+            const bool was = active_;
+            active_ = v;
+            if (active_ && !was) generate();
+        });
+
+    static const char* const kPresetLabels[] = { "Sphere", "Dam Break", "Wave" };
+    for (auto* label : kPresetLabels) presetCombo_.addItem(label);
+    presetCombo_.bind([this] { return static_cast<int>(preset_); },
+                      [this](int i) { preset_ = static_cast<Preset>(i); });
+
+    radiusSlider_.setLabelProvider([this] {
+        return std::string(preset_ == Preset::DamBreak ? "Half-Width" : "Radius");
+    });
+    radiusSlider_.bind([this] { return radius_; },
+                       [this](float v) { radius_ = v; });
+    countSlider_.bind([this] { return count_; },
+                      [this](int v) { count_ = v; });
+
+    generateButton_.setFunction([this] { generate(); });
+    generateRow_.add(&generateButton_);
+    generateRow_.add(&particleCountLabel_);
+
+    activeGroup_.add(&presetCombo_);
+    activeGroup_.add(&radiusSlider_);
+    activeGroup_.add(&countSlider_);
+    activeGroup_.add(&generateRow_);
+    activeGroup_.setVisibleWhen([this] { return active_; });
+
+    // --- comparison / debug ------------------------------------------
+    anisoView_.bind([this] { return ssfrRenderer_->getAnisotropicSmoothing(); },
+                    [this](bool v) { ssfrRenderer_->setAnisotropicSmoothing(v); });
+    depthSmoothView_.bind([this] { return ssfrRenderer_->getDepthSmoothing(); },
+                          [this](bool v) { ssfrRenderer_->setDepthSmoothing(v); });
 
     using Mode = SSFluidRenderer::Mode;
-    rawDepthButton_.setFunction([this]()    { if (ssfrRenderer_) ssfrRenderer_->setMode(Mode::DepthOnly);         });
-    smoothDepthButton_.setFunction([this]() { if (ssfrRenderer_) ssfrRenderer_->setMode(Mode::SmoothedDepth);     });
-    rawThickButton_.setFunction([this]()    { if (ssfrRenderer_) ssfrRenderer_->setMode(Mode::ThicknessRaw);      });
-    smoothThickButton_.setFunction([this]() { if (ssfrRenderer_) ssfrRenderer_->setMode(Mode::ThicknessBilateral);});
-    reflectionButton_.setFunction([this]()  { if (ssfrRenderer_) ssfrRenderer_->setMode(Mode::Reflection);        });
-    fullSSFRButton_.setFunction([this]()    { if (ssfrRenderer_) ssfrRenderer_->setMode(Mode::SSFRMain);          });
+    rawDepthButton_.setFunction([this]    { if (ssfrRenderer_) ssfrRenderer_->setMode(Mode::DepthOnly); });
+    smoothDepthButton_.setFunction([this] { if (ssfrRenderer_) ssfrRenderer_->setMode(Mode::SmoothedDepth); });
+    rawThickButton_.setFunction([this]    { if (ssfrRenderer_) ssfrRenderer_->setMode(Mode::ThicknessRaw); });
+    smoothThickButton_.setFunction([this] { if (ssfrRenderer_) ssfrRenderer_->setMode(Mode::ThicknessBilateral); });
+    reflectionButton_.setFunction([this]  { if (ssfrRenderer_) ssfrRenderer_->setMode(Mode::Reflection); });
+    fullSSFRButton_.setFunction([this]    { if (ssfrRenderer_) ssfrRenderer_->setMode(Mode::SSFRMain); });
+
+    depthCompareRow_.add(&rawDepthButton_);
+    depthCompareRow_.add(&smoothDepthButton_);
+    thickCompareRow_.add(&rawThickButton_);
+    thickCompareRow_.add(&smoothThickButton_);
+    reflCompareRow_.add(&reflectionButton_);
+    reflCompareRow_.add(&fullSSFRButton_);
+
+    comparisonGroup_.add(&comparisonSeparator_);
+    comparisonGroup_.add(&anisoComparisonHeader_);
+    comparisonGroup_.add(&anisoView_);
+    comparisonGroup_.add(&depthSmoothView_);
+    comparisonGroup_.add(&spacing1_);
+    comparisonGroup_.add(&compareModesLabel_);
+    comparisonGroup_.add(&depthCompareRow_);
+    comparisonGroup_.add(&thickCompareRow_);
+    comparisonGroup_.add(&reflCompareRow_);
+    comparisonGroup_.add(&spacing2_);
+    comparisonGroup_.add(&instr1_);
+    comparisonGroup_.add(&instr2_);
+    comparisonGroup_.add(&instr3_);
+    comparisonGroup_.setVisibleWhen([this] { return ssfrRenderer_ != nullptr; });
+
+    contents_.add(&testOnlyLabel_);
+    contents_.add(&activeView_);
+    contents_.add(&activeGroup_);
+    contents_.add(&comparisonGroup_);
+}
+
+std::string SSFRTestPanel::particleCountText() const
+{
+    char buf[48];
+    std::snprintf(buf, sizeof(buf), "(%d particles)", static_cast<int>(positions_.size()));
+    return buf;
 }
 
 void SSFRTestPanel::generate()
@@ -92,42 +160,6 @@ void SSFRTestPanel::genWave()
         }
 }
 
-void SSFRTestPanel::onImGuiComparison()
-{
-    if (!ssfrRenderer_) return;
-
-    UI::Immediate::separator();
-    UI::Immediate::textDisabled("--- Anisotropic Comparison ---");
-
-    anisoView_.setValue(ssfrRenderer_->getAnisotropicSmoothing());
-    anisoView_.show();
-    ssfrRenderer_->setAnisotropicSmoothing(anisoView_.getValue());
-
-    depthSmoothView_.setValue(ssfrRenderer_->getDepthSmoothing());
-    depthSmoothView_.show();
-    ssfrRenderer_->setDepthSmoothing(depthSmoothView_.getValue());
-
-    UI::Immediate::spacing();
-    UI::Immediate::textDisabled("Compare modes:");
-
-    rawDepthButton_.show();
-    UI::Immediate::sameLine();
-    smoothDepthButton_.show();
-
-    rawThickButton_.show();
-    UI::Immediate::sameLine();
-    smoothThickButton_.show();
-
-    reflectionButton_.show();
-    UI::Immediate::sameLine();
-    fullSSFRButton_.show();
-
-    UI::Immediate::spacing();
-    UI::Immediate::textWrapped("1. Enable Test Mode with Sphere preset");
-    UI::Immediate::textWrapped("2. Click 'Raw Depth' then 'Smooth Depth' to see depth filter");
-    UI::Immediate::textWrapped("3. In 'Reflection' mode, toggle 'Anisotropic ON' to see normal change");
-}
-
 void SSFRTestPanel::onImGui()
 {
     if (!show_) return;
@@ -144,41 +176,8 @@ void SSFRTestPanel::onImGui()
 
 void SSFRTestPanel::drawContents()
 {
-    initWidgets();
-
-    UI::Immediate::textDisabled("Test-only page -- synthetic particle sets for SSFR debugging.");
-
-    const bool wasActive = active_;
-    activeView_.setValue(active_);
-    activeView_.show();
-    active_ = activeView_.getValue();
-    if (active_ && !wasActive)
-        generate();
-
-    if (active_) {
-        static const char* kPresetLabels[] = { "Sphere", "Dam Break", "Wave" };
-        presetCombo_.setSelected(static_cast<int>(preset_));
-        presetCombo_.show();
-        {
-            const std::string sel = presetCombo_.getSelectedItem();
-            for (int i = 0; i < 3; ++i) {
-                if (sel == kPresetLabels[i]) {
-                    preset_ = static_cast<Preset>(i);
-                    break;
-                }
-            }
-        }
-
-        const char* szLabel = (preset_ == Preset::DamBreak) ? "Half-Width" : "Radius";
-        UI::Immediate::sliderFloat(szLabel, radius_, 4.f, 25.f);
-        UI::Immediate::sliderInt("Target", count_, 500, 8000);
-
-        generateButton_.show();
-        UI::Immediate::sameLine();
-        UI::Immediate::text("(%d particles)", static_cast<int>(positions_.size()));
-    }
-
-    onImGuiComparison();
+    if (!uiBuilt_) buildUi();
+    contents_.show();
 }
 
 } // namespace Phantom
