@@ -3,28 +3,271 @@
 
 namespace Phantom {
 
-void ControlPanel::initWidgets()
+ControlPanel::ControlPanel(FluidWorld* world) : world_(world)
 {
-    if (widgetsInitialized_) return;
-    widgetsInitialized_ = true;
+    buildUi();
+}
 
+void ControlPanel::buildUi()
+{
+    if (uiBuilt_) return;
+    uiBuilt_ = true;
+
+    // ---- Simulation -------------------------------------------------
     methodCombo_.addItem("DFSPH");
     methodCombo_.addItem("PBSPH");
     methodCombo_.addItem("CSPH");
     methodCombo_.addItem("GPU CSPH");
-    methodCombo_.setSelected(0);
+    methodCombo_.bind(
+        [this] { return static_cast<int>(world_->getSimulationType()); },
+        [this](int i) {
+            const auto newType = static_cast<FluidWorld::SimulationType>(i);
+            if (newType != world_->getSimulationType()) {
+                world_->setSimulationType(newType);
+                world_->reset();
+                notifyWorldChanged();
+            }
+        });
 
-    runButton_.setFunction([this]() {
-        world_->setRunning(!world_->isRunning());
+    timeStepView_.bind([this] { return p().timeStep; },
+                       [this](float v) { p().timeStep = v; });
+
+    runButton_.setFunction([this] { world_->setRunning(!world_->isRunning()); });
+    stepButton_.setFunction([this] { world_->step(); notifyWorldChanged(); });
+    resetButton_.setFunction([this] { world_->reset(); notifyWorldChanged(); });
+    actionsRow_.add(&runButton_);
+    actionsRow_.add(&stepButton_);
+    actionsRow_.add(&resetButton_);
+
+    gpuProfileLabel_.setVisibleWhen([this] {
+        return isGPU() && world_->getGpuSolver() != nullptr;
     });
-    stepButton_.setFunction([this]() {
-        world_->step();
-        if (onWorldChanged_) onWorldChanged_();
+
+    simSection_.add(&methodCombo_);
+    simSection_.add(&timeStepView_);
+    simSection_.add(&actionsRow_);
+    simSection_.add(&stepTimeLabel_);
+    simSection_.add(&gpuProfileLabel_);
+
+    // ---- Material -------------------------------------------------
+    densityView_.bind([this] { return p().density; },
+                      [this](float v) { p().density = v; });
+    viscosityView_.bind([this] { return p().viscosity; },
+                        [this](float v) { p().viscosity = v; });
+    pressureCoeScaleView_.bind([this] { return p().pressureCoeScale; },
+                               [this](float v) { p().pressureCoeScale = v; });
+    stiffnessView_.bind([this] { return p().stiffness; },
+                        [this](float v) { p().stiffness = v; });
+    pressureCoeScaleView_.setVisibleWhen([this] { return isWCSPH() || isDFSPH(); });
+    stiffnessView_.setVisibleWhen([this] { return !(isWCSPH() || isDFSPH()); });
+
+    tensionSlider_.bind([this] { return p().tension; },
+                        [this](float v) { p().tension = v; });
+    tensionScope_.setDisabledWhen([this] { return !isWCSPH(); });
+    tensionScope_.setTooltip([this]() -> std::string {
+        return isWCSPH() ? std::string{}
+            : "Surface tension is only available with the CSPH (WCSPH) method.";
     });
-    resetButton_.setFunction([this]() {
-        world_->reset();
-        if (onWorldChanged_) onWorldChanged_();
+    tensionScope_.add(&tensionSlider_);
+
+    materialSection_.add(&densityView_);
+    materialSection_.add(&viscosityView_);
+    materialSection_.add(&pressureCoeScaleView_);
+    materialSection_.add(&stiffnessView_);
+    materialSection_.add(&tensionScope_);
+
+    // ---- Initial Region ----------------------------------------
+    radiusView_.bind([this] { return p().radius; },
+                     [this](float v) { p().radius = v; });
+    effectLenView_.bind([this] { return p().effectLength; },
+                        [this](float v) { p().effectLength = v; });
+    fluidBoundsView_.bind([this] { return p().fluidBounds; },
+                          [this](const Math::Box3df& b) { p().fluidBounds = b; });
+    fluidBoundsScope_.add(&fluidBoundsView_);
+
+    initialRegionSection_.add(&appliedOnResetLabel_);
+    initialRegionSection_.add(&radiusView_);
+    initialRegionSection_.add(&effectLenView_);
+    initialRegionSection_.add(&fluidBoundsScope_);
+
+    // ---- Boundaries -------------------------------------------
+    boundaryView_.bind([this] { return p().boundary; },
+                       [this](const Math::Box3df& b) { p().boundary = b; });
+    boundaryScope_.add(&boundaryView_);
+
+    boundaryDampingSlider_.bind([this] { return p().boundaryDampingRatio; },
+                                [this](float v) { p().boundaryDampingRatio = v; });
+    boundaryDampingScope_.setDisabledWhen([this] { return !(isWCSPH() || isDFSPH()); });
+    boundaryDampingScope_.setTooltip([this]() -> std::string {
+        return (isWCSPH() || isDFSPH())
+            ? "Fraction of wall-normal velocity absorbed on contact. Applied on Reset. ~0.35 is typical."
+            : "Boundary damping only applies to the DFSPH / CSPH methods.";
     });
+    boundaryDampingScope_.add(&boundaryDampingSlider_);
+
+    loadMeshBoundaryButton_.setFunction([this] {
+        world_->loadMeshBoundary(meshBoundaryPathView_.getValue());
+    });
+    clearMeshBoundaryButton_.setFunction([this] { world_->clearMeshBoundary(); });
+    meshBoundaryRow_.add(&loadMeshBoundaryButton_);
+    meshBoundaryRow_.add(&clearMeshBoundaryButton_);
+
+    boundariesSection_.add(&boundaryScope_);
+    boundariesSection_.add(&boundaryDampingScope_);
+    boundariesSection_.add(&meshBoundarySeparator_);
+    boundariesSection_.add(&meshBoundaryHeaderLabel_);
+    boundariesSection_.add(&meshBoundaryPathView_);
+    boundariesSection_.add(&meshBoundaryRow_);
+    boundariesSection_.add(&triangleCountLabel_);
+
+    // ---- Emitters --------------------------------------------
+    emitterRadiusDrag_.setValue(0.1f);
+    emitterRateDrag_.setValue(50.0f);
+    emitterSpeedDrag_.setValue(1.0f);
+
+    addEmitterButton_.setFunction([this] {
+        Phantom::Physics::Emitter e;
+        e.center    = emitterCenterView_.getValue();
+        e.radius    = emitterRadiusDrag_.getValue();
+        e.rate      = emitterRateDrag_.getValue();
+        e.direction = emitterDirectionView_.getValue();
+        e.speed     = emitterSpeedDrag_.getValue();
+        world_->addEmitter(e);
+    });
+    clearEmittersButton_.setFunction([this] { world_->clearEmitters(); });
+    emitterButtonsRow_.add(&addEmitterButton_);
+    emitterButtonsRow_.add(&clearEmittersButton_);
+
+    emittersSection_.add(&emitterCenterView_);
+    emittersSection_.add(&emitterRadiusDrag_);
+    emittersSection_.add(&emitterRateDrag_);
+    emittersSection_.add(&emitterDirectionView_);
+    emittersSection_.add(&emitterSpeedDrag_);
+    emittersSection_.add(&emitterButtonsRow_);
+    emittersSection_.add(&emitterListLabel_);
+
+    // ---- Outflow Regions ----------------------------------
+    newOutflowScope_.add(&newOutflowRegionView_);
+    addOutflowButton_.setFunction([this] {
+        Phantom::Physics::OutflowRegion r;
+        r.bounds = newOutflowRegionView_.getValue();
+        world_->addOutflowRegion(r);
+    });
+    clearOutflowButton_.setFunction([this] { world_->clearOutflowRegions(); });
+    outflowButtonsRow_.add(&addOutflowButton_);
+    outflowButtonsRow_.add(&clearOutflowButton_);
+
+    outflowSection_.add(&newOutflowScope_);
+    outflowSection_.add(&outflowButtonsRow_);
+    outflowSection_.add(&outflowListLabel_);
+
+    // ---- White Water ------------------------------------
+    sprayVelThresholdSlider_.bind([this] { return ww().sprayVelThreshold; },
+                                  [this](float v) { ww().sprayVelThreshold = v; });
+    sprayDensityRatioSlider_.bind([this] { return ww().sprayDensityRatio; },
+                                  [this](float v) { ww().sprayDensityRatio = v; });
+    foamCurvThresholdSlider_.bind([this] { return ww().foamCurvThreshold; },
+                                  [this](float v) { ww().foamCurvThreshold = v; });
+    foamNeighborCountSlider_.bind([this] { return ww().foamNeighborCount; },
+                                  [this](float v) { ww().foamNeighborCount = v; });
+    maxSprayParticlesSlider_.bind([this] { return ww().maxSprayParticles; },
+                                  [this](int v) { ww().maxSprayParticles = v; });
+    maxFoamParticlesSlider_.bind([this] { return ww().maxFoamParticles; },
+                                 [this](int v) { ww().maxFoamParticles = v; });
+    foamBuoyancySlider_.bind([this] { return ww().foamBuoyancy; },
+                             [this](float v) { ww().foamBuoyancy = v; });
+    foamDragSlider_.bind([this] { return ww().foamDrag; },
+                         [this](float v) { ww().foamDrag = v; });
+
+    whiteWaterSection_.add(&sprayVelThresholdSlider_);
+    whiteWaterSection_.add(&sprayDensityRatioSlider_);
+    whiteWaterSection_.add(&foamCurvThresholdSlider_);
+    whiteWaterSection_.add(&foamNeighborCountSlider_);
+    whiteWaterSection_.add(&maxSprayParticlesSlider_);
+    whiteWaterSection_.add(&maxFoamParticlesSlider_);
+    whiteWaterSection_.add(&foamBuoyancySlider_);
+    whiteWaterSection_.add(&foamDragSlider_);
+
+    // ---- Assemble ---------------------------------------
+    contents_.add(&simSection_);
+    contents_.add(&materialSection_);
+    contents_.add(&initialRegionSection_);
+    contents_.add(&boundariesSection_);
+    contents_.add(&emittersSection_);
+    contents_.add(&outflowSeparator_);
+    contents_.add(&outflowSection_);
+    contents_.add(&whiteWaterSeparator_);
+    contents_.add(&whiteWaterSection_);
+}
+
+std::string ControlPanel::stepTimeText() const
+{
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "Step time: %.3f ms", world_->getLastStepTimeMs());
+    return buf;
+}
+
+std::string ControlPanel::gpuProfileText() const
+{
+    const auto* solver = world_->getGpuSolver();
+    if (!solver) return {};
+    const auto& ps = solver->getLastProfileStats();
+    char buf[512];
+    std::snprintf(buf, sizeof(buf),
+        "GPU_CSPH waitPrev2: %.3f ms\n"
+        "GPU_CSPH rec1: %.3f ms\n"
+        "GPU_CSPH sub1: %.3f ms\n"
+        "GPU_CSPH wait1: %.3f ms\n"
+        "GPU_CSPH prefix: %.3f ms\n"
+        "GPU_CSPH rec2: %.3f ms\n"
+        "GPU_CSPH sub2: %.3f ms\n"
+        "GPU_CSPH wait2: %.3f ms\n"
+        "GPU_CSPH total(sim): %.3f ms",
+        ps.waitPrevSecondMs, ps.recordClearCountMs, ps.submitClearCountMs,
+        ps.waitClearCountMs, ps.prefixSumMs, ps.recordRestMs, ps.submitRestMs,
+        ps.waitRestMs, ps.totalSimulateMs);
+    return buf;
+}
+
+std::string ControlPanel::emitterListText() const
+{
+    const auto& emitters = world_->getEmitters();
+    std::string s = "Registered: " + std::to_string(emitters.size());
+    for (size_t i = 0; i < emitters.size(); ++i) {
+        const auto& e = emitters[i];
+        char line[128];
+        std::snprintf(line, sizeof(line),
+            "\n#%llu center=(%.2f,%.2f,%.2f) rate=%.1f/s",
+            static_cast<unsigned long long>(i),
+            e.center.x, e.center.y, e.center.z, e.rate);
+        s += line;
+    }
+    return s;
+}
+
+std::string ControlPanel::outflowListText() const
+{
+    const auto& regions = world_->getOutflowRegions();
+    std::string s = "Registered: " + std::to_string(regions.size());
+    for (size_t i = 0; i < regions.size(); ++i) {
+        const auto mn = regions[i].bounds.getMin();
+        const auto mx = regions[i].bounds.getMax();
+        char line[160];
+        std::snprintf(line, sizeof(line),
+            "\n#%llu min=(%.2f,%.2f,%.2f) max=(%.2f,%.2f,%.2f)",
+            static_cast<unsigned long long>(i),
+            mn.x, mn.y, mn.z, mx.x, mx.y, mx.z);
+        s += line;
+    }
+    return s;
+}
+
+std::string ControlPanel::triangleCountText() const
+{
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "Triangles: %llu",
+        static_cast<unsigned long long>(world_->getMeshBoundaryTriangleCount()));
+    return buf;
 }
 
 void ControlPanel::onImGui()
@@ -44,221 +287,7 @@ void ControlPanel::onImGui()
 void ControlPanel::drawContents()
 {
     if (!world_) return;
-
-    initWidgets();
-
-    auto& params = world_->params();
-    const auto simType = world_->getSimulationType();
-    const bool isWCSPH = simType == FluidWorld::SimulationType::WCSPH;
-    const bool isDFSPH = simType == FluidWorld::SimulationType::DFSPH;
-    const bool isGPU   = simType == FluidWorld::SimulationType::GPU_CSPH;
-
-    // --- Simulation -----------------------------------------------------
-    if (UI::Immediate::collapsingHeader("Simulation", true)) {
-        static const char* kMethodLabels[] = { "DFSPH", "PBSPH", "CSPH", "GPU CSPH" };
-        methodCombo_.setSelected(static_cast<int>(simType));
-        methodCombo_.show();
-        {
-            const std::string sel = methodCombo_.getSelectedItem();
-            for (int i = 0; i < 4; ++i) {
-                if (sel == kMethodLabels[i]) {
-                    const auto newType = static_cast<FluidWorld::SimulationType>(i);
-                    if (newType != world_->getSimulationType()) {
-                        world_->setSimulationType(newType);
-                        world_->reset();
-                        if (onWorldChanged_) onWorldChanged_();
-                    }
-                    break;
-                }
-            }
-        }
-
-        timeStepView_.setValue(params.timeStep);
-        timeStepView_.show();
-        params.timeStep = timeStepView_.getValue();
-
-        runButton_.show();
-        UI::Immediate::sameLine();
-        stepButton_.show();
-        UI::Immediate::sameLine();
-        resetButton_.show();
-
-        UI::Immediate::text("Step time: %.3f ms", world_->getLastStepTimeMs());
-
-        if (isGPU) {
-            const auto* solver = world_->getGpuSolver();
-            if (solver) {
-                const auto& ps = solver->getLastProfileStats();
-                UI::Immediate::text("GPU_CSPH waitPrev2: %.3f ms", ps.waitPrevSecondMs);
-                UI::Immediate::text("GPU_CSPH rec1: %.3f ms",      ps.recordClearCountMs);
-                UI::Immediate::text("GPU_CSPH sub1: %.3f ms",      ps.submitClearCountMs);
-                UI::Immediate::text("GPU_CSPH wait1: %.3f ms",     ps.waitClearCountMs);
-                UI::Immediate::text("GPU_CSPH prefix: %.3f ms",    ps.prefixSumMs);
-                UI::Immediate::text("GPU_CSPH rec2: %.3f ms",      ps.recordRestMs);
-                UI::Immediate::text("GPU_CSPH sub2: %.3f ms",      ps.submitRestMs);
-                UI::Immediate::text("GPU_CSPH wait2: %.3f ms",     ps.waitRestMs);
-                UI::Immediate::text("GPU_CSPH total(sim): %.3f ms",ps.totalSimulateMs);
-            }
-        }
-    }
-
-    // --- Material ------------------------------------------------------
-    if (UI::Immediate::collapsingHeader("Material", true)) {
-        densityView_.setValue(params.density);
-        densityView_.show();
-        params.density = densityView_.getValue();
-
-        viscosityView_.setValue(params.viscosity);
-        viscosityView_.show();
-        params.viscosity = viscosityView_.getValue();
-
-        // WCSPH's own pressure solve and DFSPH's Two-Way boundary coupling
-        // force both derive pressureCoe as pressureCoeScale * effectLength
-        // instead of a raw stiffness number (see FluidWorld::createWCSPH()/
-        // createDFSPH() and internal design notes); PBSPH/GPU_CSPH take the
-        // raw value directly.
-        if (isWCSPH || isDFSPH) {
-            pressureCoeScaleView_.setValue(params.pressureCoeScale);
-            pressureCoeScaleView_.show();
-            params.pressureCoeScale = pressureCoeScaleView_.getValue();
-        } else {
-            stiffnessView_.setValue(params.stiffness);
-            stiffnessView_.show();
-            params.stiffness = stiffnessView_.getValue();
-        }
-
-        // Surface tension is only wired for WCSPH (WCSPHFluid::setTensionCoe()).
-        UI::Immediate::beginDisabled(!isWCSPH);
-        UI::Immediate::sliderFloat("Surface Tension", params.tension, 0.0f, 5.0f);
-        UI::Immediate::endDisabled();
-        if (!isWCSPH)
-            UI::Immediate::tooltipOnHover("Surface tension is only available with the CSPH (WCSPH) method.");
-    }
-
-    // --- Initial Region ----------------------------------------------
-    if (UI::Immediate::collapsingHeader("Initial Region", true)) {
-        UI::Immediate::textDisabled("Applied on Reset.");
-
-        radiusView_.setValue(params.radius);
-        radiusView_.show();
-        params.radius = radiusView_.getValue();
-
-        effectLenView_.setValue(params.effectLength);
-        effectLenView_.show();
-        params.effectLength = effectLenView_.getValue();
-
-        UI::Immediate::pushId("FluidBounds");
-        fluidBoundsView_.setValue(params.fluidBounds);
-        fluidBoundsView_.show();
-        params.fluidBounds = fluidBoundsView_.getValue();
-        UI::Immediate::popId();
-    }
-
-    // --- Boundaries -------------------------------------------------
-    if (UI::Immediate::collapsingHeader("Boundaries", true)) {
-        UI::Immediate::pushId("Boundary");
-        boundaryView_.setValue(params.boundary);
-        boundaryView_.show();
-        params.boundary = boundaryView_.getValue();
-        UI::Immediate::popId();
-
-        // Wall-normal velocity damping -- WCSPH/DFSPH honour it; PBSPH hard-
-        // clamps predicted positions instead, GPU_CSPH does not implement it.
-        const bool dampingApplies = isWCSPH || isDFSPH;
-        UI::Immediate::beginDisabled(!dampingApplies);
-        UI::Immediate::sliderFloat("Boundary Damping", params.boundaryDampingRatio, 0.0f, 0.5f);
-        UI::Immediate::endDisabled();
-        UI::Immediate::tooltipOnHover(dampingApplies
-            ? "Fraction of wall-normal velocity absorbed on contact. Applied on Reset. ~0.35 is typical."
-            : "Boundary damping only applies to the DFSPH / CSPH methods.");
-
-        UI::Immediate::separator();
-        UI::Immediate::textUnformatted("Mesh Boundary");
-        UI::Immediate::inputText("STL Path", meshBoundaryPathBuf_, sizeof(meshBoundaryPathBuf_));
-        if (UI::Immediate::button("Load##MeshBoundary")) {
-            world_->loadMeshBoundary(meshBoundaryPathBuf_);
-        }
-        UI::Immediate::sameLine();
-        if (UI::Immediate::button("Clear##MeshBoundary")) {
-            world_->clearMeshBoundary();
-        }
-        UI::Immediate::text("Triangles: %llu",
-                    static_cast<unsigned long long>(world_->getMeshBoundaryTriangleCount()));
-    }
-
-    // --- Emitters --------------------------------------------------
-    if (UI::Immediate::collapsingHeader("Emitters")) {
-        UI::Immediate::dragFloat3("Center", newEmitterCenter_, 0.1f);
-        UI::Immediate::dragFloat("Disk Radius", newEmitterRadius_, 0.01f, 0.0f, 100.0f);
-        UI::Immediate::dragFloat("Rate (particles/sec)", newEmitterRate_, 1.0f, 0.0f, 100000.0f);
-        UI::Immediate::dragFloat3("Direction", newEmitterDirection_, 0.01f);
-        UI::Immediate::dragFloat("Speed", newEmitterSpeed_, 0.01f, 0.0f, 1000.0f);
-        if (UI::Immediate::button("Add Emitter")) {
-            Phantom::Physics::Emitter e;
-            e.center = Phantom::Math::Vector3df(
-                newEmitterCenter_[0], newEmitterCenter_[1], newEmitterCenter_[2]);
-            e.radius = newEmitterRadius_;
-            e.rate = newEmitterRate_;
-            e.direction = Phantom::Math::Vector3df(
-                newEmitterDirection_[0], newEmitterDirection_[1], newEmitterDirection_[2]);
-            e.speed = newEmitterSpeed_;
-            world_->addEmitter(e);
-        }
-        UI::Immediate::sameLine();
-        if (UI::Immediate::button("Clear All##Emitters")) {
-            world_->clearEmitters();
-        }
-
-        const auto& emitters = world_->getEmitters();
-        UI::Immediate::text("Registered: %llu", static_cast<unsigned long long>(emitters.size()));
-        for (size_t i = 0; i < emitters.size(); ++i) {
-            const auto& e = emitters[i];
-            UI::Immediate::text("#%llu center=(%.2f,%.2f,%.2f) rate=%.1f/s",
-                        static_cast<unsigned long long>(i),
-                        e.center.x, e.center.y, e.center.z, e.rate);
-        }
-    }
-
-    UI::Immediate::separator();
-    if (UI::Immediate::collapsingHeader("Outflow Regions")) {
-        UI::Immediate::pushId("NewOutflowRegion");
-        newOutflowRegionView_.show();
-        UI::Immediate::popId();
-        if (UI::Immediate::button("Add Outflow Region")) {
-            Phantom::Physics::OutflowRegion r;
-            r.bounds = newOutflowRegionView_.getValue();
-            world_->addOutflowRegion(r);
-        }
-        UI::Immediate::sameLine();
-        if (UI::Immediate::button("Clear All##OutflowRegions")) {
-            world_->clearOutflowRegions();
-        }
-
-        const auto& regions = world_->getOutflowRegions();
-        UI::Immediate::text("Registered: %llu", static_cast<unsigned long long>(regions.size()));
-        for (size_t i = 0; i < regions.size(); ++i) {
-            const auto& r = regions[i];
-            const auto mn = r.bounds.getMin();
-            const auto mx = r.bounds.getMax();
-            UI::Immediate::text("#%llu min=(%.2f,%.2f,%.2f) max=(%.2f,%.2f,%.2f)",
-                        static_cast<unsigned long long>(i),
-                        mn.x, mn.y, mn.z, mx.x, mx.y, mx.z);
-        }
-    }
-
-    UI::Immediate::separator();
-    if (UI::Immediate::collapsingHeader("White Water")) {
-        auto& ww = world_->whiteWaterParams();
-
-        UI::Immediate::sliderFloat("Spray Vel Threshold", ww.sprayVelThreshold, 0.5f, 10.0f);
-        UI::Immediate::sliderFloat("Spray Density Ratio", ww.sprayDensityRatio, 0.1f, 1.0f);
-        UI::Immediate::sliderFloat("Foam Curv Threshold", ww.foamCurvThreshold, 0.1f, 2.0f);
-        UI::Immediate::sliderFloat("Foam Neighbor Count", ww.foamNeighborCount, 5.0f, 60.0f);
-        UI::Immediate::sliderInt("Max Spray Particles", ww.maxSprayParticles, 0, 100000);
-        UI::Immediate::sliderInt("Max Foam Particles", ww.maxFoamParticles, 0, 100000);
-        UI::Immediate::sliderFloat("Foam Buoyancy", ww.foamBuoyancy, 0.0f, 5.0f);
-        UI::Immediate::sliderFloat("Foam Drag", ww.foamDrag, 0.70f, 1.0f);
-    }
+    contents_.show();
 }
 
 } // namespace Phantom

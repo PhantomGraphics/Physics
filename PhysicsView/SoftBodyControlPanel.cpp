@@ -3,7 +3,7 @@
 
 namespace Phantom {
 
-static const char* kPresetNames[] = {
+static const char* const kPresetNames[] = {
     "ClothTwoPin", "ClothTopEdge", "ClothWithSphere",
     "RopeHanging", "RopePendulum",
     "JellyDrop", "JellyOnBox", "Mixed",
@@ -20,119 +20,114 @@ static const SoftBodyPreset kPresetValues[] = {
 };
 static constexpr int kNumPresets = 8;
 
-void SoftBodyControlPanel::initWidgets() {
-    if (widgetsInitialized_) return;
-    widgetsInitialized_ = true;
+SoftBodyControlPanel::SoftBodyControlPanel(SoftBodyWorld* w) : world_(w)
+{
+    buildUi();
+}
 
-    runButton_.setFunction([this]() {
-        world_->setRunning(!world_->isRunning());
-    });
-    stepButton_.setFunction([this]() {
+void SoftBodyControlPanel::buildUi()
+{
+    if (uiBuilt_) return;
+    uiBuilt_ = true;
+
+    for (int i = 0; i < kNumPresets; ++i) presetCombo_.addItem(kPresetNames[i]);
+    presetCombo_.bind(
+        [this] { return static_cast<int>(world_->currentPreset()); },
+        [this](int i) {
+            if (i < 0 || i >= kNumPresets) return;
+            world_->setPreset(kPresetValues[i]);
+            notifyWorldChanged();
+        });
+
+    runButton_.setFunction([this] { world_->setRunning(!world_->isRunning()); });
+    stepButton_.setFunction([this] {
         world_->getWorld().setRunning(true);
         world_->step();
         world_->getWorld().setRunning(false);
-        if (onWorldChanged_) onWorldChanged_();
+        notifyWorldChanged();
     });
-    resetButton_.setFunction([this]() {
-        world_->reset();
-        if (onWorldChanged_) onWorldChanged_();
-    });
+    resetButton_.setFunction([this] { world_->reset(); notifyWorldChanged(); });
+    actionsRow_.add(&runButton_);
+    actionsRow_.add(&stepButton_);
+    actionsRow_.add(&resetButton_);
+
+    // --- Solver (XPBDSolver::Params, applied live per step) ---------
+    timeStepView_.bind([this] { return world_->getWorld().solverParams().timeStep; },
+                       [this](float v) { world_->getWorld().solverParams().timeStep = v; });
+    subStepsView_.bind([this] { return world_->getWorld().solverParams().numSubsteps; },
+                       [this](int v) { world_->getWorld().solverParams().numSubsteps = v; });
+    iterView_.bind([this] { return world_->getWorld().solverParams().numIterations; },
+                   [this](int v) { world_->getWorld().solverParams().numIterations = v; });
+    gravYView_.bind([this] { return world_->getWorld().solverParams().gravity.y; },
+                    [this](float v) { world_->getWorld().solverParams().gravity.y = v; });
+    solverSection_.add(&timeStepView_);
+    solverSection_.add(&subStepsView_);
+    solverSection_.add(&iterView_);
+    solverSection_.add(&gravYView_);
+
+    // --- Sphere Collider (SoftBodySolver::Params) ------------------
+    sphereEnabledView_.bind([this] { return world_->getWorld().params().sphereEnabled; },
+                            [this](bool v) { world_->getWorld().params().sphereEnabled = v; });
+    sphereXView_.bind([this] { return world_->getWorld().params().sphereCenter.x; },
+                      [this](float v) { world_->getWorld().params().sphereCenter.x = v; });
+    sphereYView_.bind([this] { return world_->getWorld().params().sphereCenter.y; },
+                      [this](float v) { world_->getWorld().params().sphereCenter.y = v; });
+    sphereZView_.bind([this] { return world_->getWorld().params().sphereCenter.z; },
+                      [this](float v) { world_->getWorld().params().sphereCenter.z = v; });
+    sphereRView_.bind([this] { return world_->getWorld().params().sphereRadius; },
+                      [this](float v) { world_->getWorld().params().sphereRadius = v; });
+    sphereSection_.add(&sphereEnabledView_);
+    sphereSection_.add(&sphereXView_);
+    sphereSection_.add(&sphereYView_);
+    sphereSection_.add(&sphereZView_);
+    sphereSection_.add(&sphereRView_);
+
+    // --- Self-Collision (XPBDSolver::Params) ---------------------
+    selfColEnabledView_.bind([this] { return world_->getWorld().solverParams().selfCollisionEnabled; },
+                             [this](bool v) { world_->getWorld().solverParams().selfCollisionEnabled = v; });
+    selfColThicknessView_.bind([this] { return world_->getWorld().solverParams().selfCollisionThickness; },
+                               [this](float v) { world_->getWorld().solverParams().selfCollisionThickness = v; });
+    selfCollisionSection_.add(&selfColEnabledView_);
+    selfCollisionSection_.add(&selfColThicknessView_);
+
+    contents_.add(&presetCombo_);
+    contents_.add(&actionsRow_);
+    contents_.add(&statusLabel_);
+    contents_.add(&solverSection_);
+    contents_.add(&sphereSection_);
+    contents_.add(&selfCollisionSection_);
 }
 
-void SoftBodyControlPanel::onImGui() {
+std::string SoftBodyControlPanel::statusText() const
+{
+    const auto& w = world_->getWorld();
+    char buf[128];
+    std::snprintf(buf, sizeof(buf),
+        "Bodies:%llu  Particles:%llu\nRunning: %s",
+        static_cast<unsigned long long>(w.getBodyCount()),
+        static_cast<unsigned long long>(w.getParticleCount()),
+        world_->isRunning() ? "Yes" : "No");
+    return buf;
+}
+
+void SoftBodyControlPanel::onImGui()
+{
     if (!world_ || !visible_) return;
 
     UI::Immediate::setNextWindowPosition(10.f, 35.f);
     UI::Immediate::setNextWindowSize(300.f, 560.f);
-    if (!UI::Immediate::beginWindow("Soft Body Control", &visible_)) { UI::Immediate::endWindow(); return; }
+    if (!UI::Immediate::beginWindow("Soft Body Control", &visible_)) {
+        UI::Immediate::endWindow();
+        return;
+    }
     drawContents();
     UI::Immediate::endWindow();
 }
 
-void SoftBodyControlPanel::drawContents() {
+void SoftBodyControlPanel::drawContents()
+{
     if (!world_) return;
-    initWidgets();
-
-    {
-        int cur = static_cast<int>(world_->currentPreset());
-        if (UI::Immediate::combo("Preset", cur, kPresetNames, kNumPresets)) {
-            world_->setPreset(kPresetValues[cur]);
-            if (onWorldChanged_) onWorldChanged_();
-        }
-    }
-
-    runButton_.show();
-    UI::Immediate::sameLine();
-    stepButton_.show();
-    UI::Immediate::sameLine();
-    resetButton_.show();
-
-    {
-        auto& wp = world_->getWorld();
-        UI::Immediate::text("Bodies:%zu  Particles:%zu",
-                    wp.getBodyCount(), wp.getParticleCount());
-        UI::Immediate::text("Running: %s", world_->isRunning() ? "Yes" : "No");
-    }
-
-    UI::Immediate::separator();
-    UI::Immediate::text("Solver");
-    {
-        auto& sp = world_->getWorld().solverParams();
-
-        timeStepView_.setValue(sp.timeStep);
-        timeStepView_.show();
-        sp.timeStep = timeStepView_.getValue();
-
-        subStepsView_.setValue(sp.numSubsteps);
-        subStepsView_.show();
-        sp.numSubsteps = subStepsView_.getValue();
-
-        iterView_.setValue(sp.numIterations);
-        iterView_.show();
-        sp.numIterations = iterView_.getValue();
-
-        gravYView_.setValue(sp.gravity.y);
-        gravYView_.show();
-        sp.gravity.y = gravYView_.getValue();
-    }
-
-    UI::Immediate::separator();
-    UI::Immediate::text("Sphere Collider");
-    {
-        auto& wp = world_->getWorld().params();
-        bool sphereEnabled = wp.sphereEnabled;
-        if (UI::Immediate::checkbox("Enabled##sphere", sphereEnabled))
-            wp.sphereEnabled = sphereEnabled;
-
-        sphereXView_.setValue(wp.sphereCenter.x);
-        sphereXView_.show();
-        wp.sphereCenter.x = sphereXView_.getValue();
-
-        sphereYView_.setValue(wp.sphereCenter.y);
-        sphereYView_.show();
-        wp.sphereCenter.y = sphereYView_.getValue();
-
-        sphereZView_.setValue(wp.sphereCenter.z);
-        sphereZView_.show();
-        wp.sphereCenter.z = sphereZView_.getValue();
-
-        sphereRView_.setValue(wp.sphereRadius);
-        sphereRView_.show();
-        wp.sphereRadius = sphereRView_.getValue();
-    }
-
-    UI::Immediate::separator();
-    UI::Immediate::text("Self-Collision");
-    {
-        auto& sp = world_->getWorld().solverParams();
-        bool enabled = sp.selfCollisionEnabled;
-        if (UI::Immediate::checkbox("Enabled##selfcol", enabled))
-            sp.selfCollisionEnabled = enabled;
-
-        selfColThicknessView_.setValue(sp.selfCollisionThickness);
-        selfColThicknessView_.show();
-        sp.selfCollisionThickness = selfColThicknessView_.getValue();
-    }
+    contents_.show();
 }
 
 } // namespace Phantom
