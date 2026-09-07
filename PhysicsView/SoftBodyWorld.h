@@ -8,9 +8,11 @@
 #include "Physics/Physics/JellyBody.h"
 #include "Physics/Physics/RigidBody.h"
 #include "Physics/Physics/ICollisionShape.h"
+#include "SceneComponent.h"
 
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -43,6 +45,10 @@ public:
     // constructs this). SoftBody-Fluid coupling (mirrors RigidBodyWorld) reaches
     // solver.softFluidSolver() directly from FluidWorld rather than through this class.
     explicit SoftBodyWorld(Physics::PhysicsSolver& solver);
+
+    // Registers one SceneComponent per soft body into the shared registry
+    // (ids stay stable until the next preset switch). Optional.
+    void setComponentRegistry(SceneComponentRegistry* registry);
 
     void           setPreset(SoftBodyPreset p);
     SoftBodyPreset currentPreset() const { return preset_; }
@@ -123,6 +129,13 @@ private:
     Physics::RigidBody rigidBox_;
 
     void applyPreset();
+
+    // Scene-object tracking (non-owning registry pointer).
+    SceneComponentRegistry* componentRegistry_ = nullptr;
+    std::vector<int>        componentIds_;
+    void        syncComponents();
+    void        clearComponents();
+    std::string describeBody(std::size_t index) const;
 };
 
 } // namespace Phantom

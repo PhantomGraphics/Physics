@@ -25,6 +25,8 @@
 #include "../../CGLib/VulkanGraphics/VulkanCommandPool.h"
 
 #include <filesystem>
+#include <string>
+#include <vector>
 
 namespace Phantom {
 
@@ -414,6 +416,11 @@ public:
     // Returns the wall-clock duration of the last step() call in milliseconds.
     float getLastStepTimeMs() const { return lastStepTimeMs_; }
 
+    // Registers SceneComponents for the fluid itself, the mesh boundary (when
+    // loaded) and each emitter / outflow region into the shared registry.
+    // Also covers rigid()'s bodies (forwards to RigidBodyWorld). Optional.
+    void setComponentRegistry(SceneComponentRegistry* registry);
+
 private:
     SimulationType type_ = SimulationType::DFSPH;
     Params params_;
@@ -446,6 +453,21 @@ private:
     // Re-registers meshBoundary_ on the (possibly just-rebuilt) active solver.
     // A no-op if no mesh boundary is loaded. Called by loadMeshBoundary() and reset().
     void reregisterMeshBoundary();
+
+    // --- Scene-object tracking (non-owning registry pointer) ------------
+    SceneComponentRegistry* componentRegistry_ = nullptr;
+    int                     fluidComponentId_ = 0;
+    int                     meshBoundaryComponentId_ = 0;
+    std::vector<int>        emitterComponentIds_;
+    std::vector<int>        outflowComponentIds_;
+    // Reconciles the mesh-boundary / emitter / outflow components against the
+    // current world state. Called after every op that adds or drops one, and
+    // after reset() (which rebuilds the fluid and drops its emitters/outflow).
+    void        syncComponents();
+    std::string describeFluid() const;
+    std::string describeMeshBoundary() const;
+    std::string describeEmitter(std::size_t index) const;
+    std::string describeOutflow(std::size_t index) const;
 
     // Sphere boundaries (addBoundarySphere()/clearBoundarySpheres() above).
     std::vector<Phantom::Physics::SphereBoundary> boundarySpheres_;

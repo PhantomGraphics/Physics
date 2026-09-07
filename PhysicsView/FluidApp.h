@@ -18,6 +18,8 @@
 #include "ControlPanelHost.h"
 #include "IEmbeddedPanel.h"
 #include "FluidStatusView.h"
+#include "SceneComponent.h"
+#include "ObjectListPanel.h"
 #include "CommandDispatcher.h"
 #include "../FluidRenderer/SSFluidRenderer.h"
 
@@ -68,6 +70,10 @@ protected:
     void onCleanup() override;
 
 private:
+    // ID-keyed list of every scene object; each world registers into it.
+    // Declared first so it outlives the worlds that hold ids into it.
+    SceneComponentRegistry sceneComponents_;
+
     // Owns both the fluid and (via world_.rigid()) the rigid-body world,
     // plus their optional coupling (see internal design notes
     // Phase 7/8).
@@ -109,6 +115,9 @@ private:
     // this host renders the selected embedded panel plus a common status area.
     ControlPanelHost         controlHost_;
     FluidStatusView          statusView_;
+
+    // Standalone "Scene Objects" window (View menu toggle).
+    ObjectListPanel          objectListPanel_;
 
     // Main menu bar, assembled once in buildMenuBar(). File / Physics / View.
     UI::MainMenuBar          menuBar_;

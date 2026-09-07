@@ -18,7 +18,51 @@ void SoftBodyWorld::setPreset(SoftBodyPreset p) {
     getWorld().clearRigidBodyColliders();
     bodyPtrs_.clear();
     ownedBodies_.clear();
+    clearComponents();
     applyPreset();
+    syncComponents();
+}
+
+void SoftBodyWorld::setComponentRegistry(SceneComponentRegistry* registry) {
+    componentRegistry_ = registry;
+    syncComponents();
+}
+
+void SoftBodyWorld::syncComponents() {
+    if (!componentRegistry_) return;
+    const std::size_t n = bodyPtrs_.size();
+    while (componentIds_.size() > n) {
+        componentRegistry_->remove(componentIds_.back());
+        componentIds_.pop_back();
+    }
+    while (componentIds_.size() < n) {
+        const std::size_t index = componentIds_.size();
+        componentIds_.push_back(componentRegistry_->add(
+            SceneComponentKind::SoftBody, "SoftBody",
+            [this, index] { return describeBody(index); }));
+    }
+}
+
+void SoftBodyWorld::clearComponents() {
+    if (componentRegistry_) {
+        for (int id : componentIds_) componentRegistry_->remove(id);
+    }
+    componentIds_.clear();
+}
+
+std::string SoftBodyWorld::describeBody(std::size_t index) const {
+    if (index >= bodyPtrs_.size() || !bodyPtrs_[index]) return "(removed)";
+    const Physics::ISoftBody* b = bodyPtrs_[index];
+
+    const char* type =
+        dynamic_cast<const Physics::JellyBody*>(b) ? "Jelly" :
+        dynamic_cast<const Physics::RopeBody*>(b)  ? "Rope"  :
+        dynamic_cast<const Physics::ClothBody*>(b) ? "Cloth" : "Soft";
+
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "%-6s %zu verts",
+        type, b->getMesh().particles.size());
+    return buf;
 }
 
 void SoftBodyWorld::step() {

@@ -4,8 +4,10 @@
 #include "Physics/Physics/RigidBodySolver.h"
 #include "Physics/Physics/PhysicsSolver.h"
 #include "Physics/Physics/ICollisionShape.h"
+#include "SceneComponent.h"
 #include <glm/glm.hpp>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace Phantom {
@@ -27,6 +29,11 @@ public:
     // solver.rigidFluidSolver() directly from FluidWorld rather than through this class -- see
     // its class doc.
     explicit RigidBodyWorld(Physics::PhysicsSolver& solver);
+
+    // Registers one SceneComponent per rigid body (including the preset floor)
+    // into the shared registry, keeping ids stable for a body's lifetime.
+    // Optional -- if never called, component tracking is simply disabled.
+    void setComponentRegistry(SceneComponentRegistry* registry);
 
     void setPreset(ScenePreset preset);
     void reset();
@@ -72,6 +79,13 @@ private:
     std::vector<std::unique_ptr<Physics::ICollisionShape>> shapes_;
 
     void buildPreset();
+
+    // Scene-object tracking (non-owning registry pointer).
+    SceneComponentRegistry* componentRegistry_ = nullptr;
+    std::vector<int>        componentIds_;
+    void        syncComponents();
+    void        clearComponents();
+    std::string describeBody(std::size_t index) const;
 
     static void emitVertex(WireData& wd, const glm::vec3& p, const glm::vec4& c);
     static void buildSphereWire(WireData& wd, const glm::vec3& center, float radius, const glm::vec4& c);

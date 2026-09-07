@@ -12,6 +12,13 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     , softWorld_(world_.physicsSolver())
     , softControlPanel_(&softWorld_)
 {
+    // Every scene object registers itself into the shared registry: the fluid
+    // + mesh boundary + emitters/outflow via FluidWorld, its rigid bodies via
+    // the forwarded RigidBodyWorld, and the soft bodies via SoftBodyWorld.
+    world_.setComponentRegistry(&sceneComponents_);
+    softWorld_.setComponentRegistry(&sceneComponents_);
+    objectListPanel_.bind(&sceneComponents_);
+
     dispatcher_.setWorld(&world_);
     dispatcher_.setOnWorldChanged([this]() {
         if (world_.getSimulationType() == FluidWorld::SimulationType::GPU_CSPH)
@@ -88,6 +95,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     // main.cpp may have cleared it for a scenario run).
     controlHost_.setLayoutFile("physicsview_control_layout.ini");
     add(&controlHost_);
+    add(&objectListPanel_);
 
     buildMenuBar();
 }
@@ -133,6 +141,12 @@ void FluidApp::buildMenuBar()
     ctrlWin.setFunction([this] { controlHost_.setVisible(!controlHost_.isVisible()); });
     ctrlWin.setSelected([this] { return controlHost_.isVisible(); });
     viewMenu_.add(&ctrlWin);
+
+    menuItems_.emplace_back("Scene Objects");
+    UI::MenuItem& objList = menuItems_.back();
+    objList.setFunction([this] { objectListPanel_.setVisible(!objectListPanel_.isVisible()); });
+    objList.setSelected([this] { return objectListPanel_.isVisible(); });
+    viewMenu_.add(&objList);
 
     menuBar_.add(&fileMenu_);
     menuBar_.add(&physicsMenu_);

@@ -16,6 +16,7 @@ void RigidBodyWorld::setPreset(ScenePreset preset) {
     physicsSolver_.rigidSolver().clear();
     bodies_.clear();
     shapes_.clear();
+    clearComponents();  // the preset's add*() calls re-register below
     preset_ = preset;
     buildPreset();
     physicsSolver_.rigidSolver().saveSnapshot();
@@ -58,6 +59,7 @@ Physics::RigidBody* RigidBodyWorld::addSphere(const Math::Vector3df& pos, float 
     // AddSphere on a Custom scene) is silently skipped by Reset() and keeps
     // whatever position the simulation carried it to (internal design notes 1.4).
     physicsSolver_.rigidSolver().saveSnapshot();
+    syncComponents();
     return ptr;
 }
 
@@ -84,6 +86,7 @@ Physics::RigidBody* RigidBodyWorld::addBox(const Math::Vector3df& pos,
     bodies_.push_back(std::move(body));
     physicsSolver_.rigidSolver().addBody(ptr);
     physicsSolver_.rigidSolver().saveSnapshot();  // see addSphere()'s comment above
+    syncComponents();
     return ptr;
 }
 
@@ -104,6 +107,54 @@ void RigidBodyWorld::addFloor(float y) {
     bodies_.push_back(std::move(body));
     physicsSolver_.rigidSolver().addBody(ptr);
     physicsSolver_.rigidSolver().saveSnapshot();  // see addSphere()'s comment above
+    syncComponents();
+}
+
+void RigidBodyWorld::setComponentRegistry(SceneComponentRegistry* registry) {
+    componentRegistry_ = registry;
+    syncComponents();  // pick up whatever the ctor's preset already built
+}
+
+void RigidBodyWorld::syncComponents() {
+    if (!componentRegistry_) return;
+    const std::size_t n = getWorld().getBodies().size();
+    while (componentIds_.size() > n) {
+        componentRegistry_->remove(componentIds_.back());
+        componentIds_.pop_back();
+    }
+    while (componentIds_.size() < n) {
+        const std::size_t index = componentIds_.size();
+        componentIds_.push_back(componentRegistry_->add(
+            SceneComponentKind::RigidBody, "RigidBody",
+            [this, index] { return describeBody(index); }));
+    }
+}
+
+void RigidBodyWorld::clearComponents() {
+    if (componentRegistry_) {
+        for (int id : componentIds_) componentRegistry_->remove(id);
+    }
+    componentIds_.clear();
+}
+
+std::string RigidBodyWorld::describeBody(std::size_t index) const {
+    const auto& bodies = getWorld().getBodies();
+    if (index >= bodies.size()) return "(removed)";
+    const Physics::RigidBody* b = bodies[index];
+
+    const char* shape = "?";
+    if (b->shape) {
+        switch (b->shape->getType()) {
+        case Physics::ShapeType::Sphere: shape = "Sphere"; break;
+        case Physics::ShapeType::Box:    shape = "Box";    break;
+        case Physics::ShapeType::Plane:  shape = "Plane";  break;
+        case Physics::ShapeType::Mesh:   shape = "Mesh";   break;
+        }
+    }
+    char buf[96];
+    std::snprintf(buf, sizeof(buf), "%-6s pos (%.2f, %.2f, %.2f)",
+        shape, b->position.x, b->position.y, b->position.z);
+    return buf;
 }
 
 void RigidBodyWorld::buildPreset() {

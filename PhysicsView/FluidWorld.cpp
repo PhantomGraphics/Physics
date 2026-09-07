@@ -72,6 +72,11 @@ void FluidWorld::reset()
     // Wall damping is solver state like the boundaries above, so the fresh
     // solver needs it too (no-op for solvers that don't implement it).
     if (fluidSolver_) fluidSolver_->setBoundaryDampingRatio(params_.boundaryDampingRatio);
+
+    // clear() dropped the old fluid and with it its emitters / outflow
+    // regions; the mesh boundary was re-registered above. Reconcile the
+    // scene-object list to match.
+    syncComponents();
 }
 
 void FluidWorld::addEmitter(const Physics::Emitter& e)
@@ -96,6 +101,7 @@ void FluidWorld::addEmitter(const Physics::Emitter& e)
     case SimulationType::WCSPH:    if (csphFluid_)  csphFluid_->addEmitter(sceneScaled);  break;
     case SimulationType::GPU_CSPH: break;
     }
+    syncComponents();
 }
 
 void FluidWorld::clearEmitters()
@@ -106,6 +112,7 @@ void FluidWorld::clearEmitters()
     case SimulationType::WCSPH:    if (csphFluid_)  csphFluid_->clearEmitters();  break;
     case SimulationType::GPU_CSPH: break;
     }
+    syncComponents();
 }
 
 const std::vector<Physics::Emitter>& FluidWorld::getEmitters() const
@@ -138,6 +145,7 @@ void FluidWorld::addOutflowRegion(const Physics::OutflowRegion& r)
     case SimulationType::WCSPH:    if (csphFluid_)  csphFluid_->addOutflowRegion(r);  break;
     case SimulationType::GPU_CSPH: break;
     }
+    syncComponents();
 }
 
 void FluidWorld::clearOutflowRegions()
@@ -148,6 +156,7 @@ void FluidWorld::clearOutflowRegions()
     case SimulationType::WCSPH:    if (csphFluid_)  csphFluid_->clearOutflowRegions();  break;
     case SimulationType::GPU_CSPH: break;
     }
+    syncComponents();
 }
 
 const std::vector<Physics::OutflowRegion>& FluidWorld::getOutflowRegions() const
@@ -477,6 +486,7 @@ bool FluidWorld::loadMeshBoundary(const std::filesystem::path& stlPath, float vo
     meshBoundary_.syncKinematic(Vector3df(0.f, 0.f, 0.f), Quaternion(1.f, 0.f, 0.f, 0.f));
 
     reregisterMeshBoundary();
+    syncComponents();
     return true;
 }
 
@@ -488,12 +498,98 @@ void FluidWorld::clearMeshBoundary()
     // so the still-registered meshBoundary_ pointer stays harmless.
     meshBoundary_.setShape(nullptr);
     meshBoundaryShape_.reset();
+    syncComponents();
 }
 
 void FluidWorld::reregisterMeshBoundary()
 {
     if (!meshBoundaryShape_) return;
     if (fluidSolver_) fluidSolver_->addRigidBoundary(&meshBoundary_);
+}
+
+void FluidWorld::setComponentRegistry(SceneComponentRegistry* registry)
+{
+    componentRegistry_ = registry;
+    if (componentRegistry_ && fluidComponentId_ == 0) {
+        fluidComponentId_ = componentRegistry_->add(
+            SceneComponentKind::Fluid, "Fluid", [this] { return describeFluid(); });
+    }
+    rigid_.setComponentRegistry(registry);
+    syncComponents();
+}
+
+void FluidWorld::syncComponents()
+{
+    if (!componentRegistry_) return;
+
+    const bool wantBoundary = hasMeshBoundary();
+    if (wantBoundary && meshBoundaryComponentId_ == 0) {
+        meshBoundaryComponentId_ = componentRegistry_->add(
+            SceneComponentKind::MeshBoundary, "MeshBoundary",
+            [this] { return describeMeshBoundary(); });
+    } else if (!wantBoundary && meshBoundaryComponentId_ != 0) {
+        componentRegistry_->remove(meshBoundaryComponentId_);
+        meshBoundaryComponentId_ = 0;
+    }
+
+    auto reconcile = [this](std::vector<int>& ids, std::size_t want,
+                            SceneComponentKind kind, const char* label,
+                            std::string (FluidWorld::*describe)(std::size_t) const) {
+        while (ids.size() > want) {
+            componentRegistry_->remove(ids.back());
+            ids.pop_back();
+        }
+        while (ids.size() < want) {
+            const std::size_t index = ids.size();
+            ids.push_back(componentRegistry_->add(kind, label,
+                [this, index, describe] { return (this->*describe)(index); }));
+        }
+    };
+    reconcile(emitterComponentIds_, getEmitters().size(),
+              SceneComponentKind::Emitter, "Emitter", &FluidWorld::describeEmitter);
+    reconcile(outflowComponentIds_, getOutflowRegions().size(),
+              SceneComponentKind::OutflowRegion, "Outflow Region", &FluidWorld::describeOutflow);
+}
+
+std::string FluidWorld::describeFluid() const
+{
+    static const char* const kMethod[] = { "DFSPH", "PBSPH", "WCSPH", "GPU CSPH" };
+    const int mi = static_cast<int>(type_);
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "%-8s %llu particles",
+        (mi >= 0 && mi < 4) ? kMethod[mi] : "?",
+        static_cast<unsigned long long>(getParticleCount()));
+    return buf;
+}
+
+std::string FluidWorld::describeMeshBoundary() const
+{
+    char buf[48];
+    std::snprintf(buf, sizeof(buf), "%llu triangles",
+        static_cast<unsigned long long>(getMeshBoundaryTriangleCount()));
+    return buf;
+}
+
+std::string FluidWorld::describeEmitter(std::size_t index) const
+{
+    const auto& e = getEmitters();
+    if (index >= e.size()) return "(removed)";
+    char buf[96];
+    std::snprintf(buf, sizeof(buf), "center (%.2f, %.2f, %.2f)  rate %.1f/s",
+        e[index].center.x, e[index].center.y, e[index].center.z, e[index].rate);
+    return buf;
+}
+
+std::string FluidWorld::describeOutflow(std::size_t index) const
+{
+    const auto& r = getOutflowRegions();
+    if (index >= r.size()) return "(removed)";
+    const auto mn = r[index].bounds.getMin();
+    const auto mx = r[index].bounds.getMax();
+    char buf[128];
+    std::snprintf(buf, sizeof(buf), "min (%.1f, %.1f, %.1f)  max (%.1f, %.1f, %.1f)",
+        mn.x, mn.y, mn.z, mx.x, mx.y, mx.z);
+    return buf;
 }
 
 void FluidWorld::addBoundarySphere(const SphereBoundary& s)

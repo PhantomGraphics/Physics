@@ -214,6 +214,8 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/FluidMeshRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidVolumeConvertPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/ControlPanelHost.cpp
+    ${PHYSICS_ROOT}/PhysicsView/SceneComponentRegistry.cpp
+    ${PHYSICS_ROOT}/PhysicsView/ObjectListPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/CommandDispatcher.cpp
     ${PHYSICS_ROOT}/PhysicsView/SSFRTestPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/RigidBodyWorld.cpp
