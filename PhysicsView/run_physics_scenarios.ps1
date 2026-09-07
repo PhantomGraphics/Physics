@@ -1,6 +1,6 @@
 # run_physics_scenarios.ps1 - Run PhysicsView scenario tests
 # Usage: .\Physics\PhysicsView\run_physics_scenarios.ps1 [-Configuration Debug|Release] [-Filter <wildcard>]
-#                                                          [-Tag <name>...] [-ExcludeTag <name>...] [-List] [-FailFast]
+#                                                          [-Tag <name>...] [-ExcludeTag <name>...] [-List] [-FailFast] [-TimeoutSeconds 120]
 # Run from the repository root or the Physics\PhysicsView directory.
 #
 # Renamed from run_fluid_scenarios.ps1 (2026-08) -- the scenario suite has covered
@@ -21,18 +21,20 @@ param(
     [string[]]$Tag = @(),
     [string[]]$ExcludeTag = @("known-fail"),
     [switch]$List,
-    [switch]$FailFast
+    [switch]$FailFast,
+    [ValidateRange(1, 2147483)]
+    [int]$TimeoutSeconds = 120
 )
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot  = $scriptDir
-while ($repoRoot -and -not (Test-Path (Join-Path $repoRoot "Phantom2026.sln"))) {
+while ($repoRoot -and -not (Test-Path (Join-Path $repoRoot "CMakePresets.json"))) {
     $parent = Split-Path -Parent $repoRoot
     if ($parent -eq $repoRoot) { $repoRoot = $null; break }
     $repoRoot = $parent
 }
 if (-not $repoRoot) {
-    Write-Host "ERROR: Could not locate repository root (Phantom2026.sln)"
+    Write-Host "ERROR: Could not locate CMake repository root (CMakePresets.json)"
     exit 1
 }
 $preset  = "windows-$($Configuration.ToLower())"
@@ -55,7 +57,7 @@ if ($allFiles.Count -eq 0) {
 # JSON or a missing/absent "tags" field both just mean "no tags".
 function Get-ScenarioTags([string]$path) {
     try {
-        $json = Get-Content -Raw -Path $path | ConvertFrom-Json -ErrorAction Stop
+        $json = Get-Content -Raw -Encoding UTF8 -Path $path | ConvertFrom-Json -ErrorAction Stop
         if ($json.PSObject.Properties.Name -contains "tags") {
             return @($json.tags)
         }
@@ -107,15 +109,29 @@ foreach ($s in $scenarios) {
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     $proc = Start-Process -FilePath $exe `
         -ArgumentList "--run-scenario `"$($s.File.FullName)`"" `
-        -PassThru -Wait -WorkingDirectory $scriptDir
+        -PassThru -WindowStyle Hidden -WorkingDirectory $scriptDir -ErrorAction Stop
+    $timedOut = $false
+    try {
+        # Retain the process handle so ExitCode remains available after exit.
+        $null = $proc.Handle
+        if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
+            $timedOut = $true
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            $null = $proc.WaitForExit(5000)
+        }
+        $exitCode = if ($timedOut) { -1 } else { $proc.ExitCode }
+    } finally {
+        $proc.Dispose()
+    }
     $sw.Stop()
     $elapsed = "{0:N1}s" -f $sw.Elapsed.TotalSeconds
 
-    if ($proc.ExitCode -eq 0) {
+    if (-not $timedOut -and $exitCode -eq 0) {
         Write-Host "  PASSED: $($s.File.BaseName) ($elapsed)"
         $passed++
     } else {
-        Write-Host "  FAILED: $($s.File.BaseName) (exit $($proc.ExitCode), $elapsed)"
+        if ($timedOut) { Write-Host "  TIMEOUT: $($s.File.BaseName) (limit ${TimeoutSeconds}s, $elapsed)" }
+        else { Write-Host "  FAILED: $($s.File.BaseName) (exit $exitCode, $elapsed)" }
         $failed++
         $failedNames += $s.File.BaseName
         if ($FailFast) { break }

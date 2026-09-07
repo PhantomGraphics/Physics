@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 
 #include "DFSPHSolver.h"
 #include "DFSPHParticle.h"
@@ -388,6 +388,8 @@ void DFSPHSolver::addBoundaryDensity(std::vector<DFSPHParticle>& particles)
 		// searchRadius comment -- must track setEffectLength(), not an
 		// independently hardcoded ratio of particle radius).
 		const float r = kernel->getEffectLength();
+		float boundaryDensity = 0.0f;
+		Vector3df boundaryGradient(0.0f);
 
 		// Each shape contributes independently when the particle has already
 		// penetrated past it (dist > 0, within influence radius r). Near a box
@@ -404,7 +406,7 @@ void DFSPHSolver::addBoundaryDensity(std::vector<DFSPHParticle>& particles)
 			const float weight = sample.densityWeight;
 			if (weight <= 0.0f) return;
 			const float contribution = restDensity * weight * (1.0f - dist / r) * kernel->getCubicSpline(dist);
-			p.addDensity(contribution);
+			boundaryDensity += contribution;
 
 			// DFSPH's constraint numerator (density) and denominator (alpha)
 			// must be extended together. The projection direction is the shortest
@@ -413,8 +415,7 @@ void DFSPHSolver::addBoundaryDensity(std::vector<DFSPHParticle>& particles)
 			const float correctionLength = glm::length(correction);
 			if (correctionLength > 1.0e-8f) {
 				const auto direction = correction / correctionLength;
-				p.addBoundaryAlphaGradient(
-					kernel->getCubicSplineGradient(direction * dist) * restDensity * weight);
+				boundaryGradient += kernel->getCubicSplineGradient(direction * dist) * restDensity * weight;
 			}
 		};
 		for (const auto& plane : boundaryPlanes_) if (plane) addShapeConstraint(*plane);
@@ -422,6 +423,19 @@ void DFSPHSolver::addBoundaryDensity(std::vector<DFSPHParticle>& particles)
 		for (const auto& plate : boundaryPlates_) if (plate) addShapeConstraint(*plate);
 		for (const auto& cylinder : boundaryCylinders_) if (cylinder) addShapeConstraint(*cylinder);
 		for (const auto& shape : boundaryShapes_) if (shape) addShapeConstraint(*shape);
+
+		// Analytic walls replace missing fluid, as in WCSPHSolver. They must
+		// not add compression to an already full neighborhood: crossing a
+		// wall by an arbitrarily small distance otherwise adds almost W(0)
+		// instantly and launches resting particles, collapsing the CFL step.
+		// Clamp the combined contribution so corners share one density budget,
+		// and scale its matching alpha gradient by the same fraction.
+		const float headroom = std::max(restDensity - p.getDensity(), 0.0f);
+		if (boundaryDensity > 0.0f && headroom > 0.0f) {
+			const float addedDensity = std::min(boundaryDensity, headroom);
+			p.addDensity(addedDensity);
+			p.addBoundaryAlphaGradient(boundaryGradient * (addedDensity / boundaryDensity));
+		}
 	}
 }
 

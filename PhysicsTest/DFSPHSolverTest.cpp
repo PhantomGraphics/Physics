@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 
 #include "../Physics/DFSPHFluid.h"
 #include "../Physics/DFSPHParticle.h"
@@ -866,4 +866,58 @@ TEST(DFSPHSolverTest, RejectsFluidsWithMismatchedKernelConfiguration)
   EXPECT_FALSE(solver.getLastSolveStats().validConfiguration);
   EXPECT_FLOAT_EQ(a.getParticles().positions[0].y, 0.0f);
   EXPECT_FLOAT_EQ(b.getParticles().positions[0].y, 0.0f);
+}
+
+// Reduced version of PhysicsView's default block touching the container floor.
+// Unbounded wall density used to launch particles at 669 units/s on frame one,
+// forcing subsequent frames into thousands of adaptive substeps.
+TEST(DFSPHSolverTest, RestingBlockAtContainerCornerRemainsBounded)
+{
+  DFSPHFluid fluid;
+  fluid.setEffectLength(2.25f);
+  fluid.viscosityCoe = 5.0f;
+  fluid.pressureCoe = WCSPHFluid::estimatePressureCoe(2.25f, 1960.0f);
+  fluid.density = DFSPHSolver::calculateRestDensity(2.25f, 1.0f, 8.0f, &fluid);
+  for (int z = 0; z <= 4; z += 2)
+    for (int y = 0; y <= 4; y += 2)
+      for (int x = 0; x <= 4; x += 2)
+        fluid.createParticle(Vector3df(float(x), float(y), float(z)), 1.0f, 8.0f);
+  DFSPHSolver solver;
+  solver.add(&fluid);
+  solver.setTimeStep(0.01f);
+  solver.setExternalForce(Vector3df(0.0f, -9.8f, 0.0f));
+  solver.setBoundary(Box3df(Vector3df(0.0f), Vector3df(100.0f)), 0.01f);
+  for (int frame = 0; frame < 5; ++frame) {
+    solver.simulate(0.01f, 3);
+    const auto stats = solver.getLastSolveStats();
+    EXPECT_NEAR(stats.advancedTime, 0.01f, 1.0e-6f);
+    ASSERT_LT(stats.substeps, 100);
+    for (const auto& velocity : fluid.getParticles().velocities) {
+      ASSERT_TRUE(isFinite3(velocity));
+      ASSERT_LT(glm::length(velocity), 10.0f);
+    }
+  }
+}
+
+TEST(DFSPHSolverTest, OverlappingAnalyticWallsOnlyFillMissingDensity)
+{
+  // Three overlapping walls must share the deficit. Existing fluid-only
+  // compression must survive the clamp rather than being erased with it.
+  for (const float mass : {0.1f, 10.0f}) {
+    SCOPED_TRACE(mass);
+    DFSPHFluid fluid;
+    fluid.setEffectLength(1.0f);
+    fluid.density = 1.0f;
+    fluid.viscosityCoe = 0.0f;
+    fluid.pressureCoe = 0.0f;
+    fluid.setStatic(true);
+    fluid.createParticle(Vector3df(-0.1f), 0.1f, mass);
+    const float fluidDensity = fluid.getKernel()->getCubicSpline(0.0f) * mass;
+    DFSPHSolver solver;
+    solver.add(&fluid);
+    solver.setTimeStep(0.01f);
+    solver.setBoundary(Box3df(Vector3df(0.0f), Vector3df(10.0f)), 0.01f);
+    solver.simulate(0.01f, 3);
+    EXPECT_NEAR(fluid.getParticles().densities[0], std::max(fluidDensity, fluid.density), 1.0e-5f);
+  }
 }
