@@ -77,11 +77,63 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     // IVkUIPanel added here. This also prevents the double-draw described in
     // GUI_RESTRUCTURING_PLAN.md section 11.
     registerControlPages();
-    controlHost_.setStatusDrawer([this]() { drawStatusArea(); });
+    statusView_.bind(&world_, &softWorld_, &runner_);
+    controlHost_.setStatusView(&statusView_);
     // Remembers the last active page + window-visible flag across runs (the
-    // window geometry and section fold state are handled by imgui.ini).
+    // window geometry and section fold state are handled by imgui.ini). The
+    // layout file is loaded once in controlHost_.init() (from onInit(), after
+    // main.cpp may have cleared it for a scenario run).
     controlHost_.setLayoutFile("physicsview_control_layout.ini");
     add(&controlHost_);
+
+    buildMenuBar();
+}
+
+void FluidApp::buildMenuBar()
+{
+    menuItems_.emplace_back("Quit");
+    UI::MenuItem& quit = menuItems_.back();
+    quit.setFunction([this] {
+        glfwSetWindowShouldClose(getWindow().get(), GLFW_TRUE);
+    });
+    fileMenu_.add(&quit);
+
+    // One entry per ControlPage: selecting it makes that page active in the
+    // shared Control window and shows the window if it was hidden. The order
+    // matches the ControlPage enum; SSFRTest sits last, after a separator, so
+    // it reads as test-only (GUI_RESTRUCTURING_PLAN.md 5.4/6.8).
+    for (int i = 0; i < static_cast<int>(kControlPageCount); ++i) {
+        const auto page = static_cast<ControlPage>(i);
+        if (page == ControlPage::SSFRTest)
+            physicsMenu_.add(&physicsMenuSeparator_);
+
+        menuItems_.emplace_back(toString(page));
+        UI::MenuItem& item = menuItems_.back();
+        item.setFunction([this, page] {
+            controlHost_.setPage(page);
+            controlHost_.setVisible(true);
+        });
+        item.setSelected([this, page] {
+            return controlHost_.getPage() == page && controlHost_.isVisible();
+        });
+        item.setEnabled([this, page] { return controlHost_.isPageEnabled(page); });
+        item.setTooltip([this, page]() -> std::string {
+            return controlHost_.isPageEnabled(page)
+                ? std::string{}
+                : controlHost_.pageDisabledReason(page);
+        });
+        physicsMenu_.add(&item);
+    }
+
+    menuItems_.emplace_back("Control Window");
+    UI::MenuItem& ctrlWin = menuItems_.back();
+    ctrlWin.setFunction([this] { controlHost_.setVisible(!controlHost_.isVisible()); });
+    ctrlWin.setSelected([this] { return controlHost_.isVisible(); });
+    viewMenu_.add(&ctrlWin);
+
+    menuBar_.add(&fileMenu_);
+    menuBar_.add(&physicsMenu_);
+    menuBar_.add(&viewMenu_);
 }
 
 void FluidApp::registerControlPages()
@@ -167,6 +219,12 @@ void FluidApp::onInit()
     setupCallbacks();
     syncRigidRenderer();
     syncSoftRenderer();
+
+    // Load the Control-window layout (page + visible flag) and assemble its
+    // widget tree now -- after main.cpp had its chance to clear the layout file
+    // for a non-interactive scenario run (docs/todo/PLAN_physicsview_declarative_ui.md
+    // Phase 2: load at init, save on change).
+    controlHost_.init();
 
     // Load environment map after Vulkan is initialized
     static const std::array<std::string, 6> kFaceNames = {
@@ -312,61 +370,12 @@ void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
     ssfrRenderer_.onPreRender(cmd, frameIndex);
 }
 
-void FluidApp::drawPhysicsMenu()
-{
-    // One entry per ControlPage: selecting it makes that page active in the
-    // shared Control window and shows the window if it was hidden. The order
-    // matches the ControlPage enum; SSFRTest sits last, after a separator, so
-    // it reads as test-only (GUI_RESTRUCTURING_PLAN.md 5.4/6.8).
-    auto pageItem = [this](ControlPage page) {
-        const bool selected = (controlHost_.getPage() == page) && controlHost_.isVisible();
-        const bool enabled  = controlHost_.isPageEnabled(page);
-        if (UI::Immediate::menuItem(toString(page), selected, enabled)) {
-            controlHost_.setPage(page);
-            controlHost_.setVisible(true);
-        }
-        if (!enabled) {
-            const std::string& reason = controlHost_.pageDisabledReason(page);
-            if (!reason.empty())
-                UI::Immediate::tooltipOnHover(reason.c_str());
-        }
-    };
-
-    if (UI::Immediate::beginMenu("Physics")) {
-        pageItem(ControlPage::Fluid);
-        pageItem(ControlPage::RigidBody);
-        pageItem(ControlPage::SoftBody);
-        pageItem(ControlPage::FluidRendering);
-        pageItem(ControlPage::SSFR);
-        pageItem(ControlPage::VolumeConversion);
-        pageItem(ControlPage::ScenarioBrowser);
-        UI::Immediate::separator();
-        pageItem(ControlPage::SSFRTest);
-        UI::Immediate::endMenu();
-    }
-}
-
 void FluidApp::onImGui()
 {
-    if (UI::Immediate::beginMainMenuBar()) {
-        if (UI::Immediate::beginMenu("File")) {
-            if (UI::Immediate::menuItem("Quit")) {
-                glfwSetWindowShouldClose(getWindow().get(), GLFW_TRUE);
-            }
-            UI::Immediate::endMenu();
-        }
-
-        drawPhysicsMenu();
-
-        if (UI::Immediate::beginMenu("View")) {
-            if (UI::Immediate::menuItem("Control Window", controlHost_.isVisible()))
-                controlHost_.setVisible(!controlHost_.isVisible());
-            UI::Immediate::endMenu();
-        }
-
-        UI::Immediate::endMainMenuBar();
-    }
-
+    // Menu bar (File / Physics / View) is a widget tree assembled once in
+    // buildMenuBar(); the common status area is FluidStatusView, embedded into
+    // controlHost_. Nothing here re-assembles UI per frame.
+    menuBar_.show();
     ::VKG::VkAppBase::onImGui();
 }
 
@@ -376,46 +385,6 @@ void FluidApp::onCleanup()
     // the VulkanContext -- see FluidWorld::releaseGpuResources()'s doc comment.
     world_.releaseGpuResources();
     ::VKG::VkAppBase::onCleanup();
-}
-
-void FluidApp::drawStatusArea()
-{
-    // Common status shown above every Control page (GUI_RESTRUCTURING_PLAN.md
-    // section 7) so simulation state stays visible regardless of which page is
-    // open.
-    static const char* kMethodNames[] = { "DFSPH", "PBSPH", "WCSPH", "GPU CSPH" };
-    const int mi = static_cast<int>(world_.getSimulationType());
-    const char* method = (mi >= 0 && mi < 4) ? kMethodNames[mi] : "?";
-
-    auto runState = [](bool running) { return running ? "Running" : "Paused"; };
-
-    UI::Immediate::text("%s  |  Fluid: %s  |  Rigid: %s  |  Soft: %s",
-                        method,
-                        runState(world_.isRunning()),
-                        runState(world_.rigid().isRunning()),
-                        runState(softWorld_.isRunning()));
-
-    UI::Immediate::text("Particles: %llu   (spray %llu, foam %llu)",
-                        static_cast<unsigned long long>(world_.getParticleCount()),
-                        static_cast<unsigned long long>(world_.getSprayPositions().size()),
-                        static_cast<unsigned long long>(world_.getFoamPositions().size()));
-
-    {
-        const char* rigidCoupling = !world_.isCouplingEnabled()
-            ? "off"
-            : (world_.activeCouplingMode() == Phantom::Physics::CouplingMode::TwoWay
-                   ? "Two-Way" : "One-Way");
-        const char* softCoupling = world_.isSoftCouplingEnabled() ? "on" : "off";
-        UI::Immediate::text("Coupling  Rigid-Fluid: %s   Soft-Fluid: %s",
-                            rigidCoupling, softCoupling);
-    }
-
-    if (runner_.isActive()) {
-        UI::Immediate::text("Scenario: running (%llu steps)",
-                            static_cast<unsigned long long>(runner_.stepCount()));
-    } else if (runner_.hasFailed()) {
-        UI::Immediate::textWrapped("Scenario FAILED: %s", runner_.failMessage().c_str());
-    }
 }
 
 void FluidApp::setupCallbacks()

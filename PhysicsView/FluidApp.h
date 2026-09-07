@@ -17,8 +17,14 @@
 #include "FluidVolumeConvertPanel.h"
 #include "ControlPanelHost.h"
 #include "IEmbeddedPanel.h"
+#include "FluidStatusView.h"
 #include "CommandDispatcher.h"
 #include "../FluidRenderer/SSFluidRenderer.h"
+
+#include "../../CGLib/UIWidgets/MainMenuBar.h"
+#include "../../CGLib/UIWidgets/Menu.h"
+#include "../../CGLib/UIWidgets/MenuItem.h"
+#include "../../CGLib/UIWidgets/Separator.h"
 
 #include "RigidBodyWireRenderer.h"
 #include "RigidBodyControlPanel.h"
@@ -28,6 +34,7 @@
 #include "SoftBodyControlPanel.h"
 
 #include <filesystem>
+#include <list>
 #include <optional>
 
 namespace Phantom {
@@ -101,6 +108,18 @@ private:
     // The single shared "Control" window: the Physics menu picks its page,
     // this host renders the selected embedded panel plus a common status area.
     ControlPanelHost         controlHost_;
+    FluidStatusView          statusView_;
+
+    // Main menu bar, assembled once in buildMenuBar(). File / Physics / View.
+    UI::MainMenuBar          menuBar_;
+    UI::Menu                 fileMenu_    {"File"};
+    UI::Menu                 physicsMenu_ {"Physics"};
+    UI::Menu                 viewMenu_    {"View"};
+    UI::Separator            physicsMenuSeparator_;
+    // Quit + one item per ControlPage + "Control Window" -- non-copyable
+    // widgets, so held in a node-stable list rather than an array.
+    std::list<UI::MenuItem>  menuItems_;
+
     bool exitOnComplete_ = true;
     int  exitCode_       = 0;
 
@@ -109,8 +128,7 @@ private:
 
     void setupCallbacks();
     void registerControlPages();
-    void drawStatusArea();
-    void drawPhysicsMenu();
+    void buildMenuBar();
     void syncParticlesToRenderer();
     void syncGpuCsphBufferToRenderer();
     void syncRigidRenderer();

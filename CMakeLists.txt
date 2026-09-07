@@ -206,6 +206,7 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/FluidWorld.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidPLYWriter.cpp
     ${PHYSICS_ROOT}/PhysicsView/ControlPanel.cpp
+    ${PHYSICS_ROOT}/PhysicsView/FluidStatusView.cpp
     ${PHYSICS_ROOT}/PhysicsView/SSFRPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidVolumeConverter.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidMeshConverter.cpp

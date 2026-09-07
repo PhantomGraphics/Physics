@@ -6,6 +6,24 @@
 
 namespace Phantom {
 
+ControlPanelHost::ControlPanelHost() = default;
+
+ControlPanelHost::PageBodyView::PageBodyView() : UI::IWindow("PageBody")
+{
+    idScope_.add(&panelDraw_);
+}
+
+void ControlPanelHost::PageBodyView::onShow()
+{
+    if (!host_) return;
+    const auto& slot = host_->activeSlot();
+    if (!slot.enabled || !slot.panel) return;  // notices are separate Labels
+
+    panelDraw_.panel = slot.panel;
+    idScope_.setId(toString(host_->getPage()));
+    idScope_.show();
+}
+
 void ControlPanelHost::loadLayout()
 {
     layoutLoaded_ = true;
@@ -36,6 +54,11 @@ void ControlPanelHost::saveLayout() const
     if (!f) return;
     f << "page " << static_cast<int>(activePage_) << '\n'
       << "visible " << (visible_ ? 1 : 0) << '\n';
+}
+
+std::string ControlPanelHost::pageHeaderText() const
+{
+    return std::string("Page: ") + toString(activePage_);
 }
 
 void ControlPanelHost::registerPage(ControlPage page, IEmbeddedPanel* panel)
@@ -77,46 +100,47 @@ const std::string& ControlPanelHost::pageDisabledReason(ControlPage page) const
     return pages_[static_cast<std::size_t>(page)].disabledReason;
 }
 
-void ControlPanelHost::onImGui()
+void ControlPanelHost::init()
 {
     if (!layoutLoaded_) loadLayout();
+    if (uiBuilt_) return;
+    uiBuilt_ = true;
+
+    window_.setOpenFlag(&visible_);
+    window_.setInitialPosition(10.f, 35.f);
+    window_.setInitialSize(430.f, 640.f);
+
+    pageBodyView_.setHost(this);
+
+    statusSeparator_.setVisibleWhen([this] { return statusView_ != nullptr; });
+    unavailableLabel_.setVisibleWhen([this] { return !activeSlot().enabled; });
+    unavailableReasonLabel_.setVisibleWhen([this] {
+        return !activeSlot().enabled && !activeSlot().disabledReason.empty();
+    });
+    noPanelLabel_.setVisibleWhen([this] {
+        return activeSlot().enabled && activeSlot().panel == nullptr;
+    });
+
+    if (statusView_) window_.add(statusView_);
+    window_.add(&statusSeparator_);
+    window_.add(&pageHeaderLabel_);
+    window_.add(&headerSeparator_);
+    window_.add(&unavailableLabel_);
+    window_.add(&unavailableReasonLabel_);
+    window_.add(&noPanelLabel_);
+    window_.add(&pageBodyView_);
+}
+
+void ControlPanelHost::onImGui()
+{
+    if (!uiBuilt_) init();
 
     if (!visible_) {
         if (lastSavedVisible_) { saveLayout(); lastSavedVisible_ = false; }
         return;
     }
 
-    UI::Immediate::setNextWindowPosition(10.f, 35.f);
-    UI::Immediate::setNextWindowSize(430.f, 640.f);
-    if (!UI::Immediate::beginWindow("Control", &visible_)) {
-        UI::Immediate::endWindow();
-        return;
-    }
-
-    if (statusDrawer_) {
-        statusDrawer_();
-        UI::Immediate::separator();
-    }
-
-    const auto& slot = pages_[static_cast<std::size_t>(activePage_)];
-    UI::Immediate::text("Page: %s", toString(activePage_));
-    UI::Immediate::separator();
-
-    if (!slot.enabled) {
-        UI::Immediate::textWrapped("\"%s\" is not available with the current setup.",
-                                   toString(activePage_));
-        if (!slot.disabledReason.empty())
-            UI::Immediate::textWrapped("%s", slot.disabledReason.c_str());
-    } else if (!slot.panel) {
-        UI::Immediate::textWrapped("\"%s\" has no panel registered.",
-                                   toString(activePage_));
-    } else {
-        UI::Immediate::pushId(toString(activePage_));
-        slot.panel->drawContents();
-        UI::Immediate::popId();
-    }
-
-    UI::Immediate::endWindow();
+    window_.show();
 
     if (activePage_ != lastSavedPage_ || visible_ != lastSavedVisible_) {
         saveLayout();
