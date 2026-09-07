@@ -43,6 +43,5 @@ void main() {
     else if (hasEnvMap != 0) c = texture(uEnvMap, normalize(mat3(invViewRot) * rd)).rgb;
     else if (hasScene != 0) c = texture(uSceneColor, vUV).rgb;
     else c = tint.rgb * (1.0 - d * 0.2);
-    c *= exp(-max(vec3(0.0), vec3(1.0) - absorptionColor.rgb) * max(t, 0.0));
     outColor = vec4(c, 1.0);
 }
