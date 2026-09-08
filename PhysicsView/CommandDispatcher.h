@@ -15,6 +15,7 @@ namespace Phantom {
     class VolumeRenderer;
     class FluidMeshRenderer;
     class RenderBackground;
+    class GltfBodyRenderer;
 
     // Single IScenarioDispatcher for FluidApp, covering the fluid world,
     // (since the RigidBodyView -> FluidView merge) the rigid-body scene, and
@@ -130,6 +131,10 @@ namespace Phantom {
         // "Error:render background not available".
         void setRenderBackground(RenderBackground* b) { renderBg_ = b; }
 
+        // Rigid-body PBR pass (Phase 2). SetRigidRenderMode:{wire|shaded|both} /
+        // GetRigidRenderMode. Unset makes them "Error:rigid body renderer not available".
+        void setRigidBodyRenderer(GltfBodyRenderer* r) { rigidBodyRenderer_ = r; }
+
         // Called after Reset or Step so the app can sync GPU buffers.
         void setOnWorldChanged(std::function<void()> cb) { onWorldChanged_ = std::move(cb); }
         void setOnRigidWorldChanged(std::function<void()> cb) { rigidDispatcher_.setOnWorldChanged(std::move(cb)); }
@@ -178,6 +183,7 @@ namespace Phantom {
         VolumeRenderer* volumeRenderer_ = nullptr;
         FluidMeshRenderer* meshRenderer_ = nullptr;
         RenderBackground* renderBg_ = nullptr;
+        GltfBodyRenderer* rigidBodyRenderer_ = nullptr;
         std::function<void()> onWorldChanged_;
         std::function<void()> onVolumeChanged_;
         std::function<void()> onMeshChanged_;

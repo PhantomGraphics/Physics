@@ -2,6 +2,7 @@
 #include "RenderingPanel.h"
 
 #include "RenderBackground.h"
+#include "GltfBodyRenderer.h"
 
 namespace Phantom {
 
@@ -21,6 +22,11 @@ std::string RenderingPanel::environmentStatusText() const {
     if (!bg_) return {};
     return bg_->hasEnvironment() ? ("env: " + bg_->environmentDir())
                                  : std::string("env: (default)");
+}
+
+std::string RenderingPanel::rigidStatusText() const {
+    if (!rigidBody_) return {};
+    return "shaded instances: " + std::to_string(rigidBody_->instanceCount());
 }
 
 void RenderingPanel::buildUi() {
@@ -51,6 +57,17 @@ void RenderingPanel::buildUi() {
     lightInt_.bind([this] { return bg_ ? bg_->lightIntensity() : 3.f; },
                    [](float) {}); // pushed with dir/color in drawContents()
 
+    rigidModeCombo_.addItem("Wireframe");
+    rigidModeCombo_.addItem("Shaded");
+    rigidModeCombo_.addItem("Both");
+    rigidModeCombo_.bind(
+        [this] { return rigidBody_ ? static_cast<int>(rigidBody_->mode()) : 0; },
+        [this](int v) {
+            if (rigidBody_) rigidBody_->setMode(static_cast<GltfBodyRenderer::Mode>(v));
+        });
+    rigidModeCombo_.setVisibleWhen([this] { return rigidBody_ != nullptr; });
+    rigidStatus_.setVisibleWhen([this] { return rigidBody_ != nullptr; });
+
     contents_.add(&bgHeader_);
     contents_.add(&bgPathInput_);
     contents_.add(&loadBtn_);
@@ -73,6 +90,10 @@ void RenderingPanel::buildUi() {
     contents_.add(&lightDir_);
     contents_.add(&lightColor_);
     contents_.add(&lightInt_);
+    contents_.add(&sep4_);
+    contents_.add(&rigidHeader_);
+    contents_.add(&rigidModeCombo_);
+    contents_.add(&rigidStatus_);
 }
 
 void RenderingPanel::drawContents() {

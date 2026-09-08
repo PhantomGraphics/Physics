@@ -172,7 +172,11 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     // glTF background / environment / shared light (PLAN_physicsview_gltf_rendering.md).
     renderBackground_.bind(&bgGltfRenderer_, &ssfrRenderer_);
     dispatcher_.setRenderBackground(&renderBackground_);
+    // Rigid-body PBR ("shaded") rendering, Phase 2.
+    rigidGltfRenderer_.bindWorld(&world_.rigid());
+    dispatcher_.setRigidBodyRenderer(&rigidGltfRenderer_);
     renderingPanel_.bind(&renderBackground_);
+    renderingPanel_.bindRigidBodyRenderer(&rigidGltfRenderer_);
     renderingPanel_.init();
 
     volumeConvertPanel_.bindWorld(&world_);
@@ -196,6 +200,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     add(&bgGltfRenderer_);
     add(&fluidRenderer_);
     add(&ssfrRenderer_);
+    add(&rigidGltfRenderer_);   // opaque shaded rigid bodies before the wire pass
     add(&rigidRenderer_);
     add(&softRenderer_);
     add(&volumeRenderer_);
@@ -380,6 +385,10 @@ void FluidApp::onInit()
         s.fragSpv = ::VKG::loadSPVRepo("shaders/gltf.frag.spv");
         bgGltfRenderer_.setShaders(std::move(s));
     }
+    // Rigid-body shaded pass: same gltf.{vert,frag}; each per-body
+    // GltfSceneRenderer instance gets its own copy (see GltfBodyRenderer).
+    rigidGltfRenderer_.setShaders(::VKG::loadSPVRepo("shaders/gltf.vert.spv"),
+                                  ::VKG::loadSPVRepo("shaders/gltf.frag.spv"));
 
     ::VKG::VkAppBase::onInit();
     setupCallbacks();
@@ -514,8 +523,17 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         ssfrRenderer_.setEnabled(false);
     }
     flameRenderer_.setEnabled(flameActive);
-    rigidRenderer_.setEnabled(!flameActive);
     softRenderer_.setEnabled(!flameActive);
+    // Rigid body: wire (RigidBodyWireRenderer) vs shaded (GltfBodyRenderer) vs
+    // both, per SetRigidRenderMode / the "glTF Rendering" panel. Flame still
+    // takes the whole viewport.
+    {
+        const auto rm = rigidGltfRenderer_.mode();
+        const bool wantWire   = (rm == GltfBodyRenderer::Mode::Wireframe || rm == GltfBodyRenderer::Mode::Both);
+        const bool wantShaded = (rm == GltfBodyRenderer::Mode::Shaded    || rm == GltfBodyRenderer::Mode::Both);
+        rigidRenderer_.setEnabled(!flameActive && wantWire);
+        rigidGltfRenderer_.setEnabled(!flameActive && wantShaded);
+    }
     // The Flame page owns the viewport (see the flameActive comment above);
     // hide the glTF background there too, matching rigid/soft/fluid.
     bgGltfRenderer_.setVisible(!flameActive);
@@ -527,10 +545,20 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     meshRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
 
     // FluidRenderer is the single source of truth for the camera; feed the
-    // same view/proj to the glTF background so it composes with the fluid
-    // (plan §3.5). Runs before the base onUpdate() below drives
-    // bgGltfRenderer_.onUpdate().
+    // same view/proj to the glTF background + shaded rigid bodies so they
+    // compose with the fluid (plan §3.5). Runs before the base onUpdate() below
+    // drives their sub-renderer onUpdate().
     syncBackgroundCamera();
+    {
+        const glm::mat4 view = fluidRenderer_.getViewMatrix();
+        const glm::mat4 proj = fluidRenderer_.getProjMatrix();
+        const glm::vec3 eye  = glm::vec3(glm::inverse(view)[3]);
+        const glm::vec3 ld   = renderBackground_.lightDirection();
+        rigidGltfRenderer_.setCamera(view, proj, eye);
+        rigidGltfRenderer_.setLight(
+            glm::vec4(glm::normalize(ld), 0.0f),
+            glm::vec4(renderBackground_.lightColor(), renderBackground_.lightIntensity()));
+    }
 
     if (auto path = dispatcher_.takePendingScreenshot()) {
         screenshotPendingPath_ = path->string();
@@ -642,6 +670,10 @@ void FluidApp::syncRigidRenderer()
     auto wd = world_.rigid().buildWireData();
     rigidRenderer_.update(wd.positions, wd.colors, wd.indices,
                            fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
+    // Reconcile the shaded (glTF) instances with the current body set -- cheap
+    // no-op when nothing changed (preset switch / AddSphere/AddBox/AddFloor all
+    // funnel through onRigidWorldChanged -> here).
+    rigidGltfRenderer_.syncFromWorld();
 }
 
 void FluidApp::syncSoftRenderer()

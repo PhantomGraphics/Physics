@@ -110,7 +110,12 @@ if(PHANTOM_GTEST_FOUND)
     list(FILTER PHYSICSTEST_SOURCES EXCLUDE REGEX
         "(FluidPoolStabilityTest|WaterSphereEmitterStabilityTest|SPHScaleInvarianceTest)\\.cpp$")
 
-    add_executable(PhysicsTest ${PHYSICSTEST_SOURCES})
+    # PrimitiveGltf.cpp (PhysicsView) is pure logic -- GltfRenderer's header-only
+    # GltfDocument/GltfAccessorBuilder + glm, no Vulkan. Compiled straight into
+    # PhysicsTest so PrimitiveGltfTest.cpp can exercise it without a
+    # GltfRendererCore link (PLAN_physicsview_gltf_rendering.md Phase 2 / §6).
+    add_executable(PhysicsTest ${PHYSICSTEST_SOURCES}
+        ${PHYSICS_ROOT}/PhysicsView/PrimitiveGltf.cpp)
     set_target_properties(PhysicsTest PROPERTIES
         CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON
@@ -120,6 +125,7 @@ if(PHANTOM_GTEST_FOUND)
     target_include_directories(PhysicsTest PRIVATE
         ${REPO_ROOT}
         ${PHYSICS_ROOT}/PhysicsTest
+        ${CGLIB_ROOT}/ThirdParty/glm-0.9.9.8
     )
 
     target_link_libraries(PhysicsTest PRIVATE
@@ -221,6 +227,8 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/ControlPanelHost.cpp
     ${PHYSICS_ROOT}/PhysicsView/RenderBackground.cpp
     ${PHYSICS_ROOT}/PhysicsView/RenderingPanel.cpp
+    ${PHYSICS_ROOT}/PhysicsView/PrimitiveGltf.cpp
+    ${PHYSICS_ROOT}/PhysicsView/GltfBodyRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/SceneComponentRegistry.cpp
     ${PHYSICS_ROOT}/PhysicsView/ObjectListPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/CommandDispatcher.cpp

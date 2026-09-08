@@ -9,6 +9,7 @@
 #include "FluidMeshRenderer.h"
 #include "FluidPLYWriter.h"
 #include "RenderBackground.h"
+#include "GltfBodyRenderer.h"
 
 #include <glm/glm.hpp>
 
@@ -718,6 +719,19 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
     if (cmd == "GetRenderSceneState") {
         if (!renderBg_) return std::string("{}");
         return renderBg_->sceneStateJson();
+    }
+
+    if (sv.rfind("SetRigidRenderMode:", 0) == 0) {
+        if (!rigidBodyRenderer_) return std::string("Error:rigid body renderer not available");
+        GltfBodyRenderer::Mode m;
+        if (!GltfBodyRenderer::parseMode(std::string(sv.substr(19)), m))
+            return std::string("Error:mode must be wire|shaded|both");
+        rigidBodyRenderer_->setMode(m);
+        return std::string("OK");
+    }
+    if (cmd == "GetRigidRenderMode") {
+        if (!rigidBodyRenderer_) return std::string("Error:rigid body renderer not available");
+        return std::string(GltfBodyRenderer::modeName(rigidBodyRenderer_->mode()));
     }
 
     return std::nullopt;

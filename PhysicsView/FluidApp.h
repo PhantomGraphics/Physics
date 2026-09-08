@@ -27,6 +27,7 @@
 #include "../../CGLib/GltfRenderer/Renderer/GltfSceneRenderer.h"
 #include "RenderBackground.h"
 #include "RenderingPanel.h"
+#include "GltfBodyRenderer.h"
 
 #include "../../CGLib/UIWidgets/MainMenuBar.h"
 #include "../../CGLib/UIWidgets/Menu.h"
@@ -112,6 +113,11 @@ private:
     FluidVolumeConvertPanel volumeConvertPanel_;
 
     RigidBodyWireRenderer rigidRenderer_;
+    // Rigid-body PBR ("shaded") pass, an alternative to rigidRenderer_'s
+    // wireframe (docs/todo/PLAN_physicsview_gltf_rendering.md Phase 2). One
+    // GltfSceneRenderer + synthesized unit primitive per body; SetRigidRenderMode
+    // / the "glTF Rendering" panel pick wire / shaded / both.
+    GltfBodyRenderer      rigidGltfRenderer_;
     RigidBodyControlPanel rigidControlPanel_;
 
     // Independent SoftBody (cloth/rope/jelly) scene, added alongside fluid/

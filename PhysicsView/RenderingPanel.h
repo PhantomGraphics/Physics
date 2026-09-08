@@ -3,6 +3,7 @@
 #include "../../CGLib/UIWidgets/IView.h"
 #include "../../CGLib/UIWidgets/BoolView.h"
 #include "../../CGLib/UIWidgets/Button.h"
+#include "../../CGLib/UIWidgets/ComboBox.h"
 #include "../../CGLib/UIWidgets/FloatSlider.h"
 #include "../../CGLib/UIWidgets/Label.h"
 #include "../../CGLib/UIWidgets/Separator.h"
@@ -14,6 +15,7 @@
 namespace Phantom {
 
 class RenderBackground;
+class GltfBodyRenderer;
 
 /**
  * @brief "glTF Rendering" Control page: background set, environment, and the
@@ -27,6 +29,7 @@ class RenderBackground;
 class RenderingPanel : public IEmbeddedPanel {
 public:
     void bind(RenderBackground* bg) { bg_ = bg; }
+    void bindRigidBodyRenderer(GltfBodyRenderer* r) { rigidBody_ = r; }
     void init();
 
     void drawContents() override;
@@ -35,8 +38,10 @@ private:
     void buildUi();
     std::string backgroundStatusText() const;
     std::string environmentStatusText() const;
+    std::string rigidStatusText() const;
 
     RenderBackground* bg_ = nullptr;
+    GltfBodyRenderer* rigidBody_ = nullptr;
     bool uiBuilt_ = false;
     bool seeded_  = false;
 
@@ -71,6 +76,12 @@ private:
     UI::Vector3dView lightDir_   {"Direction"};
     UI::Vector3dView lightColor_ {"Color (RGB)"};
     UI::FloatSlider  lightInt_   {"Intensity", 0.0f, 10.0f};
+
+    // Rigid body display mode (wire / shaded / both)
+    UI::Separator   sep4_;
+    UI::Label       rigidHeader_    {std::string("--- Rigid Bodies ---"), UI::Label::Style::Disabled};
+    UI::ComboBox    rigidModeCombo_ {"Mode"};
+    UI::Label       rigidStatus_    {[this] { return rigidStatusText(); }, UI::Label::Style::Disabled};
 };
 
 } // namespace Phantom
