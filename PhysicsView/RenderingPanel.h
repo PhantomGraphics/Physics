@@ -72,6 +72,7 @@ private:
     UI::Button      setEnvBtn_   {"Load Environment"};
     UI::Button      clearEnvBtn_ {"Clear Environment"};
     UI::BoolView    useIblCheck_ {"Use IBL"};
+    UI::BoolView    shadowCheck_ {"Cast Shadows"};
     UI::Label       envStatus_   {[this] { return environmentStatusText(); }, UI::Label::Style::Disabled};
 
     // Light

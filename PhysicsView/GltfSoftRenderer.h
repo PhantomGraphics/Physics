@@ -43,6 +43,15 @@ public:
         vertSpv_ = std::move(vertSpv);
         fragSpv_ = std::move(fragSpv);
     }
+    void setShadowShaders(std::vector<uint32_t> vertSpv, std::vector<uint32_t> fragSpv) {
+        shadowVertSpv_ = std::move(vertSpv);
+        shadowFragSpv_ = std::move(fragSpv);
+    }
+
+    // ---- Shadows (Phase 4). Mirrors GltfBodyRenderer. ----
+    void enableShadows(VkRenderPass shadowRenderPass, VkImageView shadowView, VkSampler shadowSampler);
+    void setShadowLightVP(const glm::mat4& lightVP);
+    void renderShadowCasters(VkCommandBuffer cmd, const glm::mat4& lightVP);
 
     void setMode(Mode m) { mode_ = m; }
     Mode mode() const    { return mode_; }
@@ -76,6 +85,14 @@ private:
     SoftBodyWorld* world_ = nullptr;
     std::vector<uint32_t> vertSpv_;
     std::vector<uint32_t> fragSpv_;
+    std::vector<uint32_t> shadowVertSpv_;
+    std::vector<uint32_t> shadowFragSpv_;
+
+    bool        shadowsEnabled_ = false;
+    VkRenderPass shadowRP_      = VK_NULL_HANDLE;
+    VkImageView  shadowView_    = VK_NULL_HANDLE;
+    VkSampler    shadowSampler_ = VK_NULL_HANDLE;
+    glm::mat4    shadowVP_{1.f};
 
     Mode mode_    = Mode::Wireframe;
     bool enabled_ = true;

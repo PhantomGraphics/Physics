@@ -59,6 +59,8 @@ void RenderingPanel::buildUi() {
     });
     useIblCheck_.bind([this] { return bg_ && bg_->useIBL(); },
                       [this](bool v) { if (bg_) bg_->setUseIBL(v); });
+    shadowCheck_.bind([this] { return bg_ && bg_->castShadows(); },
+                      [this](bool v) { if (bg_) bg_->setCastShadows(v); });
 
     lightInt_.bind([this] { return bg_ ? bg_->lightIntensity() : 3.f; },
                    [](float) {}); // pushed with dir/color in drawContents()
@@ -99,6 +101,7 @@ void RenderingPanel::buildUi() {
     contents_.add(&setEnvBtn_);
     contents_.add(&clearEnvBtn_);
     contents_.add(&useIblCheck_);
+    contents_.add(&shadowCheck_);
     contents_.add(&envStatus_);
     contents_.add(&sep3_);
     contents_.add(&lightHeader_);

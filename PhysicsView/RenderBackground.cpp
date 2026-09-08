@@ -176,6 +176,7 @@ std::string RenderBackground::sceneStateJson() const {
     s += "\"environment\":\"" + jsonEscape(envDir_) + "\",";
     s += "\"hasEnvironment\":" + std::string(hasEnv_ ? "true" : "false") + ",";
     s += "\"useIBL\":" + std::string(useIBL_ ? "true" : "false") + ",";
+    s += "\"castShadows\":" + std::string(castShadows_ ? "true" : "false") + ",";
     s += "\"transform\":{\"pos\":[" + std::to_string(xfPos_.x) + "," + std::to_string(xfPos_.y) + "," + std::to_string(xfPos_.z) + "],";
     s += "\"rotDeg\":[" + std::to_string(xfRotDeg_.x) + "," + std::to_string(xfRotDeg_.y) + "," + std::to_string(xfRotDeg_.z) + "],";
     s += "\"scale\":" + std::to_string(xfScale_) + "},";

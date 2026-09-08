@@ -63,6 +63,11 @@ public:
     void clearEnvironment();
     void setLight(const glm::vec3& direction, const glm::vec3& color, float intensity);
     void setUseIBL(bool v);
+    // Phase 4: whether the glTF passes cast the shared light's shadow map.
+    // FluidApp owns the ShadowMapPass and reads this; RenderBackground just
+    // holds the flag (like useIBL) so the command + panel have one home.
+    void setCastShadows(bool v) { castShadows_ = v; }
+    bool castShadows() const    { return castShadows_; }
 
     std::string sceneStateJson() const;
 
@@ -92,8 +97,9 @@ private:
     std::string bgPath_;
     std::string envDir_;
     std::string defaultEnvDir_;
-    bool hasEnv_  = false;
-    bool useIBL_  = false;
+    bool hasEnv_       = false;
+    bool useIBL_       = false;
+    bool castShadows_  = true;
 
     glm::vec3 xfPos_{0.f};
     glm::vec3 xfRotDeg_{0.f};

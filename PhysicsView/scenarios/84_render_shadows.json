@@ -1,0 +1,33 @@
+{
+  "name": "84_render_shadows",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+
+    { "label": "Load the stage GLB so there is a floor to receive shadows",
+      "command": "LoadRenderBackground:${repo_root}/Physics/PhysicsView/scenarios/models/stage.glb", "expect": "OK" },
+
+    { "label": "Custom scene (floor only). A wide, near-static box acts as a shadow-receiving platform centred on the shared camera target (20,20,20); a sphere hangs above it as the caster",
+      "command": "SetPreset:Custom", "expect": "OK" },
+    { "label": "Wide flat platform (half-extents 9 x 0.5 x 9), heavy so it barely moves in a few steps",
+      "command": "AddBox:20:17:20:9:0.5:9:200", "expect": "OK" },
+    { "label": "Sphere caster hanging ~6 units above the platform", "command": "AddSphere:20:24:20:3:1", "expect": "OK" },
+    { "label": "Precondition: floor + platform + sphere", "command": "GetBodyCount", "expect": "Count:3" },
+    { "label": "PBR (shaded) rendering", "command": "SetRigidRenderMode:shaded", "expect": "OK" },
+
+    { "label": "Precondition: shadows default on", "command": "GetShadowEnabled", "expect": "1" },
+    { "label": "Let the sphere fall toward the platform", "command": "Step:10", "expect": "OK" },
+    { "label": "Screenshot: box + sphere cast the shared light's shadow onto the stage floor",
+      "command": "SaveScreenshot:testdata/screenshots/84_render_shadows_on.png", "expect": "OK" },
+
+    { "label": "Turn shadow casting off", "command": "SetShadowEnabled:0", "expect": "OK" },
+    { "label": "Change: shadows are now off", "command": "GetShadowEnabled", "expect": "0" },
+    { "label": "One more step so the frame is fresh", "command": "Step:1", "expect": "OK" },
+    { "label": "Screenshot: same scene, no shadows (cleared shadow depth = nothing occluded)",
+      "command": "SaveScreenshot:testdata/screenshots/84_render_shadows_off.png", "expect": "OK" },
+
+    { "label": "Turn shadow casting back on", "command": "SetShadowEnabled:1", "expect": "OK" },
+    { "label": "Invariant: the app is still alive after the shadow toggle + captures", "command": "GetStatus", "expect": "OK" },
+
+    { "label": "Neg: a non-boolean shadow argument is rejected", "command": "SetShadowEnabled:2", "expect_prefix": "Error:" }
+  ]
+}

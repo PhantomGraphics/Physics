@@ -717,6 +717,15 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
         renderBg_->setUseIBL(cmd == "SetRenderUseIBL:1");
         return std::string("OK");
     }
+    if (cmd == "SetShadowEnabled:0" || cmd == "SetShadowEnabled:1") {
+        if (!renderBg_) return std::string("Error:render background not available");
+        renderBg_->setCastShadows(cmd == "SetShadowEnabled:1");
+        return std::string("OK");
+    }
+    if (cmd == "GetShadowEnabled") {
+        if (!renderBg_) return std::string("Error:render background not available");
+        return renderBg_->castShadows() ? std::string("1") : std::string("0");
+    }
     if (cmd == "GetRenderSceneState") {
         if (!renderBg_) return std::string("{}");
         return renderBg_->sceneStateJson();

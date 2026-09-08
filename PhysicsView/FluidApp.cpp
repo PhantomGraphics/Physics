@@ -387,21 +387,43 @@ void FluidApp::onInit()
         Phantom::Gltf::GltfSceneRenderer::Shaders s;
         s.vertSpv = ::VKG::loadSPVRepo("shaders/gltf.vert.spv");
         s.fragSpv = ::VKG::loadSPVRepo("shaders/gltf.frag.spv");
+        s.shadowVertSpv = ::VKG::loadSPVRepo("shaders/shadow.vert.spv");
+        s.shadowFragSpv = ::VKG::loadSPVRepo("shaders/shadow.frag.spv");
         bgGltfRenderer_.setShaders(std::move(s));
     }
-    // Rigid-/soft-body shaded pass: same gltf.{vert,frag}; each per-body
-    // GltfSceneRenderer instance gets its own copy (see GltfBodyRenderer /
-    // GltfSoftRenderer).
+    // Rigid-/soft-body shaded pass: same gltf.{vert,frag} + shadow.{vert,frag};
+    // each per-body GltfSceneRenderer instance gets its own copy (see
+    // GltfBodyRenderer / GltfSoftRenderer).
     rigidGltfRenderer_.setShaders(::VKG::loadSPVRepo("shaders/gltf.vert.spv"),
                                   ::VKG::loadSPVRepo("shaders/gltf.frag.spv"));
+    rigidGltfRenderer_.setShadowShaders(::VKG::loadSPVRepo("shaders/shadow.vert.spv"),
+                                        ::VKG::loadSPVRepo("shaders/shadow.frag.spv"));
     softGltfRenderer_.setShaders(::VKG::loadSPVRepo("shaders/gltf.vert.spv"),
                                  ::VKG::loadSPVRepo("shaders/gltf.frag.spv"));
+    softGltfRenderer_.setShadowShaders(::VKG::loadSPVRepo("shaders/shadow.vert.spv"),
+                                       ::VKG::loadSPVRepo("shaders/shadow.frag.spv"));
 
     ::VKG::VkAppBase::onInit();
     setupCallbacks();
     syncRigidRenderer();
     syncSoftRenderer();
     syncFlameRenderer();
+
+    // Shadow map (Phase 4): one depth-only pass for the shared directional light,
+    // sampled by the background / rigid / soft glTF PBR passes. Wired here (device
+    // idle just after onInit); the light VP is refreshed per frame in onUpdate()
+    // and the caster geometry recorded in onPreRender().
+    shadowPass_.create(getContext(), 2048);
+    if (shadowPass_.isValid()) {
+        refreshShadowLightVP();
+        bgGltfRenderer_.createShadowPipeline(shadowPass_.getRenderPass());
+        bgGltfRenderer_.setShadowMap(shadowPass_.getDepthView(),
+                                     shadowPass_.getShadowSampler(), shadowPass_.getLightVP());
+        rigidGltfRenderer_.enableShadows(shadowPass_.getRenderPass(),
+                                         shadowPass_.getDepthView(), shadowPass_.getShadowSampler());
+        softGltfRenderer_.enableShadows(shadowPass_.getRenderPass(),
+                                        shadowPass_.getDepthView(), shadowPass_.getShadowSampler());
+    }
 
     // Load the Control-window layout (page + visible flag) and assemble its
     // widget tree now -- after main.cpp had its chance to clear the layout file
@@ -569,6 +591,9 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         softGltfRenderer_.setCamera(view, proj, eye);
         softGltfRenderer_.setLight(lightDir, lightCol);
     }
+    // Shadow light VP tracks the (possibly changed) light direction each frame
+    // (Phase 4). The caster geometry is recorded in onPreRender().
+    if (shadowPass_.isValid()) refreshShadowLightVP();
 
     if (auto path = dispatcher_.takePendingScreenshot()) {
         screenshotPendingPath_ = path->string();
@@ -614,6 +639,22 @@ void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
             0, 1, &mb, 0, nullptr, 0, nullptr);
     }
 
+    // Shadow-caster pass (Phase 4): depth-only, before the main render pass. The
+    // pass always runs so the depth target is defined; when shadows are toggled
+    // off the casters are simply not drawn (cleared depth = far = nothing
+    // occluded). Flame owns the viewport, so skip casters there too.
+    const bool flameActive = (controlHost_.getPage() == ControlPage::Flame);
+    if (shadowPass_.isValid()) {
+        const glm::mat4 vp = shadowPass_.getLightVP();
+        shadowPass_.begin(cmd);
+        if (renderBackground_.castShadows() && !flameActive) {
+            bgGltfRenderer_.renderShadowCasters(cmd, vp);
+            rigidGltfRenderer_.renderShadowCasters(cmd, vp);
+            softGltfRenderer_.renderShadowCasters(cmd, vp);
+        }
+        shadowPass_.end(cmd);
+    }
+
     ssfrRenderer_.onPreRender(cmd, frameIndex);
 }
 
@@ -632,6 +673,10 @@ void FluidApp::onCleanup()
     // the VulkanContext -- see FluidWorld::releaseGpuResources()'s doc comment.
     world_.releaseGpuResources();
     ::VKG::VkAppBase::onCleanup();
+    // After the sub-renderers tore down their shadow pipelines (which reference
+    // shadowPass_'s render pass). The VulkanContext is still alive here -- the
+    // caller (cleanup()) destroys it afterwards.
+    if (shadowPass_.isValid()) shadowPass_.destroy(getContext());
 }
 
 void FluidApp::setupCallbacks()
@@ -663,6 +708,28 @@ void FluidApp::setupCallbacks()
         ssfrRenderer_.setCamera(fluidRenderer_.getProjMatrix(), fluidRenderer_.getViewMatrix());
         syncBackgroundCamera();
     };
+}
+
+void FluidApp::refreshShadowLightVP()
+{
+    // Frame the shared directional light on a point between the origin (where
+    // every physics preset sits) and the shared camera target (20,20,20) with a
+    // large ortho extent so both are covered. Kept consistent between the depth
+    // render (renderShadowCasters) and the PBR sampling by routing both through
+    // ShadowMapPass::getLightVP().
+    const glm::vec3 dir = glm::normalize(renderBackground_.lightDirection());
+    const glm::vec3 up  = (std::abs(dir.y) > 0.95f) ? glm::vec3(0.f, 0.f, 1.f)
+                                                    : glm::vec3(0.f, 1.f, 0.f);
+    const glm::vec3 center(12.f, 10.f, 12.f);
+    const glm::mat4 view = glm::lookAt(center - dir * 100.f, center, up);
+    glm::mat4 proj = glm::ortho(-55.f, 55.f, -55.f, 55.f, 0.1f, 260.f);
+    proj[1][1] *= -1.f; // Vulkan Y flip (GLM_FORCE_DEPTH_ZERO_TO_ONE)
+    shadowPass_.setLightViewProj(view, proj);
+
+    const glm::mat4 vp = shadowPass_.getLightVP();
+    bgGltfRenderer_.setShadowLightVP(vp);
+    rigidGltfRenderer_.setShadowLightVP(vp);
+    softGltfRenderer_.setShadowLightVP(vp);
 }
 
 void FluidApp::syncBackgroundCamera()

@@ -31,8 +31,8 @@ namespace Physics { class RigidBody; }
  * syncFromWorld() reconciles that map with RigidBodyWorld's current body set on
  * preset switches / AddSphere / AddBox / AddFloor; onUpdate() streams each
  * body's live transform in through GltfSceneRenderer::setModelMatrix()
- * (translate * rotate * per-shape scale). Deliberately minimal: flat PBR,
- * no skybox / IBL / shadow (matches Universe Phase 2).
+ * (translate * rotate * per-shape scale). Flat PBR + optional shadow casting /
+ * receiving (Phase 4); no skybox / IBL.
  *
  * Mode: Wireframe (default -- this renderer draws nothing, RigidBodyWireRenderer
  * owns the viewport), Shaded (this renderer only), or Both. FluidApp reads
@@ -47,6 +47,21 @@ public:
         vertSpv_ = std::move(vertSpv);
         fragSpv_ = std::move(fragSpv);
     }
+    // Depth-only shadow-caster shaders (call before onInit alongside setShaders).
+    void setShadowShaders(std::vector<uint32_t> vertSpv, std::vector<uint32_t> fragSpv) {
+        shadowVertSpv_ = std::move(vertSpv);
+        shadowFragSpv_ = std::move(fragSpv);
+    }
+
+    // ---- Shadows (Phase 4). FluidApp owns the ShadowMapPass and drives these. ----
+    // Wire the shadow map into every instance's PBR pass (call once after onInit,
+    // device idle); also stored so instances created later (preset switch) get it.
+    void enableShadows(VkRenderPass shadowRenderPass, VkImageView shadowView, VkSampler shadowSampler);
+    // Per-frame light view-projection (no descriptor write -- just feeds the UBO).
+    void setShadowLightVP(const glm::mat4& lightVP);
+    // Record every instance's depth-only geometry into the shadow pass (call
+    // between ShadowMapPass::begin()/end(), from FluidApp::onPreRender()).
+    void renderShadowCasters(VkCommandBuffer cmd, const glm::mat4& lightVP);
 
     void setMode(Mode m) { mode_ = m; }
     Mode mode() const    { return mode_; }
@@ -88,6 +103,15 @@ private:
     RigidBodyWorld* world_ = nullptr;
     std::vector<uint32_t> vertSpv_;
     std::vector<uint32_t> fragSpv_;
+    std::vector<uint32_t> shadowVertSpv_;
+    std::vector<uint32_t> shadowFragSpv_;
+
+    // Shadow wiring shared by every instance (see enableShadows()).
+    bool        shadowsEnabled_ = false;
+    VkRenderPass shadowRP_      = VK_NULL_HANDLE;
+    VkImageView  shadowView_    = VK_NULL_HANDLE;
+    VkSampler    shadowSampler_ = VK_NULL_HANDLE;
+    glm::mat4    shadowVP_{1.f};
 
     Mode mode_    = Mode::Wireframe;
     bool enabled_ = true;

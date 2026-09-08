@@ -25,6 +25,8 @@ Phantom::Gltf::GltfSceneRenderer::Shaders GltfBodyRenderer::makeShaders() const 
     Phantom::Gltf::GltfSceneRenderer::Shaders s;
     s.vertSpv = vertSpv_;
     s.fragSpv = fragSpv_;
+    s.shadowVertSpv = shadowVertSpv_;
+    s.shadowFragSpv = shadowFragSpv_;
     return s;
 }
 
@@ -74,7 +76,34 @@ GltfBodyRenderer::Instance GltfBodyRenderer::makeInstance(const Physics::RigidBo
     inst.renderer->setCamera(view_, proj_, eye_);
     inst.renderer->setLight(lightDirW0_, lightColorIntensity_);
     inst.renderer->onInit(*ctx_, *pool_, renderPass_, framesInFlight_);
+    if (shadowsEnabled_) {
+        inst.renderer->createShadowPipeline(shadowRP_);
+        inst.renderer->setShadowMap(shadowView_, shadowSampler_, shadowVP_);
+    }
     return inst;
+}
+
+void GltfBodyRenderer::enableShadows(VkRenderPass shadowRenderPass, VkImageView shadowView,
+                                    VkSampler shadowSampler) {
+    shadowsEnabled_ = true;
+    shadowRP_       = shadowRenderPass;
+    shadowView_     = shadowView;
+    shadowSampler_  = shadowSampler;
+    for (auto& [body, inst] : instances_) {
+        (void)body;
+        inst.renderer->createShadowPipeline(shadowRP_);
+        inst.renderer->setShadowMap(shadowView_, shadowSampler_, shadowVP_);
+    }
+}
+
+void GltfBodyRenderer::setShadowLightVP(const glm::mat4& lightVP) {
+    shadowVP_ = lightVP;
+    for (auto& [body, inst] : instances_) { (void)body; inst.renderer->setShadowLightVP(lightVP); }
+}
+
+void GltfBodyRenderer::renderShadowCasters(VkCommandBuffer cmd, const glm::mat4& lightVP) {
+    if (!ready_ || !shadowsEnabled_) return;
+    for (auto& [body, inst] : instances_) { (void)body; inst.renderer->renderShadowCasters(cmd, lightVP); }
 }
 
 void GltfBodyRenderer::onInit(Phantom::VKG::VulkanContext& ctx,

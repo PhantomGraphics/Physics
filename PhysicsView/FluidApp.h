@@ -25,6 +25,7 @@
 
 #include "../../CGLib/GltfRenderer/Gltf/GltfDocument.h"
 #include "../../CGLib/GltfRenderer/Renderer/GltfSceneRenderer.h"
+#include "../../CGLib/GltfRenderer/Renderer/ShadowMapPass.h"
 #include "RenderBackground.h"
 #include "RenderingPanel.h"
 #include "GltfBodyRenderer.h"
@@ -102,6 +103,11 @@ private:
     Phantom::Gltf::GltfSceneRenderer bgGltfRenderer_;
     RenderBackground                 renderBackground_;
     RenderingPanel                   renderingPanel_;
+
+    // Phase 4: one depth-only shadow map for the shared directional light,
+    // sampled by the background / rigid / soft glTF PBR passes. FluidApp owns it
+    // (the sub-renderers only take its render-pass/view/sampler handles).
+    Phantom::Gltf::ShadowMapPass     shadowPass_;
     ControlPanel controlPanel_;
     SSFRPanel ssfrPanel_;
     SSFRTestPanel ssfrTestPanel_;
@@ -180,6 +186,7 @@ private:
     void syncParticlesToRenderer();
     void syncGpuCsphBufferToRenderer();
     void syncBackgroundCamera();
+    void refreshShadowLightVP();
     void syncRigidRenderer();
     void syncSoftRenderer();
     void syncFlameRenderer();
