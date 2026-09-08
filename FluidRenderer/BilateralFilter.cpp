@@ -31,6 +31,7 @@ void BilateralFilter::create(const Phantom::VKG::VulkanContext& ctx,
     cfg.framesInFlight     = framesInFlight;
     cfg.uboSize            = sizeof(UBO);
     cfg.descriptorBindings = { texBinding, uboBinding };
+    cfg.setsPerFrame       = kMaxCallsPerFrame;
 
     pipeline_.create(ctx, renderPass, cfg);
 }
@@ -68,10 +69,13 @@ void BilateralFilter::render(const Phantom::VKG::VulkanContext& ctx,
                                VkSampler sampler,
                                 Phantom::VKG::VulkanOffscreen& dst)
 {
+    const uint32_t slot = slotCursor_ % kMaxCallsPerFrame;
+    slotCursor_ = (slotCursor_ + 1) % kMaxCallsPerFrame;
+
     const auto extent = dst.getExtent();
     ubo_.texelSize = glm::vec2(1.0f / static_cast<float>(extent.width),
                                1.0f / static_cast<float>(extent.height));
-    pipeline_.updateUBO(frameIndex, &ubo_, sizeof(ubo_));
+    pipeline_.updateUBO(frameIndex, slot, &ubo_, sizeof(ubo_));
 
     VkDescriptorImageInfo ii{};
     ii.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -85,12 +89,12 @@ void BilateralFilter::render(const Phantom::VKG::VulkanContext& ctx,
     w.descriptorCount = 1;
     w.pImageInfo      = &ii;
 
-    pipeline_.writeDescriptors(ctx.getDevice(), frameIndex, { w });
+    pipeline_.writeDescriptors(ctx.getDevice(), frameIndex, slot, { w });
 
     dst.beginRenderPass(cmd, {0.f, 0.f, 0.f, 0.f}, 1.0f);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_.getPipeline());
-    VkDescriptorSet ds = pipeline_.getDescriptorSet(frameIndex);
+    VkDescriptorSet ds = pipeline_.getDescriptorSet(frameIndex, slot);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                             pipeline_.getLayout(), 0, 1, &ds, 0, nullptr);
 

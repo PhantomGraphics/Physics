@@ -11,6 +11,7 @@
 #include "RenderBackground.h"
 #include "GltfBodyRenderer.h"
 #include "GltfSoftRenderer.h"
+#include "SSFRPanel.h"
 
 #include <glm/glm.hpp>
 
@@ -729,6 +730,30 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
     if (cmd == "GetRenderSceneState") {
         if (!renderBg_) return std::string("{}");
         return renderBg_->sceneStateJson();
+    }
+
+    // Screen-space fluid rendering (Phase 5). Off = the SSFR composite still runs
+    // as the HDR scene's final ACES tonemap pass (pure passthrough); on = the
+    // fluid-surface reconstruction pre-passes run and the surface is composited
+    // over the scene with depth occlusion + refraction.
+    if (cmd == "SetSSFREnabled:true" || cmd == "SetSSFREnabled:false") {
+        if (!ssfrPanel_) return std::string("Error:SSFR panel not available");
+        ssfrPanel_->setEnabled(cmd == "SetSSFREnabled:true");
+        return std::string("OK");
+    }
+    if (cmd == "IsSSFREnabled") {
+        if (!ssfrPanel_) return std::string("Error:SSFR panel not available");
+        return ssfrPanel_->isEnabled() ? std::string("1") : std::string("0");
+    }
+    if (sv.rfind("SetSSFRMode:", 0) == 0) {
+        if (!ssfrPanel_) return std::string("Error:SSFR panel not available");
+        int idx = 0;
+        auto s = sv.substr(12);
+        auto [p, ec] = std::from_chars(s.data(), s.data() + s.size(), idx);
+        if (ec != std::errc() || idx < 0 || idx > 5)
+            return std::string("Error:SSFR mode index must be 0..5");
+        ssfrPanel_->setModeIndex(idx);
+        return std::string("OK");
     }
 
     if (sv.rfind("SetRigidRenderMode:", 0) == 0) {

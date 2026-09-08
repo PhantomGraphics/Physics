@@ -56,10 +56,21 @@ public:
 
     bool isValid() const { return pipeline_.isValid(); }
 
+    // Max render() calls per frame across every BilateralFilter instance --
+    // SSFluidRenderer::onPreRender runs the depth bilateral as 3 separable
+    // ping-pong iterations (6 render() calls). Each call needs its own
+    // descriptor set + UBO buffer (see SSFRPassConfig::setsPerFrame): the shared
+    // set was updated between draws while still bound (invalidating the command
+    // buffer) and the shared UBO was overwritten before the earlier draw ran.
+    static constexpr uint32_t kMaxCallsPerFrame = 8;
+
 private:
     SSFRPipeline pipeline_;
     UBO ubo_{};
-
+    // Monotonic slot cursor, wrapped to kMaxCallsPerFrame. SSFRPipeline keys the
+    // set/UBO by (frame, slot), so same-slot reuse is always >= 2 frames apart
+    // (the fence for that frame parity has been waited) -- no reset needed.
+    uint32_t slotCursor_ = 0;
 };
 
 } // namespace VKSSFR

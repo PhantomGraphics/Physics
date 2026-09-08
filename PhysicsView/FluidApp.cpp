@@ -177,6 +177,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     dispatcher_.setRigidBodyRenderer(&rigidGltfRenderer_);
     softGltfRenderer_.bindWorld(&softWorld_);
     dispatcher_.setSoftBodyRenderer(&softGltfRenderer_);
+    dispatcher_.setSsfrPanel(&ssfrPanel_);
     renderingPanel_.bind(&renderBackground_);
     renderingPanel_.bindRigidBodyRenderer(&rigidGltfRenderer_);
     renderingPanel_.bindSoftBodyRenderer(&softGltfRenderer_);
@@ -200,16 +201,19 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     // Background glTF first so its opaque geometry writes depth before the
     // fluid/particle passes draw over it (PLAN_physicsview_gltf_rendering.md
     // §3.4). SSFR still composites last, as before.
-    add(&bgGltfRenderer_);
-    add(&fluidRenderer_);
+    // Phase 5 (PLAN_physicsview_gltf_rendering.md): the opaque scene renders into
+    // a linear-HDR offscreen (hdrScene_) in onPreRender(), and SSFluidRenderer's
+    // composite is the single final pass -- it samples that HDR color/depth,
+    // composites the fluid surface (or just passes the scene through when SSFR is
+    // off), applies ACES + exposure once, and writes the swapchain. So only the
+    // SSFR composite stays a VkAppBase sub-renderer (its pipeline is built
+    // against the swapchain render pass); every "scene" renderer is driven
+    // manually against hdrScene_'s render pass.
+    hdrRenderers_ = { &bgGltfRenderer_, &fluidRenderer_,
+                      &rigidGltfRenderer_, &rigidRenderer_,
+                      &softGltfRenderer_, &softRenderer_,
+                      &volumeRenderer_, &meshRenderer_, &flameRenderer_ };
     add(&ssfrRenderer_);
-    add(&rigidGltfRenderer_);   // opaque shaded rigid bodies before the wire pass
-    add(&rigidRenderer_);
-    add(&softGltfRenderer_);    // opaque shaded soft bodies before the wire pass
-    add(&softRenderer_);
-    add(&volumeRenderer_);
-    add(&meshRenderer_);
-    add(&flameRenderer_);
 
     // The per-domain control panels are no longer registered as standalone
     // UI panels -- they are embedded into controlHost_ (one shared "Control"
@@ -403,8 +407,21 @@ void FluidApp::onInit()
     softGltfRenderer_.setShadowShaders(::VKG::loadSPVRepo("shaders/shadow.vert.spv"),
                                        ::VKG::loadSPVRepo("shaders/shadow.frag.spv"));
 
-    ::VKG::VkAppBase::onInit();
+    ::VKG::VkAppBase::onInit();   // onInits ssfrRenderer_ (composite -> swapchain) + UI panels
     setupCallbacks();
+
+    // Phase 5: linear-HDR opaque-scene target. Every "scene" renderer is onInit'd
+    // against hdrScene_'s render pass (NOT the swapchain one) and driven manually
+    // from onPreRender(); SSFR's composite then samples it and writes the swapchain.
+    if (createHdrTargets()) {
+        for (auto* r : hdrRenderers_)
+            r->onInit(getContext(), getCommandPool(), hdrScene_.getRenderPass(), MAX_FRAMES_IN_FLIGHT);
+        ssfrRenderer_.setSceneInput(hdrScene_.getColorImageView(), hdrScene_.getDepthImageView(),
+                                    hdrSampler_.get(), 0.1f, 1000.f);
+    } else {
+        std::fprintf(stderr, "[FluidApp] HDR scene target creation failed; the viewport will be blank\n");
+    }
+
     syncRigidRenderer();
     syncSoftRenderer();
     syncFlameRenderer();
@@ -459,13 +476,72 @@ void FluidApp::onInit()
     renderBackground_.applyLight();
 }
 
+bool FluidApp::createHdrTargets()
+{
+    // Idempotent: run() calls onInit() then onSwapChainCreated() back to back
+    // (and recreateSwapChain() calls onSwapChainDestroying() -> onSwapChainCreated()),
+    // so this can be entered with a live target set. A recreated VulkanOffscreen
+    // render pass stays render-pass-compatible with the one the scene-renderer
+    // pipelines were built against (same attachment formats / sample counts), so
+    // they need no rebuild.
+    destroyHdrTargets();
+
+    const VkExtent2D ext = getExtent();
+    const VkFormat depthFmt = getSwapChain().findDepthFormat().value_or(VK_FORMAT_D32_SFLOAT);
+    if (!hdrScene_.create(getContext(), ext.width, ext.height,
+                          VK_FORMAT_R16G16B16A16_SFLOAT, depthFmt))
+        return false;
+    if (!hdrSampler_.create(getContext().getDevice(), VK_FILTER_NEAREST,
+                            VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)) {
+        hdrScene_.destroy(getContext());
+        return false;
+    }
+    hdrValid_ = true;
+    return true;
+}
+
+void FluidApp::destroyHdrTargets()
+{
+    if (!hdrValid_) return;
+    hdrSampler_.destroy(getContext().getDevice());
+    hdrScene_.destroy(getContext());
+    hdrValid_ = false;
+}
+
+void FluidApp::onSwapChainDestroying()
+{
+    // Device is idle here (VkAppBase::recreateSwapChain).
+    destroyHdrTargets();
+}
+
 void FluidApp::onSwapChainCreated()
 {
-    fluidRenderer_.setExtent(getExtent());
-    ssfrRenderer_.setExtent(getExtent());
-    rigidRenderer_.setExtent(getExtent());
-    softRenderer_.setExtent(getExtent());
-    bgGltfRenderer_.setExtent(getExtent());
+    const VkExtent2D ext = getExtent();
+    fluidRenderer_.setExtent(ext);
+    ssfrRenderer_.setExtent(ext);
+    rigidRenderer_.setExtent(ext);
+    softRenderer_.setExtent(ext);
+    bgGltfRenderer_.setExtent(ext);
+
+    // Phase 5. run() calls onInit() (which builds the HDR target) then this,
+    // back to back at the same size -- skip the redundant rebuild so the
+    // scene-renderer pipelines onInit() just built are not left pointing at a
+    // freed render pass. On a genuine resize, rebuild the HDR target + SSFR
+    // offscreen targets, re-point SSFR at the fresh views, and hand the new
+    // render-pass handle to the renderers that create pipelines lazily
+    // (GltfBodyRenderer / GltfSoftRenderer make one per body on preset switch);
+    // pipelines already built stay valid via render-pass compatibility.
+    if (hdrValid_ && hdrScene_.getExtent().width == ext.width &&
+        hdrScene_.getExtent().height == ext.height) {
+        return;
+    }
+    if (createHdrTargets()) {
+        rigidGltfRenderer_.setMainRenderPass(hdrScene_.getRenderPass());
+        softGltfRenderer_.setMainRenderPass(hdrScene_.getRenderPass());
+        ssfrRenderer_.resize(ext.width, ext.height);
+        ssfrRenderer_.setSceneInput(hdrScene_.getColorImageView(), hdrScene_.getDepthImageView(),
+                                    hdrSampler_.get(), 0.1f, 1000.f);
+    }
 }
 
 void FluidApp::onUpdate(uint32_t frameIndex)
@@ -532,6 +608,22 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     prevTestActive_ = testActive;
 
     const bool useSSFR = testActive || ssfrPanel_.isEnabled();
+    // Phase 5: SSFR's composite is the mandatory final pass whenever the HDR
+    // path is active -- it samples the linear-HDR scene target, applies ACES +
+    // exposure once, and writes the swapchain. That composite runs even with
+    // SSFR "disabled" because setSceneInput() makes hasScene true (see
+    // SSFluidRenderer::onRender): mode -1 = pure scene passthrough.
+    //
+    // enabled_ therefore gates only the *fluid-surface* work: the depth /
+    // thickness / bilateral / reflection / refraction pre-passes (onPreRender)
+    // and the surface composite mode. Turn it on only when there is actually a
+    // fluid surface to reconstruct -- forcing it on with an empty particle set
+    // still runs the whole pre-pass chain, and the bilateral pass reuses one
+    // per-frame descriptor set across its ping-pong iterations, which trips
+    // "descriptor set updated while bound" and invalidates the command buffer.
+    // The pre-pass targets are transitioned to SHADER_READ_ONLY_OPTIMAL once at
+    // init (initializeSSFRTargetLayouts), so the composite can sample them in
+    // passthrough mode without the pre-pass having run this frame.
     ssfrRenderer_.setEnabled(useSSFR);
     fluidRenderer_.setEnabled(!useSSFR);
     ssfrRenderer_.setMode(static_cast<SSFluidRenderer::Mode>(ssfrPanel_.getModeIndex()));
@@ -549,6 +641,9 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         if (flameWorld_.isRunning()) flameWorld_.step();
         syncFlameRenderer();
         fluidRenderer_.setEnabled(false);
+        // Flame owns the viewport. SSFR's fluid-surface work stays off; when the
+        // HDR path is active its composite still runs (hasScene) and passes the
+        // HDR scene (= flame) through with the shared ACES tonemap.
         ssfrRenderer_.setEnabled(false);
     }
     flameRenderer_.setEnabled(flameActive);
@@ -620,7 +715,9 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     } else {
     }
 
-    ::VKG::VkAppBase::onUpdate(frameIndex);
+    ::VKG::VkAppBase::onUpdate(frameIndex);   // ssfrRenderer_ + UI panels
+    // Phase 5: the opaque scene renderers are no longer VkAppBase sub-renderers.
+    for (auto* r : hdrRenderers_) r->onUpdate(frameIndex);
 }
 
 void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
@@ -655,6 +752,16 @@ void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
         shadowPass_.end(cmd);
     }
 
+    // Phase 5: render the whole opaque scene into the linear-HDR target. SSFR's
+    // pre-passes (below) sample its color + depth for refraction / occlusion,
+    // and its composite (in the swapchain pass) tonemaps it once.
+    if (hdrValid_) {
+        const std::array<float, 4> clear{ 0.02f, 0.02f, 0.03f, 1.0f };
+        hdrScene_.beginRenderPass(cmd, clear, 1.0f);
+        for (auto* r : hdrRenderers_) r->onRender(cmd, frameIndex);
+        hdrScene_.endRenderPass(cmd);
+    }
+
     ssfrRenderer_.onPreRender(cmd, frameIndex);
 }
 
@@ -672,11 +779,18 @@ void FluidApp::onCleanup()
     // Must run before VkAppBase::onCleanup()'s caller (cleanup()) destroys
     // the VulkanContext -- see FluidWorld::releaseGpuResources()'s doc comment.
     world_.releaseGpuResources();
-    ::VKG::VkAppBase::onCleanup();
+    ::VKG::VkAppBase::onCleanup();   // cleans up ssfrRenderer_ (the only sub-renderer left)
+
+    // Phase 5: the opaque scene renderers are driven manually, so clean them up
+    // manually too (device is idle -- cleanup() waited).
+    VkDevice device = getContext().getDevice();
+    for (auto* r : hdrRenderers_) r->onCleanup(device);
+
     // After the sub-renderers tore down their shadow pipelines (which reference
     // shadowPass_'s render pass). The VulkanContext is still alive here -- the
     // caller (cleanup()) destroys it afterwards.
     if (shadowPass_.isValid()) shadowPass_.destroy(getContext());
+    destroyHdrTargets();
 }
 
 void FluidApp::setupCallbacks()

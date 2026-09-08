@@ -32,6 +32,10 @@ public:
 
     bool isEnabled() const { return enabled_; }
     int  getModeIndex() const { return modeIndex_; }
+    // Scenario / command-driven (the bound enableCheck_ / modeCombo_ widgets read
+    // these same fields, so the GUI stays in sync).
+    void setEnabled(bool v) { enabled_ = v; }
+    void setModeIndex(int i) { modeIndex_ = i; }
     void setVisible(bool visible) { visible_ = visible; }
     bool isVisible() const { return visible_; }
 

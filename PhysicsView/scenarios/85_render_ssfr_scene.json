@@ -1,0 +1,45 @@
+{
+  "name": "85_render_ssfr_scene",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+
+    { "label": "Precondition: the default fluid block is seeded (0,0,0)-(20,20,20)", "command": "GetParticleCount", "expect_prefix": "Count:" },
+    { "label": "Precondition: SSFR is off by default -- the HDR composite runs as a pure passthrough tonemap", "command": "IsSSFREnabled", "expect": "0" },
+
+    { "label": "Background set + environment + shared light on the fluid camera", "command": "LoadRenderBackground:${repo_root}/Physics/PhysicsView/scenarios/models/stage.glb", "expect": "OK" },
+    { "label": "Synthetic cube map (SSFR reflections + refraction environment)", "command": "SetEnvironment:${repo_root}/Physics/PhysicsView/scenarios/models/env", "expect": "OK" },
+    { "label": "Shared directional light", "command": "SetLight:-0.3,-1,-0.25,1,1,1,3", "expect": "OK" },
+
+    { "label": "Let the fluid column slump so there is a real surface to reconstruct", "command": "Step:25", "expect": "OK" },
+
+    { "label": "A rigid sphere planted inside the fluid volume (occluder / refractor)", "command": "SetPreset:Custom", "expect": "OK" },
+    { "label": "Sphere near the shared camera target, overlapping the fluid", "command": "AddSphere:15:9:15:4:1", "expect": "OK" },
+    { "label": "A second sphere behind the fluid block", "command": "AddSphere:3:6:3:3:1", "expect": "OK" },
+    { "label": "Precondition: floor + 2 spheres", "command": "GetBodyCount", "expect": "Count:3" },
+    { "label": "Shade the rigid bodies so they read as solids against the fluid", "command": "SetRigidRenderMode:shaded", "expect": "OK" },
+
+    { "label": "Turn on screen-space fluid rendering", "command": "SetSSFREnabled:true", "expect": "OK" },
+    { "label": "Change: SSFR reports enabled", "command": "IsSSFREnabled", "expect": "1" },
+    { "label": "Advance so the SSFR surface + rigid occlusion settle", "command": "Step:15", "expect": "OK" },
+    { "label": "Screenshot: rigid spheres in front of / inside / behind the SSFR fluid surface",
+      "command": "SaveScreenshot:testdata/screenshots/85_render_ssfr_scene.png", "expect": "OK" },
+
+    { "label": "Switch SSFR to the thickness/absorption mode", "command": "SetSSFRMode:3", "expect": "OK" },
+    { "label": "Advance a couple of frames", "command": "Step:3", "expect": "OK" },
+    { "label": "Screenshot: an alternate SSFR mode composited on the same HDR scene",
+      "command": "SaveScreenshot:testdata/screenshots/85_render_ssfr_scene_mode3.png", "expect": "OK" },
+
+    { "label": "Back to surface mode", "command": "SetSSFRMode:5", "expect": "OK" },
+
+    { "label": "Turn SSFR off -- the HDR scene must still composite (pure ACES passthrough)", "command": "SetSSFREnabled:false", "expect": "OK" },
+    { "label": "Change: SSFR reports disabled", "command": "IsSSFREnabled", "expect": "0" },
+    { "label": "Advance a couple of frames", "command": "Step:3", "expect": "OK" },
+    { "label": "Screenshot: the glTF background + rigid spheres, no fluid surface, tonemapped once",
+      "command": "SaveScreenshot:testdata/screenshots/85_render_ssfr_scene_off.png", "expect": "OK" },
+
+    { "label": "Invariant: the app is still alive after the SSFR toggles + mode changes + captures", "command": "GetStatus", "expect": "OK" },
+
+    { "label": "Neg: an out-of-range SSFR mode index is rejected", "command": "SetSSFRMode:9", "expect_prefix": "Error:" },
+    { "label": "Neg: a non-boolean SSFR toggle is rejected", "command": "SetSSFREnabled:maybe", "expect_prefix": "Error:" }
+  ]
+}

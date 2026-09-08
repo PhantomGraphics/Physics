@@ -83,6 +83,11 @@ public:
 
     int instanceCount() const { return static_cast<int>(instances_.size()); }
 
+    // Point future instances at a recreated main render pass (Phase 5: FluidApp's
+    // HDR offscreen is rebuilt on window resize, invalidating the old handle).
+    // Existing instances' pipelines stay valid via render-pass compatibility.
+    void setMainRenderPass(VkRenderPass renderPass) { renderPass_ = renderPass; }
+
     // ---- IVkSubRenderer ----
     void onInit(Phantom::VKG::VulkanContext& ctx, const Phantom::VKG::VulkanCommandPool& pool,
                 VkRenderPass renderPass, uint32_t framesInFlight) override;

@@ -192,10 +192,11 @@ void main() {
 
     vec3 color = ambient + Lo + emissive;
 
-    // Tone mapping (Reinhard)
-    color = color / (color + vec3(1.0));
-    // Gamma correction
-    color = pow(color, vec3(1.0 / 2.2));
-
+    // Phase 5: keep the FluidApp HDR scene target linear -- ACES + exposure are
+    // applied exactly once, together with the fluid, by SSFluidRenderer's
+    // composite pass (the final pass into the swapchain). This is the only other
+    // PhysicsView-local divergence from CGLib/GltfViewer/shaders/gltf.frag (the
+    // first being the dot(N,V)<0 normal flip above), matching FluidStudio's
+    // linear gltf.frag.
     outColor = vec4(color, baseColor.a);
 }

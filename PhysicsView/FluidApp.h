@@ -26,6 +26,8 @@
 #include "../../CGLib/GltfRenderer/Gltf/GltfDocument.h"
 #include "../../CGLib/GltfRenderer/Renderer/GltfSceneRenderer.h"
 #include "../../CGLib/GltfRenderer/Renderer/ShadowMapPass.h"
+#include "../../CGLib/VulkanGraphics/VulkanOffscreen.h"
+#include "../../CGLib/VulkanGraphics/VulkanSampler.h"
 #include "RenderBackground.h"
 #include "RenderingPanel.h"
 #include "GltfBodyRenderer.h"
@@ -76,6 +78,7 @@ public:
 protected:
     void onInit() override;
     void onSwapChainCreated() override;
+    void onSwapChainDestroying() override;
     void onUpdate(uint32_t frameIndex) override;
     void onPreRender(VkCommandBuffer cmd, uint32_t frameIndex) override;
     void onImGui() override;
@@ -108,6 +111,15 @@ private:
     // sampled by the background / rigid / soft glTF PBR passes. FluidApp owns it
     // (the sub-renderers only take its render-pass/view/sampler handles).
     Phantom::Gltf::ShadowMapPass     shadowPass_;
+
+    // Phase 5: linear-HDR offscreen the opaque scene renders into; SSFR's
+    // composite samples it, tonemaps (ACES) once, and writes the swapchain.
+    Phantom::VKG::VulkanOffscreen    hdrScene_;
+    Phantom::VKG::VulkanSampler      hdrSampler_;
+    bool                             hdrValid_ = false;
+    // Opaque "scene" sub-renderers, driven manually against hdrScene_'s render
+    // pass (NOT via add()). Populated in the constructor.
+    std::vector<::VKG::IVkSubRenderer*> hdrRenderers_;
     ControlPanel controlPanel_;
     SSFRPanel ssfrPanel_;
     SSFRTestPanel ssfrTestPanel_;
@@ -187,6 +199,8 @@ private:
     void syncGpuCsphBufferToRenderer();
     void syncBackgroundCamera();
     void refreshShadowLightVP();
+    bool createHdrTargets();
+    void destroyHdrTargets();
     void syncRigidRenderer();
     void syncSoftRenderer();
     void syncFlameRenderer();

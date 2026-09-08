@@ -10,8 +10,11 @@ bool SSFRPipeline::create(const Phantom::VKG::VulkanContext& ctx,
                              const SSFRPassConfig& cfg)
 {
     framesInFlight_ = cfg.framesInFlight;
+    setsPerFrame_   = cfg.setsPerFrame ? cfg.setsPerFrame : 1;
     uboSize_        = cfg.uboSize;
     VkDevice device = ctx.getDevice();
+
+    const uint32_t totalSets = framesInFlight_ * setsPerFrame_;
 
     // --- Descriptor set layout ---
     if (!cfg.descriptorBindings.empty()) {
@@ -147,9 +150,9 @@ bool SSFRPipeline::create(const Phantom::VKG::VulkanContext& ctx,
     vkDestroyShaderModule(device, vertMod, nullptr);
     vkDestroyShaderModule(device, fragMod, nullptr);
 
-    // --- per-frame UBO ---
+    // --- per-(frame, slot) UBO ---
     if (uboSize_ > 0) {
-        uniformBuffers_.resize(framesInFlight_);
+        uniformBuffers_.resize(totalSets);
         for (auto& ub : uniformBuffers_)
             ub.createMapped(ctx, uboSize_, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     }
@@ -161,22 +164,22 @@ bool SSFRPipeline::create(const Phantom::VKG::VulkanContext& ctx,
             bool found = false;
             for (auto& ps : poolSizes) {
                 if (ps.type == b.descriptorType) {
-                    ps.descriptorCount += framesInFlight_;
+                    ps.descriptorCount += totalSets;
                     found = true;
                     break;
                 }
             }
             if (!found)
-                poolSizes.push_back({ b.descriptorType, framesInFlight_ });
+                poolSizes.push_back({ b.descriptorType, totalSets });
         }
-        descriptorPool_.create(device, poolSizes, framesInFlight_);
+        descriptorPool_.create(device, poolSizes, totalSets);
 
-        std::vector<VkDescriptorSetLayout> layouts(framesInFlight_, descriptorSetLayout_.get());
+        std::vector<VkDescriptorSetLayout> layouts(totalSets, descriptorSetLayout_.get());
         descriptorSets_ = descriptorPool_.allocateSets(device, layouts);
 
-        // Pre-fill UBO bindings.
+        // Pre-fill UBO bindings (each set gets its own UBO buffer).
         if (uboSize_ > 0) {
-            for (uint32_t i = 0; i < framesInFlight_; ++i) {
+            for (uint32_t i = 0; i < totalSets; ++i) {
                 // Write UBO bindings (type == UNIFORM_BUFFER).
                 for (const auto& b : cfg.descriptorBindings) {
                     if (b.descriptorType != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) continue;
@@ -220,18 +223,18 @@ void SSFRPipeline::destroy(VkDevice device)
     uboSize_        = 0;
 }
 
-void SSFRPipeline::updateUBO(uint32_t frame, const void* data, VkDeviceSize size)
+void SSFRPipeline::updateUBO(uint32_t frame, uint32_t slot, const void* data, VkDeviceSize size)
 {
-    uniformBuffers_[frame].write(data, size);
+    uniformBuffers_[frame * setsPerFrame_ + slot].write(data, size);
 }
 
-void SSFRPipeline::writeDescriptors(VkDevice device, uint32_t frame,
+void SSFRPipeline::writeDescriptors(VkDevice device, uint32_t frame, uint32_t slot,
                                        const std::vector<VkWriteDescriptorSet>& writes)
 {
-    // Override dstSet to the per-frame descriptor set before applying.
+    // Override dstSet to the (frame, slot) descriptor set before applying.
     std::vector<VkWriteDescriptorSet> patched = writes;
     for (auto& w : patched)
-        w.dstSet = descriptorSets_[frame];
+        w.dstSet = descriptorSets_[frame * setsPerFrame_ + slot];
     vkUpdateDescriptorSets(device, static_cast<uint32_t>(patched.size()),
                            patched.data(), 0, nullptr);
 }

@@ -17,6 +17,7 @@ namespace Phantom {
     class RenderBackground;
     class GltfBodyRenderer;
     class GltfSoftRenderer;
+    class SSFRPanel;
 
     // Single IScenarioDispatcher for FluidApp, covering the fluid world,
     // (since the RigidBodyView -> FluidView merge) the rigid-body scene, and
@@ -138,6 +139,11 @@ namespace Phantom {
         void setRigidBodyRenderer(GltfBodyRenderer* r) { rigidBodyRenderer_ = r; }
         void setSoftBodyRenderer(GltfSoftRenderer* r)  { softBodyRenderer_ = r; }
 
+        // Screen-space fluid rendering toggle + mode (Phase 5). SetSSFREnabled:
+        // {true|false} / SetSSFRMode:<index> / IsSSFREnabled. Unset makes them
+        // "Error:SSFR panel not available".
+        void setSsfrPanel(SSFRPanel* p) { ssfrPanel_ = p; }
+
         // Called after Reset or Step so the app can sync GPU buffers.
         void setOnWorldChanged(std::function<void()> cb) { onWorldChanged_ = std::move(cb); }
         void setOnRigidWorldChanged(std::function<void()> cb) { rigidDispatcher_.setOnWorldChanged(std::move(cb)); }
@@ -188,6 +194,7 @@ namespace Phantom {
         RenderBackground* renderBg_ = nullptr;
         GltfBodyRenderer* rigidBodyRenderer_ = nullptr;
         GltfSoftRenderer* softBodyRenderer_  = nullptr;
+        SSFRPanel* ssfrPanel_ = nullptr;
         std::function<void()> onWorldChanged_;
         std::function<void()> onVolumeChanged_;
         std::function<void()> onMeshChanged_;

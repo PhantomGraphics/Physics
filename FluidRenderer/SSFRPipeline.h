@@ -25,6 +25,14 @@ struct SSFRPassConfig {
     bool                additiveBlend = false;  // ONE+ONE additive blend for particle pass
     uint32_t            framesInFlight = 2;
     uint32_t            uboSize        = 0;     // per-frame UBO byte size (0 = no UBO)
+    // Descriptor sets (and matching UBO buffers) allocated per frame-in-flight.
+    // The default of 1 matches a pass invoked once per frame. A pass invoked
+    // several times per frame (e.g. a separable / ping-pong bilateral filter)
+    // must set this to its max invocations per frame so each invocation gets a
+    // distinct set -- otherwise updating the shared set between draws while it is
+    // still bound invalidates the command buffer (and the shared UBO buffer is
+    // overwritten before the earlier draw executes).
+    uint32_t            setsPerFrame   = 1;
 };
 
 // Manages graphics pipeline + descriptor set + UBO for each SSFR pass.
@@ -42,21 +50,31 @@ public:
                 const SSFRPassConfig& cfg);
     void destroy(VkDevice device);
 
-    // Update the per-frame UBO (valid only for passes where uboSize > 0).
-    void updateUBO(uint32_t frame, const void* data, VkDeviceSize size);
+    // Update the UBO for (frame, slot) (valid only for passes where uboSize > 0).
+    // slot must be < setsPerFrame; the 2-arg form targets slot 0.
+    void updateUBO(uint32_t frame, const void* data, VkDeviceSize size) { updateUBO(frame, 0, data, size); }
+    void updateUBO(uint32_t frame, uint32_t slot, const void* data, VkDeviceSize size);
 
-    // Apply WriteDescriptorSet to the frame's descriptor set.
-    // Used for texture binding updates.
+    // Apply WriteDescriptorSet to the (frame, slot) descriptor set.
+    // Used for texture binding updates. The 3-arg form targets slot 0.
     void writeDescriptors(VkDevice device, uint32_t frame,
+                          const std::vector<VkWriteDescriptorSet>& writes) {
+        writeDescriptors(device, frame, 0, writes);
+    }
+    void writeDescriptors(VkDevice device, uint32_t frame, uint32_t slot,
                           const std::vector<VkWriteDescriptorSet>& writes);
 
     VkPipeline       getPipeline()                const { return pipeline_; }
     VkPipelineLayout getLayout()                  const { return layout_; }
-    VkDescriptorSet  getDescriptorSet(uint32_t f) const { return descriptorSets_[f]; }
+    VkDescriptorSet  getDescriptorSet(uint32_t f) const { return getDescriptorSet(f, 0); }
+    VkDescriptorSet  getDescriptorSet(uint32_t f, uint32_t slot) const {
+        return descriptorSets_[f * setsPerFrame_ + slot];
+    }
     bool             isValid()                    const { return pipeline_ != VK_NULL_HANDLE; }
 
 private:
     uint32_t framesInFlight_ = 0;
+    uint32_t setsPerFrame_   = 1;
     uint32_t uboSize_        = 0;
 
     VkPipeline            pipeline_ = VK_NULL_HANDLE;
