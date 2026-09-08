@@ -1,0 +1,41 @@
+{
+  "name": "83_render_soft_shaded",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+
+    { "label": "Cloth draping over a sphere onto the floor", "command": "SetPreset:ClothWithSphere", "expect": "OK" },
+    { "label": "Precondition: 1 soft body", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Precondition: 400 particles (20x20 grid)", "command": "GetSoftParticleCount", "expect": "Particles:400" },
+    { "label": "Precondition: the soft render mode defaults to wireframe", "command": "GetSoftRenderMode", "expect": "wire" },
+    { "label": "Precondition: the cloth spawns flat at y=1.5, above the sphere", "command": "GetSoftMinPositionY", "expect": "1.500000", "store_as": "cloth_min_before" },
+
+    { "label": "Switch the soft bodies to PBR (shaded) rendering", "command": "SetSoftRenderMode:shaded", "expect": "OK" },
+    { "label": "Change: the mode is now shaded", "command": "GetSoftRenderMode", "expect": "shaded" },
+
+    { "label": "Let the cloth fall and drape over the sphere onto the floor (~3.3s)", "command": "Step:200", "expect": "OK" },
+    { "label": "Change: the cloth has fallen -- min Y after draping is below its flat starting height", "command": "GetSoftMinPositionY", "store_as": "cloth_min_after" },
+    { "label": "Invariant: no velocity explosion", "command": "GetMaxSpeed", "expect_range": "0.0,20.0" },
+
+    { "label": "Both modes at once (wire over shaded)", "command": "SetSoftRenderMode:both", "expect": "OK" },
+    { "label": "Screenshot: the draped cloth rendered as a PBR surface + wire overlay",
+      "command": "SaveScreenshot:testdata/screenshots/83_render_soft_shaded_cloth.png", "expect": "OK" },
+
+    { "label": "Preset switch (cloth -> jelly) reconciles the shaded instances", "command": "SetPreset:JellyDrop", "expect": "OK" },
+    { "label": "Precondition: 1 soft body", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Shaded only", "command": "SetSoftRenderMode:shaded", "expect": "OK" },
+    { "label": "Let the jelly cube fall and land", "command": "Step:90", "expect": "OK" },
+    { "label": "Screenshot: the jelly cube rendered as a PBR surface",
+      "command": "SaveScreenshot:testdata/screenshots/83_render_soft_shaded_jelly.png", "expect": "OK" },
+
+    { "label": "Rope has no triangle surface -> stays wireframe only (0 shaded instances)", "command": "SetPreset:RopeHanging", "expect": "OK" },
+    { "label": "Precondition: 1 soft body", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Shaded mode requested, but the rope contributes no shaded surface", "command": "SetSoftRenderMode:shaded", "expect": "OK" },
+    { "label": "Step the rope", "command": "Step:30", "expect": "OK" },
+    { "label": "Invariant: the app is still alive with a shaded rope requested (no surface drawn)", "command": "GetStatus", "expect": "OK" },
+
+    { "label": "Restore the default wireframe mode", "command": "SetSoftRenderMode:wire", "expect": "OK" },
+
+    { "label": "Neg: an unknown render mode is rejected", "command": "SetSoftRenderMode:bogus", "expect_prefix": "Error:" }
+  ],
+  "post_assert": "cloth_min_after < cloth_min_before"
+}

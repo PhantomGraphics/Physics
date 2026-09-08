@@ -16,6 +16,7 @@ namespace Phantom {
 
 class RenderBackground;
 class GltfBodyRenderer;
+class GltfSoftRenderer;
 
 /**
  * @brief "glTF Rendering" Control page: background set, environment, and the
@@ -30,6 +31,7 @@ class RenderingPanel : public IEmbeddedPanel {
 public:
     void bind(RenderBackground* bg) { bg_ = bg; }
     void bindRigidBodyRenderer(GltfBodyRenderer* r) { rigidBody_ = r; }
+    void bindSoftBodyRenderer(GltfSoftRenderer* r) { softBody_ = r; }
     void init();
 
     void drawContents() override;
@@ -39,9 +41,11 @@ private:
     std::string backgroundStatusText() const;
     std::string environmentStatusText() const;
     std::string rigidStatusText() const;
+    std::string softStatusText() const;
 
     RenderBackground* bg_ = nullptr;
     GltfBodyRenderer* rigidBody_ = nullptr;
+    GltfSoftRenderer* softBody_ = nullptr;
     bool uiBuilt_ = false;
     bool seeded_  = false;
 
@@ -77,11 +81,13 @@ private:
     UI::Vector3dView lightColor_ {"Color (RGB)"};
     UI::FloatSlider  lightInt_   {"Intensity", 0.0f, 10.0f};
 
-    // Rigid body display mode (wire / shaded / both)
+    // Rigid / soft body display mode (wire / shaded / both)
     UI::Separator   sep4_;
-    UI::Label       rigidHeader_    {std::string("--- Rigid Bodies ---"), UI::Label::Style::Disabled};
-    UI::ComboBox    rigidModeCombo_ {"Mode"};
+    UI::Label       rigidHeader_    {std::string("--- Rigid / Soft Bodies ---"), UI::Label::Style::Disabled};
+    UI::ComboBox    rigidModeCombo_ {"Rigid Mode"};
     UI::Label       rigidStatus_    {[this] { return rigidStatusText(); }, UI::Label::Style::Disabled};
+    UI::ComboBox    softModeCombo_  {"Soft Mode"};
+    UI::Label       softStatus_     {[this] { return softStatusText(); }, UI::Label::Style::Disabled};
 };
 
 } // namespace Phantom

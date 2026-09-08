@@ -172,11 +172,14 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     // glTF background / environment / shared light (PLAN_physicsview_gltf_rendering.md).
     renderBackground_.bind(&bgGltfRenderer_, &ssfrRenderer_);
     dispatcher_.setRenderBackground(&renderBackground_);
-    // Rigid-body PBR ("shaded") rendering, Phase 2.
+    // Rigid-/soft-body PBR ("shaded") rendering, Phase 2/3.
     rigidGltfRenderer_.bindWorld(&world_.rigid());
     dispatcher_.setRigidBodyRenderer(&rigidGltfRenderer_);
+    softGltfRenderer_.bindWorld(&softWorld_);
+    dispatcher_.setSoftBodyRenderer(&softGltfRenderer_);
     renderingPanel_.bind(&renderBackground_);
     renderingPanel_.bindRigidBodyRenderer(&rigidGltfRenderer_);
+    renderingPanel_.bindSoftBodyRenderer(&softGltfRenderer_);
     renderingPanel_.init();
 
     volumeConvertPanel_.bindWorld(&world_);
@@ -202,6 +205,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     add(&ssfrRenderer_);
     add(&rigidGltfRenderer_);   // opaque shaded rigid bodies before the wire pass
     add(&rigidRenderer_);
+    add(&softGltfRenderer_);    // opaque shaded soft bodies before the wire pass
     add(&softRenderer_);
     add(&volumeRenderer_);
     add(&meshRenderer_);
@@ -385,10 +389,13 @@ void FluidApp::onInit()
         s.fragSpv = ::VKG::loadSPVRepo("shaders/gltf.frag.spv");
         bgGltfRenderer_.setShaders(std::move(s));
     }
-    // Rigid-body shaded pass: same gltf.{vert,frag}; each per-body
-    // GltfSceneRenderer instance gets its own copy (see GltfBodyRenderer).
+    // Rigid-/soft-body shaded pass: same gltf.{vert,frag}; each per-body
+    // GltfSceneRenderer instance gets its own copy (see GltfBodyRenderer /
+    // GltfSoftRenderer).
     rigidGltfRenderer_.setShaders(::VKG::loadSPVRepo("shaders/gltf.vert.spv"),
                                   ::VKG::loadSPVRepo("shaders/gltf.frag.spv"));
+    softGltfRenderer_.setShaders(::VKG::loadSPVRepo("shaders/gltf.vert.spv"),
+                                 ::VKG::loadSPVRepo("shaders/gltf.frag.spv"));
 
     ::VKG::VkAppBase::onInit();
     setupCallbacks();
@@ -523,16 +530,17 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         ssfrRenderer_.setEnabled(false);
     }
     flameRenderer_.setEnabled(flameActive);
-    softRenderer_.setEnabled(!flameActive);
-    // Rigid body: wire (RigidBodyWireRenderer) vs shaded (GltfBodyRenderer) vs
-    // both, per SetRigidRenderMode / the "glTF Rendering" panel. Flame still
-    // takes the whole viewport.
+    // Rigid / soft body: wire (RigidBodyWireRenderer / SoftBodyWireRenderer) vs
+    // shaded (GltfBodyRenderer / GltfSoftRenderer) vs both, per SetRigidRenderMode
+    // / SetSoftRenderMode / the "glTF Rendering" panel. Flame still takes the
+    // whole viewport.
     {
         const auto rm = rigidGltfRenderer_.mode();
-        const bool wantWire   = (rm == GltfBodyRenderer::Mode::Wireframe || rm == GltfBodyRenderer::Mode::Both);
-        const bool wantShaded = (rm == GltfBodyRenderer::Mode::Shaded    || rm == GltfBodyRenderer::Mode::Both);
-        rigidRenderer_.setEnabled(!flameActive && wantWire);
-        rigidGltfRenderer_.setEnabled(!flameActive && wantShaded);
+        rigidRenderer_.setEnabled(!flameActive && bodyRenderModeWantsWire(rm));
+        rigidGltfRenderer_.setEnabled(!flameActive && bodyRenderModeWantsShaded(rm));
+        const auto sm = softGltfRenderer_.mode();
+        softRenderer_.setEnabled(!flameActive && bodyRenderModeWantsWire(sm));
+        softGltfRenderer_.setEnabled(!flameActive && bodyRenderModeWantsShaded(sm));
     }
     // The Flame page owns the viewport (see the flameActive comment above);
     // hide the glTF background there too, matching rigid/soft/fluid.
@@ -554,10 +562,12 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         const glm::mat4 proj = fluidRenderer_.getProjMatrix();
         const glm::vec3 eye  = glm::vec3(glm::inverse(view)[3]);
         const glm::vec3 ld   = renderBackground_.lightDirection();
+        const glm::vec4 lightDir(glm::normalize(ld), 0.0f);
+        const glm::vec4 lightCol(renderBackground_.lightColor(), renderBackground_.lightIntensity());
         rigidGltfRenderer_.setCamera(view, proj, eye);
-        rigidGltfRenderer_.setLight(
-            glm::vec4(glm::normalize(ld), 0.0f),
-            glm::vec4(renderBackground_.lightColor(), renderBackground_.lightIntensity()));
+        rigidGltfRenderer_.setLight(lightDir, lightCol);
+        softGltfRenderer_.setCamera(view, proj, eye);
+        softGltfRenderer_.setLight(lightDir, lightCol);
     }
 
     if (auto path = dispatcher_.takePendingScreenshot()) {
@@ -681,6 +691,7 @@ void FluidApp::syncSoftRenderer()
     auto wd = softWorld_.buildWireData();
     softRenderer_.update(wd.positions, wd.colors, wd.indices,
                           fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
+    softGltfRenderer_.syncFromWorld();
 }
 
 void FluidApp::syncFlameRenderer()

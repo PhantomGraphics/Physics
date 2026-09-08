@@ -21,22 +21,6 @@ const glm::vec4 kStaticColor {0.45f, 0.47f, 0.50f, 1.0f};
 const glm::vec4 kDynamicColor{0.35f, 0.55f, 0.90f, 1.0f};
 } // namespace
 
-bool GltfBodyRenderer::parseMode(const std::string& s, Mode& out) {
-    if (s == "wire" || s == "wireframe") { out = Mode::Wireframe; return true; }
-    if (s == "shaded")                   { out = Mode::Shaded;    return true; }
-    if (s == "both")                     { out = Mode::Both;      return true; }
-    return false;
-}
-
-const char* GltfBodyRenderer::modeName(Mode m) {
-    switch (m) {
-    case Mode::Wireframe: return "wire";
-    case Mode::Shaded:    return "shaded";
-    case Mode::Both:      return "both";
-    }
-    return "wire";
-}
-
 Phantom::Gltf::GltfSceneRenderer::Shaders GltfBodyRenderer::makeShaders() const {
     Phantom::Gltf::GltfSceneRenderer::Shaders s;
     s.vertSpv = vertSpv_;

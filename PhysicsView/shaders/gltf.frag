@@ -124,6 +124,14 @@ void main() {
     }
 
     vec3 V = normalize(cam.camPos.xyz - fragPos);
+    // Two-sided shading: PhysicsView renders zero-thickness soft-body surfaces
+    // with culling disabled, so a visible fragment on the far side of the sheet
+    // carries a normal pointing away from the camera -- flip it toward the
+    // viewer. For the solid, back-face-culled background/rigid meshes every
+    // visible fragment already faces the camera, so this is a no-op there.
+    // (docs/todo/PLAN_physicsview_gltf_rendering.md Phase 3 -- this is the one
+    // PhysicsView-local divergence from CGLib/GltfViewer/shaders/gltf.frag.)
+    if (dot(N, V) < 0.0) N = -N;
     vec3 R = reflect(-V, N);
 
     // Light direction (w=0: directional, w=1: point)

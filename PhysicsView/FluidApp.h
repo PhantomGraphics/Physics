@@ -28,6 +28,7 @@
 #include "RenderBackground.h"
 #include "RenderingPanel.h"
 #include "GltfBodyRenderer.h"
+#include "GltfSoftRenderer.h"
 
 #include "../../CGLib/UIWidgets/MainMenuBar.h"
 #include "../../CGLib/UIWidgets/Menu.h"
@@ -126,6 +127,11 @@ private:
     // placement + minimal scenario-command wiring.
     SoftBodyWorld    softWorld_;
     SoftBodyWireRenderer  softRenderer_;
+    // SoftBody PBR ("shaded") pass -- sibling of rigidGltfRenderer_
+    // (docs/todo/PLAN_physicsview_gltf_rendering.md Phase 3). Cloth/Jelly get a
+    // shaded surface (double-wound, per-frame CPU normals); Rope has no faces
+    // and stays wireframe. SetSoftRenderMode / the "glTF Rendering" panel.
+    GltfSoftRenderer      softGltfRenderer_;
     SoftBodyControlPanel  softControlPanel_;
 
     // Flame (reacting hot-gas SPH), folded in from the former standalone

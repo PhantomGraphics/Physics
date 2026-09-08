@@ -72,7 +72,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 | 30–44 | `soft` — 軟体単体・軟体間/自己衝突 | 90–99 | `neg` — 異常系 |
 | 50–59 | `couple` — Rigid↔Fluid / Soft↔Fluid | | |
 
-現在 49 本（`81_render_background` / `82_render_rigid_shaded` を含む、glTF レンダリング Phase 1–2）。全シナリオが「事前条件・変化（`store_as`+`post_assert` または初期値を含まない `expect_range`/`expect_not`）・不変条件」の三点契約で構成されている（詳細は
+現在 50 本（`81_render_background` / `82_render_rigid_shaded` / `83_render_soft_shaded` を含む、glTF レンダリング Phase 1–3）。全シナリオが「事前条件・変化（`store_as`+`post_assert` または初期値を含まない `expect_range`/`expect_not`）・不変条件」の三点契約で構成されている（詳細は
 シナリオテストガイドの「アサーション三点契約」節）。
 
 **タグ:** JSON トップレベルの `"tags": [...]` を `run_physics_scenarios.ps1` が読み、`-Tag`/`-ExcludeTag` で絞り込む
@@ -126,6 +126,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 | `SetLight:dx,dy,dz,r,g,b,intensity` | 共有 directional light（glTF パス + SSFR。7 float、退化方向/負値は `Error:`） |
 | `SetRenderUseIBL:{0\|1}` / `GetRenderSceneState` | IBL フラグ（実 precompute は Phase 6 の TODO）／背景パス・primitive 数・環境・transform・ライトを JSON で返す |
 | `SetRigidRenderMode:{wire\|shaded\|both}` / `GetRigidRenderMode` | 剛体の表示切替。`wire`（既定、`RigidBodyWireRenderer`）／`shaded`（`GltfBodyRenderer` = body ごとに `GltfSceneRenderer` + 合成した単位 Sphere/Box をPBR描画、共有カメラ＋directional light）／`both`。Plane shape（床）は shaded instance を作らない（背景ステージと冗長・z-fight）。glTF レンダリング Phase 2、2026-09-08 |
+| `SetSoftRenderMode:{wire\|shaded\|both}` / `GetSoftRenderMode` | 軟体の表示切替。`shaded` は `GltfSoftRenderer`（faces を持つ body ごとに `GltfSceneRenderer`、`SoftMesh::particles`＋スムーズ法線を毎フレーム `updateMorphedGeometry()` でストリーム、`VK_CULL_MODE_NONE`＋シェーダで法線をカメラ方向反転して両面ライティング）。Rope は faces 無し → shaded 対象外。glTF レンダリング Phase 3、2026-09-08 |
 
 **既知の簡略化**（各シナリオ JSON の `_comment` にも記載）:
 - `showcase_dam_break.json`/`showcase_preview.json`: 崩れた水柱を裂く柱2本・段差1個の障害物は**入れていない**。
@@ -186,7 +187,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 - `SoftBodyWorld` — クロス/ロープ/ゼリーのシーン。`setSoftCouplingEnabled()`でSoftBody-Fluid結合も可能（UI・シナリオコマンドの配線は`FluidWorld`/`FluidApp`側）。
 - `FluidCommandDispatcher`/`RigidBodyCommandDispatcher`/`SoftBodyCommandDispatcher` — `IScenarioDispatcher` を実装するコマンド文字列ディスパッチャ（シナリオテストガイド参照）。`CommandDispatcher` の `AddEmitter:cx,cy,cz,radius,rate,dirX,dirY,dirZ,speed`/`ClearEmitters`/`GetEmitterCount` が `FluidWorld::addEmitter()`（上記 Emitter 節）を駆動する。`ControlPanel` にも同機能の ImGui セクション（"Emitters"）がある。シナリオ例: `scenarios/dfsph_emitter_faucet.json`。
 - 描画: `FluidRenderer`（パーティクル直接描画）と `SSFluidRenderer`（`Physics/FluidRenderer/` の SSFR、下記）を切替可能。`RigidBodyWireRenderer`/`SoftBodyWireRenderer` はワイヤーフレーム表示。
-- glTF レンダリング（`docs/todo/PLAN_physicsview_gltf_rendering.md`、Phase 0–1 実装済み 2026-09-08）: `bgGltfRenderer_`（`Phantom::Gltf::GltfSceneRenderer` 1 個、`add()` で最初のサブレンダラー）が不透明背景セットを流体と同一カメラ（`FluidRenderer` が唯一のソース、`syncBackgroundCamera()` が `inverse(view)[3]` を eye に）で PBR 描画する。ドキュメント・環境・共有 directional light は `RenderBackground.{h,cpp}` が所有し、`CommandDispatcher` の `LoadRenderBackground`/`SetEnvironment`/`SetLight`/… と `ControlPage::Rendering`（`RenderingPanel`、"glTF Rendering" ページ）が駆動する。gltf.{vert,frag} は `CGLib/GltfViewer/shaders` から `PhysicsView/shaders/` へコピー（SDR シェーダ内トーンマップ版、Universe と同一）。Flame ページ中は `setVisible(false)`。Phase 2（2026-09-08）で剛体の PBR 描画 `GltfBodyRenderer`（body ごとに `GltfSceneRenderer` + `PrimitiveGltf.{h,cpp}` の Vulkan 非依存な単位 Sphere/Box 合成、`SetRigidRenderMode:{wire|shaded|both}`、Plane は shaded 対象外）を追加。次フェーズ = SoftBody の PBR 描画。
+- glTF レンダリング（`docs/todo/PLAN_physicsview_gltf_rendering.md`、Phase 0–1 実装済み 2026-09-08）: `bgGltfRenderer_`（`Phantom::Gltf::GltfSceneRenderer` 1 個、`add()` で最初のサブレンダラー）が不透明背景セットを流体と同一カメラ（`FluidRenderer` が唯一のソース、`syncBackgroundCamera()` が `inverse(view)[3]` を eye に）で PBR 描画する。ドキュメント・環境・共有 directional light は `RenderBackground.{h,cpp}` が所有し、`CommandDispatcher` の `LoadRenderBackground`/`SetEnvironment`/`SetLight`/… と `ControlPage::Rendering`（`RenderingPanel`、"glTF Rendering" ページ）が駆動する。gltf.{vert,frag} は `CGLib/GltfViewer/shaders` から `PhysicsView/shaders/` へコピー（SDR シェーダ内トーンマップ版、Universe と同一）。Flame ページ中は `setVisible(false)`。Phase 2–3（2026-09-08）で剛体・軟体の PBR 描画を追加: `GltfBodyRenderer`（`PrimitiveGltf.{h,cpp}` の単位 Sphere/Box、`SetRigidRenderMode`）と `GltfSoftRenderer`（`SoftMeshGltf.{h,cpp}` で `SoftMesh` から合成、毎フレーム `GltfSceneRenderer::updateMorphedGeometry()` で position+法線ストリーム、cull-none、`SetSoftRenderMode`、Rope は対象外）。どちらも Vulkan 非依存の合成部を PhysicsTest で単体テスト。CGLib 側は `GltfGpuMesh::setKeepCpuVertices()`/`updatePositionsAndNormals()`・`GltfSceneRenderer::setDynamic()`/`setCullMode()`/`updateMorphedGeometry()` を純追加（既定不変）。
 - `FlameWorld`/`FlameControlPanel`/`FlameRenderer` — 炎 SPH（旧 FlameView を統合、下記 Flame 節）。`ControlPage::Flame` を開いている間だけ描画する独立ドメイン。
 
 ### Fluid_GPU_Vk（`Physics/Fluid_GPU_Vk/`）

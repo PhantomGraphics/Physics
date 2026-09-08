@@ -110,12 +110,15 @@ if(PHANTOM_GTEST_FOUND)
     list(FILTER PHYSICSTEST_SOURCES EXCLUDE REGEX
         "(FluidPoolStabilityTest|WaterSphereEmitterStabilityTest|SPHScaleInvarianceTest)\\.cpp$")
 
-    # PrimitiveGltf.cpp (PhysicsView) is pure logic -- GltfRenderer's header-only
-    # GltfDocument/GltfAccessorBuilder + glm, no Vulkan. Compiled straight into
-    # PhysicsTest so PrimitiveGltfTest.cpp can exercise it without a
-    # GltfRendererCore link (PLAN_physicsview_gltf_rendering.md Phase 2 / §6).
+    # PrimitiveGltf.cpp / SoftMeshGltf.cpp (PhysicsView) are pure logic --
+    # GltfRenderer's header-only GltfDocument/GltfAccessorBuilder + glm (+
+    # PhysicsCore's SoftMesh.h for the soft one), no Vulkan. Compiled straight
+    # into PhysicsTest so PrimitiveGltfTest.cpp / SoftMeshGltfTest.cpp can
+    # exercise them without a GltfRendererCore link
+    # (PLAN_physicsview_gltf_rendering.md Phase 2/3 / §6).
     add_executable(PhysicsTest ${PHYSICSTEST_SOURCES}
-        ${PHYSICS_ROOT}/PhysicsView/PrimitiveGltf.cpp)
+        ${PHYSICS_ROOT}/PhysicsView/PrimitiveGltf.cpp
+        ${PHYSICS_ROOT}/PhysicsView/SoftMeshGltf.cpp)
     set_target_properties(PhysicsTest PROPERTIES
         CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON
@@ -229,6 +232,8 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/RenderingPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/PrimitiveGltf.cpp
     ${PHYSICS_ROOT}/PhysicsView/GltfBodyRenderer.cpp
+    ${PHYSICS_ROOT}/PhysicsView/SoftMeshGltf.cpp
+    ${PHYSICS_ROOT}/PhysicsView/GltfSoftRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/SceneComponentRegistry.cpp
     ${PHYSICS_ROOT}/PhysicsView/ObjectListPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/CommandDispatcher.cpp

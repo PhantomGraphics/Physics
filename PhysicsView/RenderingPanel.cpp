@@ -3,6 +3,7 @@
 
 #include "RenderBackground.h"
 #include "GltfBodyRenderer.h"
+#include "GltfSoftRenderer.h"
 
 namespace Phantom {
 
@@ -27,6 +28,11 @@ std::string RenderingPanel::environmentStatusText() const {
 std::string RenderingPanel::rigidStatusText() const {
     if (!rigidBody_) return {};
     return "shaded instances: " + std::to_string(rigidBody_->instanceCount());
+}
+
+std::string RenderingPanel::softStatusText() const {
+    if (!softBody_) return {};
+    return "shaded instances: " + std::to_string(softBody_->instanceCount());
 }
 
 void RenderingPanel::buildUi() {
@@ -57,16 +63,25 @@ void RenderingPanel::buildUi() {
     lightInt_.bind([this] { return bg_ ? bg_->lightIntensity() : 3.f; },
                    [](float) {}); // pushed with dir/color in drawContents()
 
-    rigidModeCombo_.addItem("Wireframe");
-    rigidModeCombo_.addItem("Shaded");
-    rigidModeCombo_.addItem("Both");
+    for (auto* c : { &rigidModeCombo_, &softModeCombo_ }) {
+        c->addItem("Wireframe");
+        c->addItem("Shaded");
+        c->addItem("Both");
+    }
     rigidModeCombo_.bind(
         [this] { return rigidBody_ ? static_cast<int>(rigidBody_->mode()) : 0; },
         [this](int v) {
-            if (rigidBody_) rigidBody_->setMode(static_cast<GltfBodyRenderer::Mode>(v));
+            if (rigidBody_) rigidBody_->setMode(static_cast<BodyRenderMode>(v));
         });
     rigidModeCombo_.setVisibleWhen([this] { return rigidBody_ != nullptr; });
     rigidStatus_.setVisibleWhen([this] { return rigidBody_ != nullptr; });
+    softModeCombo_.bind(
+        [this] { return softBody_ ? static_cast<int>(softBody_->mode()) : 0; },
+        [this](int v) {
+            if (softBody_) softBody_->setMode(static_cast<BodyRenderMode>(v));
+        });
+    softModeCombo_.setVisibleWhen([this] { return softBody_ != nullptr; });
+    softStatus_.setVisibleWhen([this] { return softBody_ != nullptr; });
 
     contents_.add(&bgHeader_);
     contents_.add(&bgPathInput_);
@@ -94,6 +109,8 @@ void RenderingPanel::buildUi() {
     contents_.add(&rigidHeader_);
     contents_.add(&rigidModeCombo_);
     contents_.add(&rigidStatus_);
+    contents_.add(&softModeCombo_);
+    contents_.add(&softStatus_);
 }
 
 void RenderingPanel::drawContents() {

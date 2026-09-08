@@ -10,6 +10,7 @@
 #include "FluidPLYWriter.h"
 #include "RenderBackground.h"
 #include "GltfBodyRenderer.h"
+#include "GltfSoftRenderer.h"
 
 #include <glm/glm.hpp>
 
@@ -723,15 +724,28 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
 
     if (sv.rfind("SetRigidRenderMode:", 0) == 0) {
         if (!rigidBodyRenderer_) return std::string("Error:rigid body renderer not available");
-        GltfBodyRenderer::Mode m;
-        if (!GltfBodyRenderer::parseMode(std::string(sv.substr(19)), m))
+        BodyRenderMode m;
+        if (!parseBodyRenderMode(std::string(sv.substr(19)), m))
             return std::string("Error:mode must be wire|shaded|both");
         rigidBodyRenderer_->setMode(m);
         return std::string("OK");
     }
     if (cmd == "GetRigidRenderMode") {
         if (!rigidBodyRenderer_) return std::string("Error:rigid body renderer not available");
-        return std::string(GltfBodyRenderer::modeName(rigidBodyRenderer_->mode()));
+        return std::string(bodyRenderModeName(rigidBodyRenderer_->mode()));
+    }
+
+    if (sv.rfind("SetSoftRenderMode:", 0) == 0) {
+        if (!softBodyRenderer_) return std::string("Error:soft body renderer not available");
+        BodyRenderMode m;
+        if (!parseBodyRenderMode(std::string(sv.substr(18)), m))
+            return std::string("Error:mode must be wire|shaded|both");
+        softBodyRenderer_->setMode(m);
+        return std::string("OK");
+    }
+    if (cmd == "GetSoftRenderMode") {
+        if (!softBodyRenderer_) return std::string("Error:soft body renderer not available");
+        return std::string(bodyRenderModeName(softBodyRenderer_->mode()));
     }
 
     return std::nullopt;

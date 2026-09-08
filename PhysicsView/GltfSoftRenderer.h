@@ -12,37 +12,33 @@
 
 #include <cstdint>
 #include <memory>
-#include <string>
 #include <unordered_map>
 #include <vector>
 
 namespace Phantom {
 
-class RigidBodyWorld;
-namespace Physics { class RigidBody; }
+class SoftBodyWorld;
+namespace Physics { struct ISoftBody; }
 
 /**
- * @brief PBR ("shaded") rendering of the rigid-body scene, an alternative to
- * RigidBodyWireRenderer's wireframe (docs/todo/PLAN_physicsview_gltf_rendering.md
- * Phase 2). Strongly modelled on Universe's Rendering/GltfRenderer.
+ * @brief PBR ("shaded") rendering of the soft-body scene, an alternative to
+ * SoftBodyWireRenderer's wireframe
+ * (docs/todo/PLAN_physicsview_gltf_rendering.md Phase 3). Sibling of
+ * GltfBodyRenderer.
  *
- * One Phantom::Gltf::GltfSceneRenderer + synthesized unit-primitive GltfDocument
- * per RigidBody, keyed by the (lifetime-stable) RigidBody pointer.
- * syncFromWorld() reconciles that map with RigidBodyWorld's current body set on
- * preset switches / AddSphere / AddBox / AddFloor; onUpdate() streams each
- * body's live transform in through GltfSceneRenderer::setModelMatrix()
- * (translate * rotate * per-shape scale). Deliberately minimal: flat PBR,
- * no skybox / IBL / shadow (matches Universe Phase 2).
- *
- * Mode: Wireframe (default -- this renderer draws nothing, RigidBodyWireRenderer
- * owns the viewport), Shaded (this renderer only), or Both. FluidApp reads
- * mode() to gate the two renderers' setEnabled().
+ * One Phantom::Gltf::GltfSceneRenderer + GltfDocument per ISoftBody that has a
+ * triangle surface (SoftMesh::faces) -- Rope has none and stays wireframe-only.
+ * The document is one shared-vertex, double-wound primitive
+ * (SoftMeshGltf.h). syncFromWorld() reconciles the instance map on preset
+ * switches; onUpdate() re-streams every particle position + a CPU-recomputed
+ * smooth normal each frame via GltfSceneRenderer::updateMorphedGeometry() (the
+ * primitive is marked setDynamic(true) so the CPU vertex mirror is kept).
  */
-class GltfBodyRenderer : public ::VKG::IVkSubRenderer {
+class GltfSoftRenderer : public ::VKG::IVkSubRenderer {
 public:
     using Mode = BodyRenderMode;
 
-    void bindWorld(RigidBodyWorld* world) { world_ = world; }
+    void bindWorld(SoftBodyWorld* world) { world_ = world; }
     void setShaders(std::vector<uint32_t> vertSpv, std::vector<uint32_t> fragSpv) {
         vertSpv_ = std::move(vertSpv);
         fragSpv_ = std::move(fragSpv);
@@ -51,22 +47,14 @@ public:
     void setMode(Mode m) { mode_ = m; }
     Mode mode() const    { return mode_; }
 
-    // Drawn only when enabled AND mode != Wireframe (FluidApp gates enabled for
-    // the Flame page, same as the wire renderers).
     void setEnabled(bool e) { enabled_ = e; }
     bool isEnabled() const  { return enabled_; }
 
-    // Forwarded from FluidApp every frame (FluidRenderer is the camera's single
-    // source of truth) alongside the shared directional light.
     void setCamera(const glm::mat4& view, const glm::mat4& proj, const glm::vec3& eye);
     void setLight(const glm::vec4& dirW0, const glm::vec4& colorIntensityW);
 
-    // Reconcile instances_ with world_'s current bodies. Cheap no-op when the
-    // body set is unchanged. Safe to call every frame; FluidApp calls it from
-    // syncRigidRenderer() (fired on every rigid-world change).
     void syncFromWorld();
-
-    int instanceCount() const { return static_cast<int>(instances_.size()); }
+    int  instanceCount() const { return static_cast<int>(instances_.size()); }
 
     // ---- IVkSubRenderer ----
     void onInit(Phantom::VKG::VulkanContext& ctx, const Phantom::VKG::VulkanCommandPool& pool,
@@ -79,13 +67,13 @@ private:
     struct Instance {
         Phantom::Gltf::GltfDocument                        doc;
         std::unique_ptr<Phantom::Gltf::GltfSceneRenderer>  renderer;
+        size_t                                            vertexCount = 0; // guards size mismatches
     };
 
     Phantom::Gltf::GltfSceneRenderer::Shaders makeShaders() const;
-    static glm::mat4 bodyModelMatrix(const Physics::RigidBody& body);
-    Instance makeInstance(const Physics::RigidBody& body) const;
+    Instance makeInstance(const Physics::ISoftBody& body) const;
 
-    RigidBodyWorld* world_ = nullptr;
+    SoftBodyWorld* world_ = nullptr;
     std::vector<uint32_t> vertSpv_;
     std::vector<uint32_t> fragSpv_;
 
@@ -104,10 +92,9 @@ private:
     glm::vec4 lightDirW0_{glm::vec4(glm::normalize(glm::vec3(-0.3f, -1.0f, -0.25f)), 0.0f)};
     glm::vec4 lightColorIntensity_{1.f, 1.f, 1.f, 3.f};
 
-    // unordered_map so an Instance's address is stable across insert/erase of
-    // *other* entries -- GltfSceneRenderer::setDocument() stores a raw pointer
-    // into Instance::doc (same reason as Universe's map).
-    std::unordered_map<const Physics::RigidBody*, Instance> instances_;
+    std::vector<glm::vec3> normalScratch_; // reused each frame
+
+    std::unordered_map<const Physics::ISoftBody*, Instance> instances_;
 };
 
 } // namespace Phantom
