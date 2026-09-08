@@ -15,6 +15,7 @@ enum class ControlPage {
     Fluid = 0,
     RigidBody,
     SoftBody,
+    Flame,
     FluidRendering,
     SSFR,
     VolumeConversion,
@@ -32,6 +33,7 @@ inline const char* toString(ControlPage page)
     case ControlPage::Fluid:            return "Fluid";
     case ControlPage::RigidBody:        return "Rigid Body";
     case ControlPage::SoftBody:         return "Soft Body";
+    case ControlPage::Flame:            return "Flame";
     case ControlPage::FluidRendering:   return "Fluid Rendering";
     case ControlPage::SSFR:             return "SSFR";
     case ControlPage::VolumeConversion: return "Volume / Mesh Conversion";

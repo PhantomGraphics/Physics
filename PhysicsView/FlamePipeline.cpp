@@ -5,7 +5,7 @@
 
 using namespace Phantom::VKG;
 
-namespace FlameView {
+namespace Phantom {
 
 void FlamePipeline::create(const VulkanContext& ctx,
 	const VulkanCommandPool& pool,
@@ -165,4 +165,4 @@ void FlamePipeline::render(VkCommandBuffer cmd, uint32_t frameIndex)
 	vkCmdDraw(cmd, particleCount_, 1, 0, 0);
 }
 
-} // namespace FlameView
+} // namespace Phantom

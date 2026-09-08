@@ -11,7 +11,7 @@
 #include <optional>
 #include <vector>
 
-namespace FlameView {
+namespace Phantom {
 
 /**
  * @brief IVkSubRenderer wrapping FlamePipeline + FlameSmokePipeline + FlamePBVRPipeline.
@@ -26,16 +26,16 @@ namespace FlameView {
  *   opaque "PBVR variant" while flame kept unconditionally drawing on top) is what makes this a
  *   real no-sort-needed PBVR technique instead of an inconsistent, incorrectly-occluding one.
  *
- * Particle data is pushed in via setParticles()/setSmokeParticles()/setPBVRParticles() (FlameApp
+ * Particle data is pushed in via setParticles()/setSmokeParticles()/setPBVRParticles() (FluidApp
  * extracts/thins it from Physics::FlameFluid each frame) rather than this class reading
  * FlameFluid directly, so it stays a plain renderer with no simulation-side coupling. Sparks are
  * cosmetic secondary particles (see Phantom::Physics::FlameFluid::SecondaryParticle) but share
- * the flame's own temperature-gradient look, so FlameApp merges them into the same
+ * the flame's own temperature-gradient look, so FluidApp merges them into the same
  * position/temperature (Normal mode) or position/color (PBVR mode) arrays -- no renderer-side
  * distinction needed. Smoke needs a different (non-additive, tinted) look in Normal mode, so it
  * gets its own pipeline/buffers there, including its own inherited-temperature attribute (see
  * FlameSmokePipeline's doc comment) blended toward an ember-glow tint instead of the flame's
- * full blackbody gradient; in PBVR mode that same tint is pre-computed by FlameApp into the
+ * full blackbody gradient; in PBVR mode that same tint is pre-computed by FluidApp into the
  * shared color buffer instead (see FlamePBVRPipeline's doc comment).
  */
 class FlameRenderer : public ::VKG::IVkSubRenderer
@@ -48,6 +48,9 @@ public:
 	void setPBVRShaders(std::vector<uint32_t> vertSpv, std::vector<uint32_t> fragSpv);
 	void setRenderMode(RenderMode m) { renderMode_ = m; }
 	RenderMode getRenderMode() const { return renderMode_; }
+
+	void setEnabled(bool e) { enabled_ = e; }
+	bool isEnabled() const { return enabled_; }
 
 	/** @brief Replaces this frame's particle data (Normal mode). Call once per frame before the render pass. */
 	void setParticles(std::vector<float> positions, std::vector<float> temperatures, std::vector<float> sizes = {});
@@ -98,6 +101,7 @@ private:
 	float tMax_ = 1500.0f;
 	float smokePointSize_ = 20.0f;
 	RenderMode renderMode_ = RenderMode::Normal;
+	bool enabled_ = false;
 
 	const Phantom::VKG::VulkanContext* ctx_ = nullptr;
 	const Phantom::VKG::VulkanCommandPool* pool_ = nullptr;
@@ -107,4 +111,4 @@ private:
 	std::optional<FlamePBVRPipeline> pbvrPipeline_;
 };
 
-} // namespace FlameView
+} // namespace Phantom

@@ -46,6 +46,7 @@ public:
 
     glm::mat4 getViewMatrix() const;
     glm::mat4 getProjMatrix() const;
+    float     getCameraDistance() const { return distance_; }
 
     void handleMouseButton(bool pressed, float x, float y);
     void handleMouseMove(float x, float y);

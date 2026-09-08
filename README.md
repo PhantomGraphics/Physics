@@ -17,10 +17,9 @@ and standalone Vulkan viewers.
 |---|---|---|
 | `Physics/` (`PhysicsCore`) | Static library | Core library in `Phantom::Physics` |
 | `PhysicsTest/` | GoogleTest | Core-library unit tests |
-| `PhysicsView/` | Vulkan + ImGui app | Integrated viewer with JSON scenarios |
+| `PhysicsView/` | Vulkan + ImGui app | Integrated viewer with JSON scenarios; also hosts the experimental combustion-gas (Flame) SPH scene |
 | `Fluid_GPU_Vk/` (`FluidGPUVkCore`) | Static library | Vulkan Compute CSPH solver |
 | `FluidRenderer/` (`FluidRendererCore`) | Static library | Screen-space fluid rendering pipeline |
-| `FlameView/` | Vulkan + ImGui app | Experimental combustion-gas SPH viewer |
 
 ### Core capabilities
 
@@ -50,13 +49,13 @@ cmake --preset windows-debug
 cmake --build --preset windows-debug
 ```
 
-Main targets are `PhysicsCore`, `PhysicsTest`, `PhysicsView`, `FlameView`,
+Main targets are `PhysicsCore`, `PhysicsTest`, `PhysicsView`,
 `Fluid_GPU_Vk` (`FluidGPUVkCore`), and `FluidRenderer` (`FluidRendererCore`).
 
 If Vulkan headers, the Vulkan loader, or GLFW cannot be found, CMake skips
-`PhysicsView` and `FlameView` with a warning while retaining the core and test
-targets. On Linux, provide `VULKAN_INCLUDE_DIR`, `VULKAN_LIBRARY`, and
-`GLFW_LIBRARY` to enable the viewers.
+`PhysicsView` with a warning while retaining the core and test targets. On
+Linux, provide `VULKAN_INCLUDE_DIR`, `VULKAN_LIBRARY`, and `GLFW_LIBRARY` to
+enable the viewer.
 
 Precompiled SPIR-V shaders are included. Run a project's
 `shaders/compile_shaders.bat` only after changing GLSL sources.

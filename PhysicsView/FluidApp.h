@@ -35,6 +35,10 @@
 #include "SoftBodyWireRenderer.h"
 #include "SoftBodyControlPanel.h"
 
+#include "FlameWorld.h"
+#include "FlameRenderer.h"
+#include "FlameControlPanel.h"
+
 #include <filesystem>
 #include <list>
 #include <optional>
@@ -103,6 +107,14 @@ private:
     SoftBodyWireRenderer  softRenderer_;
     SoftBodyControlPanel  softControlPanel_;
 
+    // Flame (reacting hot-gas SPH), folded in from the former standalone
+    // FlameView. A peer domain alongside fluid/rigid/soft with its own
+    // Play/Pause/Step and control page, deliberately uncoupled from all three
+    // (FlameSolver does not implement ISPHSolver -- see Physics/CLAUDE.md).
+    FlameWorld        flameWorld_;
+    FlameRenderer     flameRenderer_;
+    FlameControlPanel flameControlPanel_;
+
     CommandDispatcher dispatcher_;
     ScenarioRunner           runner_;
     ScenarioBrowserPanel     scenarioBrowser_;
@@ -142,6 +154,7 @@ private:
     void syncGpuCsphBufferToRenderer();
     void syncRigidRenderer();
     void syncSoftRenderer();
+    void syncFlameRenderer();
     void syncVolumeRenderer();
     void syncMeshRenderer();
 };

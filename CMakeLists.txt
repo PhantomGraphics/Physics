@@ -1,5 +1,5 @@
 # Cross-platform CMake build for the Physics core library (Phantom::Physics),
-# its GoogleTest suite (PhysicsTest), and PhysicsView/FlameView (Vulkan apps).
+# its GoogleTest suite (PhysicsTest), and PhysicsView (Vulkan app).
 #
 # This is a standalone CMake build, separate from the MSBuild/.vcxproj-based
 # Windows build (Physics/Physics/Physics.vcxproj + Physics/PhysicsTest/
@@ -9,7 +9,7 @@
 # (Phase 4 §5.4 item 1 dedup, internal design notes)
 # -- this file just calls them (PhysicsCore itself links against those
 # instead of bundling their raw sources, same behavior, cleaner) and adds
-# PhysicsTest/PhysicsView/FlameView on top, so it also works standalone
+# PhysicsTest/PhysicsView on top, so it also works standalone
 # (`cmake -S Physics -B ...`) exactly as before, and identically when
 # add_subdirectory()'d from the root CMakeLists.txt.
 #
@@ -27,13 +27,11 @@
 # <ProjectReference> of their own (header-only include paths onto Math/
 # VulkanGraphics/imgui/glm/VMA) -- they're leaf static libs PhysicsView links.
 #
-# FlameView.vcxproj's real <ProjectReference> list is much narrower: Math,
-# VulkanGraphics, Space, VkAppBase, Physics -- no VkRenderer, no UIWidgets/
-# Graphics reference of its own, no FluidRenderer/Fluid_GPU_Vk/File/Numerics
-# -- FlameRenderer/FlamePipeline/FlameSmokePipeline/FlamePBVRPipeline are
-# self-contained pipelines, not built atop VkRenderer or SSFR (matches
-# Physics/CLAUDE.md's description of Flame as an intentionally independent,
-# narrower subsystem).
+# FlameRenderer/FlamePipeline/FlameSmokePipeline/FlamePBVRPipeline (folded in
+# from the former standalone FlameView) are self-contained point-sprite
+# pipelines, not built atop VkRenderer or SSFR -- they compile straight into
+# PhysicsView now, and Flame stays an intentionally uncoupled subsystem (matches
+# Physics/CLAUDE.md's Flame section).
 
 cmake_minimum_required(VERSION 3.20)
 
@@ -139,7 +137,7 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------
-# PhysicsView + FlameView (Vulkan/ImGui apps) -- Phase 2.
+# PhysicsView (Vulkan/ImGui app) -- Phase 2.
 # ---------------------------------------------------------------------------
 
 phantom_find_vulkan_headers()
@@ -226,6 +224,12 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/SoftBodyWireRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/SoftBodyControlPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/SoftBodyCommandDispatcher.cpp
+    ${PHYSICS_ROOT}/PhysicsView/FlameWorld.cpp
+    ${PHYSICS_ROOT}/PhysicsView/FlameControlPanel.cpp
+    ${PHYSICS_ROOT}/PhysicsView/FlameRenderer.cpp
+    ${PHYSICS_ROOT}/PhysicsView/FlamePipeline.cpp
+    ${PHYSICS_ROOT}/PhysicsView/FlameSmokePipeline.cpp
+    ${PHYSICS_ROOT}/PhysicsView/FlamePBVRPipeline.cpp
 )
 target_include_directories(PhysicsView PRIVATE
     ${CGLIB_ROOT}/ThirdParty/VulkanMemoryAllocator
@@ -261,6 +265,9 @@ target_compile_features(PhysicsView PRIVATE cxx_std_20)
 # SSFluidRenderer is constructed unconditionally. Keep this list in sync with
 # PhysicsView's target_link_libraries above: linking another Vulkan renderer
 # library means adding its shader directory here too.
+# PhysicsView/shaders also carries the six flame_*.{vert,frag} sources (folded
+# in with the former standalone FlameView) -- FlameRenderer's three pipelines
+# load them by name via VulkanSPVResolver from the same flattened shaders/ dir.
 phantom_add_runtime_shaders(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/shaders
     ${PHYSICS_ROOT}/Fluid_GPU_Vk/Shader
@@ -276,40 +283,17 @@ add_custom_command(TARGET PhysicsView POST_BUILD
         -OutputDir "$<TARGET_FILE_DIR:PhysicsView>/envmap"
     VERBATIM)
 
-# --- FlameView (FlameApp : VkAppBase) -- minimal flame-SPH standalone viewer,
-# intentionally independent of RigidBodyWorld/VkRenderer/FluidRenderer (see
-# Physics/CLAUDE.md's Flame section) ---
-
-add_executable(FlameView
-    ${PHYSICS_ROOT}/FlameView/main.cpp
-    ${PHYSICS_ROOT}/FlameView/FlameApp.cpp
-    ${PHYSICS_ROOT}/FlameView/FlameRenderer.cpp
-    ${PHYSICS_ROOT}/FlameView/FlamePipeline.cpp
-    ${PHYSICS_ROOT}/FlameView/FlameSmokePipeline.cpp
-    ${PHYSICS_ROOT}/FlameView/FlamePBVRPipeline.cpp
-)
-target_include_directories(FlameView PRIVATE
-    ${CGLIB_ROOT}/UIWidgets
-    ${PHYSICS_ROOT}/Physics
-)
-target_link_libraries(FlameView PRIVATE
-    PhysicsCore
-    VkAppBaseCore
-    ${PHANTOM_VULKAN_LIBRARY}
-    ${PHANTOM_GLFW_LIBRARY}
-)
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(FlameView PRIVATE OpenMP::OpenMP_CXX)
-endif()
-target_compile_options(FlameView PRIVATE ${PHANTOM_WARN_FLAGS})
-target_compile_features(FlameView PRIVATE cxx_std_20)
-
-phantom_add_runtime_shaders(FlameView ${PHYSICS_ROOT}/FlameView/shaders)
+# FlameView (the former standalone flame-SPH viewer) was folded into PhysicsView
+# on 2026-09-08: FlameRenderer/FlamePipeline/FlameSmokePipeline/FlamePBVRPipeline
+# and the flame_*.{vert,frag} shaders moved under PhysicsView/, and FlameApp's
+# scene/UI became PhysicsView's FlameWorld + FlameControlPanel (ControlPage::Flame).
+# Flame is still an intentionally uncoupled subsystem (FlameSolver does not
+# implement ISPHSolver) -- see Physics/CLAUDE.md's Flame section.
 
 else()
-    message(WARNING "Physics: Vulkan and/or GLFW loader not found -- PhysicsView/FlameView are skipped (Physics/PhysicsTest still build). Pass -DVULKAN_LIBRARY=... -DGLFW_LIBRARY=... to enable them.")
+    message(WARNING "Physics: Vulkan and/or GLFW loader not found -- PhysicsView is skipped (Physics/PhysicsTest still build). Pass -DVULKAN_LIBRARY=... -DGLFW_LIBRARY=... to enable it.")
 endif()
 
 else()
-    message(WARNING "Physics: vulkan/vulkan.h not found -- PhysicsView/FlameView are skipped. Pass -DVULKAN_INCLUDE_DIR=/path/to/include to enable them (on Windows, check $ENV{VULKAN_SDK} is set).")
+    message(WARNING "Physics: vulkan/vulkan.h not found -- PhysicsView is skipped. Pass -DVULKAN_INCLUDE_DIR=/path/to/include to enable it (on Windows, check $ENV{VULKAN_SDK} is set).")
 endif()

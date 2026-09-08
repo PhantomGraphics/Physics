@@ -21,6 +21,8 @@ public:
 
     void setShaders(Shaders s)   { shaders_ = std::move(s); }
     void setExtent(VkExtent2D e) { extent_ = e; }
+    void setEnabled(bool e)      { enabled_ = e; }
+    bool isEnabled() const       { return enabled_; }
 
     void update(const std::vector<float>&    positions,
                 const std::vector<float>&    colors,
@@ -43,8 +45,9 @@ public:
 
 private:
     Shaders    shaders_;
-    VkExtent2D extent_ = {1280, 720};
-    bool       dirty_  = false;
+    VkExtent2D extent_  = {1280, 720};
+    bool       dirty_   = false;
+    bool       enabled_ = true;
 
     const Phantom::VKG::VulkanContext*     ctx_  = nullptr;
     const Phantom::VKG::VulkanCommandPool* pool_ = nullptr;

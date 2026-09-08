@@ -12,20 +12,20 @@
 
 namespace Phantom { namespace VKG { class VulkanContext; class VulkanCommandPool; } }
 
-namespace FlameView {
+namespace Phantom {
 
 /**
- * @brief Unified PBVR (Particle-Based Volume Rendering) pipeline for FlameView.
+ * @brief Unified PBVR (Particle-Based Volume Rendering) pipeline for PhysicsView's Flame page.
  *
  * Renders flame/spark particles AND smoke particles through the exact same opaque,
  * depth-tested, non-blended point-sprite pass -- there is deliberately no separate
- * "smoke PBVR pipeline" and "flame pipeline" anymore. FlameApp::uploadParticlesToRenderer()
+ * "smoke PBVR pipeline" and "flame pipeline" anymore. FluidApp::syncFlameRenderer()
  * stochastically thins BOTH particle kinds by independent Bernoulli(opacity) trials (flame/spark
  * via flameOpacityScale_, smoke via sp.opacity*smokeOpacityScale_) before handing them here, so
  * opacity becomes particle *existence* rather than a blend weight for either kind alike. Colour
  * is pre-computed on the CPU per particle (flame's blackbody-ish gradient / smoke's
  * ember-to-soot tint -- see flame_point.frag's and flame_smoke.frag's formulas, replicated in
- * FlameApp.cpp) instead of derived from a temperature attribute in-shader, precisely because
+ * FluidApp.cpp) instead of derived from a temperature attribute in-shader, precisely because
  * this pipeline does not distinguish between particle kinds: every vertex is just a
  * pos+color+size PBVR particle (same pos+color convention as Phantom::Volume::PBVRVertex).
  *
@@ -92,4 +92,4 @@ private:
 	std::vector<Phantom::VKG::VulkanBuffer> uniformBuffers_; // one per frame in flight
 };
 
-} // namespace FlameView
+} // namespace Phantom

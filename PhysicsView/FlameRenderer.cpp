@@ -5,7 +5,7 @@
 
 using namespace Phantom::VKG;
 
-namespace FlameView {
+namespace Phantom {
 
 void FlameRenderer::setShaders(std::vector<uint32_t> vertSpv, std::vector<uint32_t> fragSpv)
 {
@@ -75,6 +75,9 @@ void FlameRenderer::onInit(VulkanContext& ctx, const VulkanCommandPool& pool,
 
 void FlameRenderer::onUpdate(uint32_t /*frameIndex*/)
 {
+	if (!enabled_) {
+		return;
+	}
 	if (!pipeline_ || !smokePipeline_ || !pbvrPipeline_ || !ctx_ || !pool_) {
 		return;
 	}
@@ -113,6 +116,10 @@ void FlameRenderer::onUpdate(uint32_t /*frameIndex*/)
 
 void FlameRenderer::onRender(VkCommandBuffer cmd, uint32_t frameIndex)
 {
+	if (!enabled_) {
+		return;
+	}
+
 	if (renderMode_ == RenderMode::PBVR) {
 		if (pbvrPipeline_ && pbvrPipeline_->isValid()) {
 			pbvrPipeline_->render(cmd, frameIndex);
@@ -146,4 +153,4 @@ void FlameRenderer::onCleanup(VkDevice device)
 	}
 }
 
-} // namespace FlameView
+} // namespace Phantom

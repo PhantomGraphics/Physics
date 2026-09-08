@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Overview
 
 流体・剛体・軟体（クロス／ゼリー／ロープ）シミュレーションと SPH ベースの三者結合（Rigid↔Fluid↔SoftBody）を提供するモジュール群。
-`Physics`（コアライブラリ）、`PhysicsTest`（GoogleTest）、`PhysicsView`（スタンドアロン ImGui + Vulkan ビューア）、`Fluid_GPU_Vk`（GPU Compute CSPH）、`FluidRenderer`（Screen Space Fluid Rendering）、`FlameView`（炎 SPH の実験的スタンドアロンビューア、下記）の 6 プロジェクトで構成される。単独の `.sln` は持たず、すべて上位の `Phantom2026.sln` でビルドする。
+`Physics`（コアライブラリ）、`PhysicsTest`（GoogleTest）、`PhysicsView`（スタンドアロン ImGui + Vulkan ビューア。炎 SPH を含む——下記 Flame 節）、`Fluid_GPU_Vk`（GPU Compute CSPH）、`FluidRenderer`（Screen Space Fluid Rendering）の 5 プロジェクトで構成される。単独の `.sln` は持たず、すべて上位の `Phantom2026.sln` でビルドする。旧 `FlameView`（炎 SPH の独立スタンドアロンビューア）は 2026-09-08 に PhysicsView へ統合済み。
 
 親リポジトリの CLAUDE.md（`../CLAUDE.md`）にビルド方法・全体アーキテクチャ・命名規則が記載されているのであわせて参照すること。
 
@@ -24,7 +24,7 @@ cmake --preset windows-debug
 cmake --build --preset windows-debug
 ```
 
-ターゲット: `PhysicsCore`, `PhysicsTest`, `PhysicsView`, `FlameView`, `Fluid_GPU_Vk`(`FluidGPUVkCore`),
+ターゲット: `PhysicsCore`, `PhysicsTest`, `PhysicsView`, `Fluid_GPU_Vk`(`FluidGPUVkCore`),
 `FluidRenderer`(`FluidRendererCore`)。実行ファイル名は CMake ターゲット名基準で `PhysicsView.exe`
 （`RootNamespace` が旧名 `VkFluidView` だった vcxproj 時代の名残はもう関係ない）。
 
@@ -181,6 +181,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 - `SoftBodyWorld` — クロス/ロープ/ゼリーのシーン。`setSoftCouplingEnabled()`でSoftBody-Fluid結合も可能（UI・シナリオコマンドの配線は`FluidWorld`/`FluidApp`側）。
 - `FluidCommandDispatcher`/`RigidBodyCommandDispatcher`/`SoftBodyCommandDispatcher` — `IScenarioDispatcher` を実装するコマンド文字列ディスパッチャ（シナリオテストガイド参照）。`CommandDispatcher` の `AddEmitter:cx,cy,cz,radius,rate,dirX,dirY,dirZ,speed`/`ClearEmitters`/`GetEmitterCount` が `FluidWorld::addEmitter()`（上記 Emitter 節）を駆動する。`ControlPanel` にも同機能の ImGui セクション（"Emitters"）がある。シナリオ例: `scenarios/dfsph_emitter_faucet.json`。
 - 描画: `FluidRenderer`（パーティクル直接描画）と `SSFluidRenderer`（`Physics/FluidRenderer/` の SSFR、下記）を切替可能。`RigidBodyWireRenderer`/`SoftBodyWireRenderer` はワイヤーフレーム表示。
+- `FlameWorld`/`FlameControlPanel`/`FlameRenderer` — 炎 SPH（旧 FlameView を統合、下記 Flame 節）。`ControlPage::Flame` を開いている間だけ描画する独立ドメイン。
 
 ### Fluid_GPU_Vk（`Physics/Fluid_GPU_Vk/`）
 
@@ -190,12 +191,14 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 
 Screen Space Fluid Rendering（SSFR）パイプライン。`ParticleDepthRenderer`（深度）→ `BilateralFilter`（平滑化）→ `SSThicknessRenderer`（厚み）→ `SSReflectionRenderer`/`SSRefractionRenderer`（反射・屈折）を `SSFluidRenderer` が束ね、`SSFROffscreenSet` でオフスクリーンターゲットを管理する。
 
-### Flame（`Physics/Physics/Flame*` + `Physics/FlameView/`）— 炎 SPH（実験的・独立系統）
+### Flame（`Physics/Physics/Flame*` + `Physics/PhysicsView/Flame*`）— 炎 SPH（実験的・独立系統）
 
 内部設計メモに基づく、燃焼するガスを表現する SPH ソルバー。
 `WCSPHParticle`/`WCSPHFluid`/`WCSPHSolver` と同じ 3 分割構成・同じ近傍探索（`Space::CSRNeighborList`）/
 カーネル（`SPHKernel`）を土台にしているが、**Rigid/SoftBody 結合（`ISPHSolver`）を一切実装しない独立系統**。
-`PhysicsSolver`（Rigid↔Fluid↔SoftBody 三者結合）にも登録されない。
+`PhysicsSolver`（Rigid↔Fluid↔SoftBody 三者結合）にも登録されない。2026-09-08 に旧
+`Physics/FlameView/` スタンドアロンビューアを PhysicsView へ統合したが、この「結合しない独立系統」
+という性質は変えていない（PhysicsView の中でも fluid/rigid/soft とは一切カップリングしない）。
 
 - `FlameParticle`/`FlameFluid`/`FlameSolver`（`Physics/Physics/`）— コアシミュレーション。
   `FlameParticle` は position/velocity/force/density に加え `temperature`/`fuel`/`soot`/`age` を保持し、
@@ -206,11 +209,22 @@ Screen Space Fluid Rendering（SSFR）パイプライン。`ParticleDepthRendere
   バグを生むため、`FlameSolver.cpp`/`FlameParticle.cpp` のコメント参照の上で符号を反転してある点に注意）・
   カールノイズ（`glm::perlin` ベース、速度に直接加算）を実装する。`FlameFluid::updateEmitters()`/
   `removeDead()` がエミッタ生成と寿命管理（`age > lifeMax` または燃え尽きて常温近傍まで冷えたら削除）を担う。
-- `FlameView`（`Physics/FlameView/`）— 最小限のスタンドアロン ImGui + Vulkan ビューア。`FlameApp : VkAppBase`
-  が `FlameFluid`/`FlameSolver` のみを所有（Rigid/SoftBody 結合口に触れようがない構成）。`FlameRenderer`/
-  `FlamePipeline` は `PhysicsView/FluidRenderer`/`FluidPipeline` とは別実装の、position+temperature の
-  2 頂点属性のみを持つ加算合成ポイントスプライトパイプライン（`shaders/flame_point.vert/.frag` で温度→
-  黒体放射風グラデーションを簡易近似）。シナリオテスト自動化は無し（実験用途、手動確認のみ）。
+- **PhysicsView 統合**（`Physics/PhysicsView/`、2026-09-08）— 旧 `FlameView` の中身を PhysicsView に
+  折り込んだ。`FlameWorld`（`FlameFluid`+`FlameSolver` を所有、旧 `FlameApp::setupInitialScene` と同一の
+  初期シーン・同じ固定 1/60 ステップ・同じ決定的シード）、`FlameControlPanel`（`ControlPage::Flame`、
+  旧 `FlameApp::onImGui` の移植）、`FlameRenderer`/`FlamePipeline`/`FlameSmokePipeline`/`FlamePBVRPipeline`
+  （旧 FlameView から移動、`namespace FlameView` → `Phantom` へ改名）で構成される。`FluidApp` は fluid/
+  rigid/soft と並ぶ 1 ドメインとして扱い、独立に Play/Pause/Step できる。**軽量統合**——`CommandDispatcher`
+  への配線・シナリオコマンド・シナリオテストは追加していない（旧 FlameView 同様、手動確認のみ）。
+  - シミュレーションはネイティブの ~3 unit スケールのまま動かし、`FlameControlPanel` の「Display
+    Transform」（`FlameWorld::RenderParams::renderScale`/`renderOffset`、既定 12 / (20,4,20)）で
+    PhysicsView 共有カメラ（中心 (20,20,20)）空間へ写す純粋な描画変換をかける。SPH 状態は旧 FlameView と
+    バイト一致。
+  - `flame_*.{vert,frag}` は `PhysicsView/shaders/` に移動済み。`FlameRenderer` の 3 パイプラインが
+    `VulkanSPVResolver` 経由で他シェーダーと同じ `shaders/` から名前で読む。
+  - Flame ページを開いている間は `FlameRenderer` のみ描画し、fluid/SSFR/rigid/soft の各レンダラーは
+    `setEnabled(false)`（`RigidBodyWireRenderer`/`SoftBodyWireRenderer` に `setEnabled` を追加した）。
+    fluid/rigid/soft のシミュレーション自体は他ページと同様バックグラウンドで進む。
 - **非スコープ（意図的）**: `RigidBoundary`/`addRigidBoundary()` 等の Rigid/SoftBody 境界結合、GPU 化
   （`Fluid_GPU_Vk` 相当）、煙レイヤー分離。将来の拡張候補として 内部設計メモ の Phase 4 に記載。
 

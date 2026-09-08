@@ -12,10 +12,10 @@
 
 namespace Phantom { namespace VKG { class VulkanContext; class VulkanCommandPool; } }
 
-namespace FlameView {
+namespace Phantom {
 
 /**
- * @brief Minimal alpha-blended point-sprite pipeline for FlameView's cosmetic
+ * @brief Minimal alpha-blended point-sprite pipeline for PhysicsView's cosmetic Flame
  * smoke secondary particles (see Phantom::Physics::FlameFluid::SecondaryParticle).
  *
  * Structurally a sibling of FlamePipeline (same create/upload/render shape),
@@ -103,4 +103,4 @@ private:
 	std::vector<Phantom::VKG::VulkanBuffer> uniformBuffers_; // one per frame in flight
 };
 
-} // namespace FlameView
+} // namespace Phantom

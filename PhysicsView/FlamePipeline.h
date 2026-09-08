@@ -12,10 +12,10 @@
 
 namespace Phantom { namespace VKG { class VulkanContext; class VulkanCommandPool; } }
 
-namespace FlameView {
+namespace Phantom {
 
 /**
- * @brief Minimal additive-blended point-sprite pipeline for FlameView.
+ * @brief Minimal additive-blended point-sprite pipeline for PhysicsView's Flame page.
  *
  * Modeled after Phantom::VKG::VkPointRenderer (CGLib/Renderer/VkRenderer)
  * but deliberately a separate, new implementation: three vertex bindings
@@ -91,4 +91,4 @@ private:
 	std::vector<Phantom::VKG::VulkanBuffer> uniformBuffers_; // one per frame in flight
 };
 
-} // namespace FlameView
+} // namespace Phantom

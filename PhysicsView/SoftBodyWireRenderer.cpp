@@ -58,6 +58,7 @@ void SoftBodyWireRenderer::onUpdate(uint32_t frameIndex)
 
 void SoftBodyWireRenderer::onRender(VkCommandBuffer cmd, uint32_t frameIndex)
 {
+    if (!enabled_) return;
     if (!lineRenderer_ || !lineRenderer_->isValid()) return;
     if (indices_.empty()) return;
     lineRenderer_->render(cmd, frameIndex);
