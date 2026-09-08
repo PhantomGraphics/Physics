@@ -163,11 +163,13 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
         syncSoftRenderer();
     });
     flameControlPanel_.setOnWorldChanged([this]() { syncFlameRenderer(); });
-    ssfrPanel_.bindRenderer(&ssfrRenderer_);
-    ssfrPanel_.bindWorld(&world_);
-    ssfrPanel_.init();
     ssfrTestPanel_.bindSSFRRenderer(&ssfrRenderer_);
     ssfrTestPanel_.init();
+    ssfrPanel_.bindRenderer(&ssfrRenderer_);
+    ssfrPanel_.bindWorld(&world_);
+    // The former "SSFR Test" page is now a collapsible section of the SSFR page.
+    ssfrPanel_.bindDebugPanel(&ssfrTestPanel_);
+    ssfrPanel_.init();
 
     // glTF background / environment / shared light (PLAN_physicsview_gltf_rendering.md).
     renderBackground_.bind(&bgGltfRenderer_, &ssfrRenderer_);
@@ -245,12 +247,9 @@ void FluidApp::buildMenuBar()
 
     // One entry per ControlPage: selecting it makes that page active in the
     // shared Control window and shows the window if it was hidden. The order
-    // matches the ControlPage enum; SSFRTest sits last, after a separator, so
-    // it reads as test-only (GUI_RESTRUCTURING_PLAN.md 5.4/6.8).
+    // matches the ControlPage enum.
     for (int i = 0; i < static_cast<int>(kControlPageCount); ++i) {
         const auto page = static_cast<ControlPage>(i);
-        if (page == ControlPage::SSFRTest)
-            physicsMenu_.add(&physicsMenuSeparator_);
 
         menuItems_.emplace_back(toString(page));
         UI::MenuItem& item = menuItems_.back();
@@ -298,7 +297,6 @@ void FluidApp::registerControlPages()
     controlHost_.registerPage(ControlPage::Rendering,        &renderingPanel_);
     controlHost_.registerPage(ControlPage::VolumeConversion, &volumeConvertPanel_);
     controlHost_.registerPage(ControlPage::ScenarioBrowser,  &scenarioBrowserEmbed_);
-    controlHost_.registerPage(ControlPage::SSFRTest,         &ssfrTestPanel_);
 }
 
 bool FluidApp::loadScenario(const std::string& jsonPath) {

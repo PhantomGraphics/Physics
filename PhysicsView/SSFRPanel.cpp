@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "SSFRPanel.h"
 
+#include "SSFRTestPanel.h"
 #include "../FluidRenderer/SSFluidRenderer.h"
 
 namespace Phantom {
@@ -80,6 +81,12 @@ void SSFRPanel::buildUi()
 
     contents_.add(&enableCheck_);
     contents_.add(&enabledGroup_);
+
+    // Former "SSFR Test" page, folded in as a collapsed section (2026-09-09).
+    if (debugPanel_) {
+        debugSection_.add(&debugPanel_->contentsView());
+        contents_.add(&debugSection_);
+    }
 }
 
 void SSFRPanel::onImGui()

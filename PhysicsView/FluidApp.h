@@ -181,7 +181,6 @@ private:
     UI::Menu                 fileMenu_    {"File"};
     UI::Menu                 physicsMenu_ {"Physics"};
     UI::Menu                 viewMenu_    {"View"};
-    UI::Separator            physicsMenuSeparator_;
     // Quit + one item per ControlPage + "Control Window" -- non-copyable
     // widgets, so held in a node-stable list rather than an array.
     std::list<UI::MenuItem>  menuItems_;

@@ -21,12 +21,14 @@ namespace Phantom {
     class SSFluidRenderer;
 
 /**
- * @brief Test-only page: synthetic particle sets for SSFR debugging.
+ * @brief SSFR debugging aid: synthetic particle sets + filter-comparison shortcuts.
  *
- * buildUi() runs once from init() (after bindSSFRRenderer()). drawContents()
- * is contents_.show(). show_/active_/preset_/count_/radius_/positions_ stay
- * panel fields that FluidApp drives the render loop from (isActive(),
- * consumeDirty(), getPositions()).
+ * No longer its own Control page -- as of 2026-09-09 its widgets are embedded
+ * as a collapsible "SSFR Debug" section inside SSFRPanel (contentsView() hands
+ * that view to SSFRPanel::bindDebugPanel()). buildUi() still runs once from
+ * init() (after bindSSFRRenderer()). show_/active_/preset_/count_/radius_/
+ * positions_ stay panel fields that FluidApp drives the render loop from
+ * (isActive(), consumeDirty(), getPositions()).
  */
 class SSFRTestPanel : public ::VKG::IVkUIPanel, public IEmbeddedPanel {
 public:
@@ -38,6 +40,10 @@ public:
 
     void bindSSFRRenderer(SSFluidRenderer* r) { ssfrRenderer_ = r; }
     void init();
+
+    // The declarative view SSFRPanel embeds as its "SSFR Debug" section.
+    // Valid after init(); its children are populated by buildUi().
+    UI::IView& contentsView() { return contents_; }
 
     bool consumeDirty();
 

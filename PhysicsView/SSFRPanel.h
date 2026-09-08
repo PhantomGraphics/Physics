@@ -6,6 +6,7 @@
 #include "../../CGLib/UIWidgets/ComboBox.h"
 #include "../../CGLib/UIWidgets/FloatSlider.h"
 #include "../../CGLib/UIWidgets/Label.h"
+#include "../../CGLib/UIWidgets/Section.h"
 #include "../../CGLib/UIWidgets/Separator.h"
 
 #include "FluidWorld.h"
@@ -13,6 +14,7 @@
 
 namespace Phantom {
     class SSFluidRenderer;
+    class SSFRTestPanel;
 
 /**
  * @brief SSFR (screen-space fluid rendering) controls, assembled declaratively.
@@ -28,6 +30,10 @@ class SSFRPanel : public ::VKG::IVkUIPanel, public IEmbeddedPanel {
 public:
     void bindRenderer(SSFluidRenderer* r) { renderer_ = r; }
     void bindWorld(FluidWorld* w) { world_ = w; }
+    // Folds the former "SSFR Test" page in as a collapsible "SSFR Debug"
+    // section at the bottom of this panel. Must be called before init();
+    // the debug panel itself must be init()'d too (order-independent).
+    void bindDebugPanel(SSFRTestPanel* p) { debugPanel_ = p; }
     void init();
 
     bool isEnabled() const { return enabled_; }
@@ -45,6 +51,7 @@ public:
 private:
     SSFluidRenderer* renderer_ = nullptr;
     FluidWorld* world_ = nullptr;
+    SSFRTestPanel* debugPanel_ = nullptr;
 
     bool enabled_ = false;
     bool visible_ = true;
@@ -55,6 +62,10 @@ private:
 
     UI::IView    contents_    {"SSFRControl"};
     UI::BoolView enableCheck_ {"SSFR"};
+
+    // Wraps debugPanel_->contentsView() (collapsed by default). Only added to
+    // contents_ when bindDebugPanel() was called.
+    UI::Section  debugSection_ {"SSFR Debug (synthetic particles)", false};
 
     UI::IView    enabledGroup_ {"SSFREnabled"};
     UI::ComboBox modeCombo_    {"SSFR Mode"};

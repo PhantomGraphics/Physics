@@ -9,7 +9,8 @@ namespace Phantom {
  *
  * Exactly one page is active at a time (see GUI_RESTRUCTURING_PLAN.md 5.1):
  * the Physics main menu selects it, ControlPanelHost renders it. The order
- * here is the menu order; SSFRTest is intentionally last (test-only).
+ * here is the menu order. (The former test-only "SSFR Test" page was folded
+ * into the SSFR page as a collapsible "SSFR Debug" section on 2026-09-09.)
  */
 enum class ControlPage {
     Fluid = 0,
@@ -21,7 +22,6 @@ enum class ControlPage {
     Rendering,
     VolumeConversion,
     ScenarioBrowser,
-    SSFRTest,
     Count,
 };
 
@@ -40,7 +40,6 @@ inline const char* toString(ControlPage page)
     case ControlPage::Rendering:        return "glTF Rendering";
     case ControlPage::VolumeConversion: return "Volume / Mesh Conversion";
     case ControlPage::ScenarioBrowser:  return "Scenario Browser";
-    case ControlPage::SSFRTest:         return "SSFR Test";
     default:                            return "?";
     }
 }
