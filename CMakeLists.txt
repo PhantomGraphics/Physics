@@ -159,6 +159,13 @@ phantom_add_file_core()
 phantom_add_vkappbase_core()
 phantom_add_vkrenderer_core()
 
+# GltfSceneRenderer (CGLib/GltfRenderer) -- PhysicsView hosts one instance as a
+# glTF background/set renderer on the shared FluidRenderer camera
+# (docs/todo/PLAN_physicsview_gltf_rendering.md). Pulls in AnimationCore /
+# FileCore / VulkanGraphicsCore / GraphicsCore transitively; listed explicitly
+# in target_link_libraries below to match the plan's wiring section.
+phantom_add_gltfrenderer_core()
+
 # --- FluidRenderer (Screen Space Fluid Rendering) -- PhysicsView only ---
 
 add_library(FluidRendererCore STATIC
@@ -245,6 +252,9 @@ target_link_libraries(PhysicsView PRIVATE
     FileCore
     VkAppBaseCore
     VkRendererCore
+    GltfRendererCore
+    AnimationCore
+    GraphicsCore
     ${PHANTOM_VULKAN_LIBRARY}
     ${PHANTOM_GLFW_LIBRARY}
 )
@@ -268,6 +278,9 @@ target_compile_features(PhysicsView PRIVATE cxx_std_20)
 # PhysicsView/shaders also carries the six flame_*.{vert,frag} sources (folded
 # in with the former standalone FlameView) -- FlameRenderer's three pipelines
 # load them by name via VulkanSPVResolver from the same flattened shaders/ dir.
+# It likewise carries gltf.{vert,frag} (copied verbatim from CGLib/GltfViewer/
+# shaders -- the SDR/in-shader-tonemap variant, same as Universe uses) for the
+# GltfSceneRenderer background pass (PLAN_physicsview_gltf_rendering.md Phase 0).
 phantom_add_runtime_shaders(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/shaders
     ${PHYSICS_ROOT}/Fluid_GPU_Vk/Shader

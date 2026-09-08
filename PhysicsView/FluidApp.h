@@ -23,6 +23,9 @@
 #include "CommandDispatcher.h"
 #include "../FluidRenderer/SSFluidRenderer.h"
 
+#include "../../CGLib/GltfRenderer/Gltf/GltfDocument.h"
+#include "../../CGLib/GltfRenderer/Renderer/GltfSceneRenderer.h"
+
 #include "../../CGLib/UIWidgets/MainMenuBar.h"
 #include "../../CGLib/UIWidgets/Menu.h"
 #include "../../CGLib/UIWidgets/MenuItem.h"
@@ -85,6 +88,15 @@ private:
 
     FluidRenderer fluidRenderer_;
     SSFluidRenderer ssfrRenderer_;
+
+    // Phase 0 of docs/todo/PLAN_physicsview_gltf_rendering.md: a single
+    // GltfSceneRenderer drawing a hard-coded background (floor + block) on the
+    // shared FluidRenderer camera, to prove out the build wiring / camera path /
+    // resize stability before Phase 1 adds LoadRenderBackground + real assets.
+    // bgGltfDoc_ must outlive bgGltfRenderer_ (setDocument() stores a pointer
+    // into it) -- declared first so it is destroyed last.
+    Phantom::Gltf::GltfDocument      bgGltfDoc_;
+    Phantom::Gltf::GltfSceneRenderer bgGltfRenderer_;
     ControlPanel controlPanel_;
     SSFRPanel ssfrPanel_;
     SSFRTestPanel ssfrTestPanel_;
@@ -152,6 +164,7 @@ private:
     void buildMenuBar();
     void syncParticlesToRenderer();
     void syncGpuCsphBufferToRenderer();
+    void syncBackgroundCamera();
     void syncRigidRenderer();
     void syncSoftRenderer();
     void syncFlameRenderer();

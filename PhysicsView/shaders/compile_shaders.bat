@@ -17,6 +17,12 @@ cd /d "%~dp0"
 "%VULKAN_SDK%\Bin\glslc.exe" triangle.vert -o triangle.vert.spv
 "%VULKAN_SDK%\Bin\glslc.exe" triangle.frag -o triangle.frag.spv
 
+rem glTF background/set pass (GltfSceneRenderer, CGLib/GltfRenderer). Copied
+rem verbatim from CGLib/GltfViewer/shaders -- the SDR in-shader-tonemap variant.
+rem See docs/todo/PLAN_physicsview_gltf_rendering.md Phase 0.
+"%VULKAN_SDK%\Bin\glslc.exe" gltf.vert -o gltf.vert.spv
+"%VULKAN_SDK%\Bin\glslc.exe" gltf.frag -o gltf.frag.spv
+
 rem Flame (folded in from the former standalone FlameView): additive flame/spark,
 rem alpha-blended smoke, and the unified opaque PBVR pass. See FlameRenderer.
 "%VULKAN_SDK%\Bin\glslc.exe" flame_point.vert -o flame_point.vert.spv

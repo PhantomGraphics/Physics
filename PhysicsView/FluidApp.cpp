@@ -2,6 +2,7 @@
 #include "FluidApp.h"
 
 #include "../../CGLib/VulkanGraphics/VulkanSPVResolver.h"
+#include "../../CGLib/GltfRenderer/Gltf/GltfAccessorBuilder.h"
 
 #include <random>
 
@@ -29,6 +30,85 @@ glm::vec3 smokeColorTint(float temperature, float tMin, float tMax) {
     const float t = glm::clamp((temperature - tMin) / std::max(tMax - tMin, 1.0e-4f), 0.0f, 1.0f);
     const glm::vec3 emberGlow(1.0f, 0.45f, 0.12f);
     return glm::mix(smokeColor, emberGlow, t * t);
+}
+
+// --- Phase 0 hard-coded glTF background --------------------------------------
+//
+// Synthesizes a GltfDocument in memory (a large ground quad + a single raised
+// block near the fluid scene centre) rather than loading a real .glb -- Phase 1
+// of docs/todo/PLAN_physicsview_gltf_rendering.md replaces this with the
+// LoadRenderBackground command + a generated asset. Every quad is emitted with
+// both windings so the surface shows regardless of GltfSceneRenderer's
+// VK_CULL_MODE_BACK_BIT + VK_FRONT_FACE_COUNTER_CLOCKWISE pipeline.
+//
+// Coordinates are in PhysicsView world space: FluidRenderer orbits (20,20,20),
+// so the floor sits at y=0 spanning roughly the fluid domain footprint.
+void addBothFacedQuad(std::vector<glm::vec3>& pos, std::vector<glm::vec3>& nrm,
+                      const glm::vec3& a, const glm::vec3& b,
+                      const glm::vec3& c, const glm::vec3& d,
+                      const glm::vec3& n) {
+    const glm::vec3 front[6] = { a, b, c, a, c, d };
+    for (const auto& v : front) { pos.push_back(v); nrm.push_back(n); }
+    const glm::vec3 back[6] = { a, c, b, a, d, c };
+    for (const auto& v : back)  { pos.push_back(v); nrm.push_back(-n); }
+}
+
+Phantom::Gltf::GltfDocument buildPhase0BackgroundDocument() {
+    using namespace Phantom::Gltf;
+
+    std::vector<glm::vec3> positions;
+    std::vector<glm::vec3> normals;
+
+    // Ground plane (y = 0).
+    addBothFacedQuad(positions, normals,
+                     { -30.f, 0.f, -30.f }, { 70.f, 0.f, -30.f },
+                     { 70.f, 0.f,  70.f }, { -30.f, 0.f,  70.f },
+                     { 0.f, 1.f, 0.f });
+
+    // A raised block near the scene centre so shading + depth occlusion of the
+    // fluid particles is visible.
+    const glm::vec3 lo(12.f, 0.f, 12.f);
+    const glm::vec3 hi(28.f, 16.f, 28.f);
+    addBothFacedQuad(positions, normals, { lo.x, lo.y, hi.z }, { hi.x, lo.y, hi.z }, { hi.x, hi.y, hi.z }, { lo.x, hi.y, hi.z }, { 0.f, 0.f, 1.f });
+    addBothFacedQuad(positions, normals, { hi.x, lo.y, lo.z }, { lo.x, lo.y, lo.z }, { lo.x, hi.y, lo.z }, { hi.x, hi.y, lo.z }, { 0.f, 0.f, -1.f });
+    addBothFacedQuad(positions, normals, { hi.x, lo.y, hi.z }, { hi.x, lo.y, lo.z }, { hi.x, hi.y, lo.z }, { hi.x, hi.y, hi.z }, { 1.f, 0.f, 0.f });
+    addBothFacedQuad(positions, normals, { lo.x, lo.y, lo.z }, { lo.x, lo.y, hi.z }, { lo.x, hi.y, hi.z }, { lo.x, hi.y, lo.z }, { -1.f, 0.f, 0.f });
+    addBothFacedQuad(positions, normals, { lo.x, hi.y, hi.z }, { hi.x, hi.y, hi.z }, { hi.x, hi.y, lo.z }, { lo.x, hi.y, lo.z }, { 0.f, 1.f, 0.f });
+
+    std::vector<uint32_t> indices(positions.size());
+    for (uint32_t i = 0; i < static_cast<uint32_t>(indices.size()); ++i) indices[i] = i;
+
+    GltfDocument doc;
+
+    GltfMaterial mat;
+    mat.name = "phase0_background";
+    mat.pbrMetallicRoughness.baseColorFactor  = { 0.62f, 0.63f, 0.66f, 1.f };
+    mat.pbrMetallicRoughness.metallicFactor   = 0.f;
+    mat.pbrMetallicRoughness.roughnessFactor  = 0.9f;
+    doc.materials.push_back(std::move(mat));
+
+    GltfPrimitive prim;
+    prim.positionAccessor = appendAccessor(doc, positions, GltfComponentType::Float,       GltfAccessorType::Vec3);
+    prim.normalAccessor   = appendAccessor(doc, normals,   GltfComponentType::Float,       GltfAccessorType::Vec3);
+    prim.indicesAccessor  = appendAccessor(doc, indices,   GltfComponentType::UnsignedInt, GltfAccessorType::Scalar);
+    prim.materialIndex    = 0;
+
+    GltfMesh mesh;
+    mesh.name = "phase0_background";
+    mesh.primitives.push_back(prim);
+    doc.meshes.push_back(std::move(mesh));
+
+    GltfNode node;
+    node.name      = "phase0_background";
+    node.meshIndex = 0;
+    doc.nodes.push_back(std::move(node));
+
+    GltfScene scene;
+    scene.nodes.push_back(0);
+    doc.scenes.push_back(std::move(scene));
+    doc.defaultScene = 0;
+
+    return doc;
 }
 
 } // namespace
@@ -104,6 +184,10 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     dispatcher_.setOnVolumeChanged([this]() { syncVolumeRenderer(); });
     dispatcher_.setOnMeshChanged([this]() { syncMeshRenderer(); });
 
+    // Background glTF first so its opaque geometry writes depth before the
+    // fluid/particle passes draw over it (PLAN_physicsview_gltf_rendering.md
+    // §3.4). SSFR still composites last, as before.
+    add(&bgGltfRenderer_);
     add(&fluidRenderer_);
     add(&ssfrRenderer_);
     add(&rigidRenderer_);
@@ -277,6 +361,21 @@ void FluidApp::onInit()
         ssfrRenderer_.setShaders(std::move(s));
     }
 
+    // Phase 0 glTF background: hard-coded document + shaders, wired before the
+    // base onInit() runs each sub-renderer's onInit() (VkAppBase.cpp:73).
+    bgGltfDoc_ = buildPhase0BackgroundDocument();
+    bgGltfRenderer_.setDocument(bgGltfDoc_);
+    bgGltfRenderer_.setExtent(getExtent());
+    bgGltfRenderer_.setLight(
+        glm::vec4(glm::normalize(glm::vec3(-0.3f, -1.0f, -0.25f)), 0.0f),
+        glm::vec4(1.0f, 1.0f, 1.0f, 3.0f));
+    {
+        Phantom::Gltf::GltfSceneRenderer::Shaders s;
+        s.vertSpv = ::VKG::loadSPVRepo("shaders/gltf.vert.spv");
+        s.fragSpv = ::VKG::loadSPVRepo("shaders/gltf.frag.spv");
+        bgGltfRenderer_.setShaders(std::move(s));
+    }
+
     ::VKG::VkAppBase::onInit();
     setupCallbacks();
     syncRigidRenderer();
@@ -316,6 +415,7 @@ void FluidApp::onSwapChainCreated()
     ssfrRenderer_.setExtent(getExtent());
     rigidRenderer_.setExtent(getExtent());
     softRenderer_.setExtent(getExtent());
+    bgGltfRenderer_.setExtent(getExtent());
 }
 
 void FluidApp::onUpdate(uint32_t frameIndex)
@@ -404,12 +504,21 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     flameRenderer_.setEnabled(flameActive);
     rigidRenderer_.setEnabled(!flameActive);
     softRenderer_.setEnabled(!flameActive);
+    // The Flame page owns the viewport (see the flameActive comment above);
+    // hide the glTF background there too, matching rigid/soft/fluid.
+    bgGltfRenderer_.setVisible(!flameActive);
 
     ssfrRenderer_.setCamera(fluidRenderer_.getProjMatrix(), fluidRenderer_.getViewMatrix());
     rigidRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
     softRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
     volumeRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
     meshRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
+
+    // FluidRenderer is the single source of truth for the camera; feed the
+    // same view/proj to the glTF background so it composes with the fluid
+    // (plan §3.5). Runs before the base onUpdate() below drives
+    // bgGltfRenderer_.onUpdate().
+    syncBackgroundCamera();
 
     if (auto path = dispatcher_.takePendingScreenshot()) {
         screenshotPendingPath_ = path->string();
@@ -490,17 +599,30 @@ void FluidApp::setupCallbacks()
                                          static_cast<float>(x),
                                          static_cast<float>(y));
         ssfrRenderer_.setCamera(fluidRenderer_.getProjMatrix(), fluidRenderer_.getViewMatrix());
+        syncBackgroundCamera();
     };
 
     win.onCursorPos = [this](double x, double y) {
         fluidRenderer_.handleMouseMove(static_cast<float>(x), static_cast<float>(y));
         ssfrRenderer_.setCamera(fluidRenderer_.getProjMatrix(), fluidRenderer_.getViewMatrix());
+        syncBackgroundCamera();
     };
 
     win.onScroll = [this](double, double dy) {
         fluidRenderer_.handleScroll(static_cast<float>(dy));
         ssfrRenderer_.setCamera(fluidRenderer_.getProjMatrix(), fluidRenderer_.getViewMatrix());
+        syncBackgroundCamera();
     };
+}
+
+void FluidApp::syncBackgroundCamera()
+{
+    // Eye is the translation column of inverse(view) (FluidStudio Phase 1's
+    // technique) -- FluidRenderer exposes no eye getter.
+    const glm::mat4 view = fluidRenderer_.getViewMatrix();
+    const glm::mat4 proj = fluidRenderer_.getProjMatrix();
+    const glm::vec3 eye  = glm::vec3(glm::inverse(view)[3]);
+    bgGltfRenderer_.setCamera(view, proj, eye);
 }
 
 void FluidApp::syncRigidRenderer()
