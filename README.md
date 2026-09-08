@@ -4,7 +4,9 @@ Phantom Physics is a C++17 physics simulation module. It provides SPH-based flui
 rigid-body, and XPBD soft-body solvers, coupled rigid/fluid/soft-body simulation,
 and standalone Vulkan viewers.
 
-**Showcase video:** https://youtu.be/FiPkxZWLwsU
+**Showcase video:**
+
+[![Phantom Physics showcase video](https://img.youtube.com/vi/FiPkxZWLwsU/maxresdefault.jpg)](https://youtu.be/FiPkxZWLwsU)
 
 > This repository is the `Physics/` submodule of the
 > [Phantom](https://github.com/PhantomGraphics/Phantom) superproject. It can be
