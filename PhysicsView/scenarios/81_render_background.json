@@ -1,0 +1,43 @@
+{
+  "name": "81_render_background",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+
+    { "label": "Precondition: the render-scene state is queryable and returns a JSON object (the shipped default background is a synthesized stage)",
+      "command": "GetRenderSceneState", "expect_prefix": "{" },
+
+    { "label": "A visible fluid + rigid scene sharing the glTF background's camera",
+      "command": "SetPreset:SphereDrop", "expect": "OK" },
+
+    { "label": "Load the hand-written stage GLB (floor + 2 walls + obstacle block) as the background set",
+      "command": "LoadRenderBackground:${repo_root}/Physics/PhysicsView/scenarios/models/stage.glb", "expect": "OK" },
+    { "label": "The render-scene state is still a JSON object after the load",
+      "command": "GetRenderSceneState", "expect_prefix": "{" },
+
+    { "label": "Identity transform is accepted", "command": "SetRenderBackgroundTransform:0,0,0,0,0,0,1", "expect": "OK" },
+    { "label": "Shared directional light", "command": "SetLight:-0.3,-1,-0.25,1,1,1,3", "expect": "OK" },
+    { "label": "Load the synthetic cube map (SSFR reflections + SSFR-mode skybox)",
+      "command": "SetEnvironment:${repo_root}/Physics/PhysicsView/scenarios/models/env", "expect": "OK" },
+    { "label": "Enable the IBL flag", "command": "SetRenderUseIBL:1", "expect": "OK" },
+
+    { "label": "Advance the fluid a few frames so the capture isn't the static spawn pose",
+      "command": "Step", "expect": "OK", "repeat": 5 },
+
+    { "label": "Hot-reload the same background (loadDocument path, no pipeline rebuild)",
+      "command": "LoadRenderBackground:${repo_root}/Physics/PhysicsView/scenarios/models/stage.glb", "expect": "OK" },
+    { "label": "Clear the environment back to the shipped default", "command": "ClearRenderEnvironment", "expect": "OK" },
+    { "label": "Disable IBL again", "command": "SetRenderUseIBL:0", "expect": "OK" },
+
+    { "label": "Clear the background entirely", "command": "ClearRenderBackground", "expect": "OK" },
+    { "label": "Reload the stage for the capture", "command": "LoadRenderBackground:${repo_root}/Physics/PhysicsView/scenarios/models/stage.glb", "expect": "OK" },
+
+    { "label": "Screenshot round-trip completes with the glTF background + fluid composited on one camera",
+      "command": "SaveScreenshot:testdata/screenshots/81_render_background.png", "expect": "OK" },
+    { "label": "Invariant: the app is still alive after the load/reload/clear/capture round-trip", "command": "GetStatus", "expect": "OK" },
+
+    { "label": "Neg: a nonexistent background path is rejected", "command": "LoadRenderBackground:no_such_stage_file.glb", "expect_prefix": "Error:" },
+    { "label": "Neg: a degenerate light direction is rejected", "command": "SetLight:0,0,0,1,1,1,1", "expect_prefix": "Error:" },
+    { "label": "Neg: a transform with the wrong argument count is rejected", "command": "SetRenderBackgroundTransform:1,2,3", "expect_prefix": "Error:" },
+    { "label": "Neg: a non-positive background scale is rejected", "command": "SetRenderBackgroundTransform:0,0,0,0,0,0,0", "expect_prefix": "Error:" }
+  ]
+}

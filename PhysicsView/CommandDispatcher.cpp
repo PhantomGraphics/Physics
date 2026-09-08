@@ -8,6 +8,9 @@
 #include "VolumeRenderer.h"
 #include "FluidMeshRenderer.h"
 #include "FluidPLYWriter.h"
+#include "RenderBackground.h"
+
+#include <glm/glm.hpp>
 
 #include <algorithm>
 #include <charconv>
@@ -644,6 +647,77 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
             return std::string("Error:could not write '") + path.string() + "'";
         ++plyFrameCounter_;
         return std::string("OK");
+    }
+
+    // ---- Vulkan-native glTF background / environment / light
+    // (docs/todo/PLAN_physicsview_gltf_rendering.md Phase 1). Mirrors
+    // FluidStudio's VkFluidRenderer command set. ----
+
+    if (sv.rfind("LoadRenderBackground:", 0) == 0) {
+        if (!renderBg_) return std::string("Error:render background not available");
+        const std::string path(sv.substr(21));
+        if (path.empty()) return std::string("Error:path is empty");
+        std::error_code ec;
+        const std::string abs = std::filesystem::absolute(path, ec).string();
+        if (!renderBg_->loadBackground(ec ? path : abs))
+            return std::string("Error:failed to load glTF background");
+        return std::string("OK");
+    }
+    if (cmd == "ClearRenderBackground") {
+        if (!renderBg_) return std::string("Error:render background not available");
+        renderBg_->clearBackground();
+        return std::string("OK");
+    }
+    if (sv.rfind("SetRenderBackgroundTransform:", 0) == 0) {
+        if (!renderBg_) return std::string("Error:render background not available");
+        const auto parts = split(sv.substr(29), ',');
+        if (parts.size() != 7)
+            return std::string("Error:SetRenderBackgroundTransform needs 7 comma-separated values (px,py,pz,rx,ry,rz,s)");
+        float v[7];
+        for (size_t i = 0; i < 7; ++i)
+            if (!parseFlt(parts[i], v[i])) return std::string("Error:bad float");
+        if (v[6] <= 0.f) return std::string("Error:scale must be > 0");
+        renderBg_->setTransform({ v[0], v[1], v[2] }, { v[3], v[4], v[5] }, v[6]);
+        return std::string("OK");
+    }
+    if (sv.rfind("SetEnvironment:", 0) == 0) {
+        if (!renderBg_) return std::string("Error:render background not available");
+        const std::string dir(sv.substr(15));
+        if (dir.empty()) return std::string("Error:dir is empty");
+        std::error_code ec;
+        const std::string abs = std::filesystem::absolute(dir, ec).string();
+        if (!renderBg_->setEnvironment(ec ? dir : abs))
+            return std::string("Error:failed to load environment cube map");
+        return std::string("OK");
+    }
+    if (cmd == "ClearRenderEnvironment") {
+        if (!renderBg_) return std::string("Error:render background not available");
+        renderBg_->clearEnvironment();
+        return std::string("OK");
+    }
+    if (sv.rfind("SetLight:", 0) == 0) {
+        if (!renderBg_) return std::string("Error:render background not available");
+        const auto parts = split(sv.substr(9), ',');
+        if (parts.size() != 7)
+            return std::string("Error:SetLight needs 7 comma-separated values (dx,dy,dz,r,g,b,intensity)");
+        float v[7];
+        for (size_t i = 0; i < 7; ++i)
+            if (!parseFlt(parts[i], v[i])) return std::string("Error:bad float");
+        const glm::vec3 dir(v[0], v[1], v[2]);
+        if (glm::length(dir) < 1.0e-6f) return std::string("Error:light direction is degenerate");
+        if (v[3] < 0.f || v[4] < 0.f || v[5] < 0.f) return std::string("Error:light colour must be >= 0");
+        if (v[6] < 0.f) return std::string("Error:light intensity must be >= 0");
+        renderBg_->setLight(dir, { v[3], v[4], v[5] }, v[6]);
+        return std::string("OK");
+    }
+    if (cmd == "SetRenderUseIBL:0" || cmd == "SetRenderUseIBL:1") {
+        if (!renderBg_) return std::string("Error:render background not available");
+        renderBg_->setUseIBL(cmd == "SetRenderUseIBL:1");
+        return std::string("OK");
+    }
+    if (cmd == "GetRenderSceneState") {
+        if (!renderBg_) return std::string("{}");
+        return renderBg_->sceneStateJson();
     }
 
     return std::nullopt;

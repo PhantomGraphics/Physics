@@ -169,6 +169,12 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     ssfrTestPanel_.bindSSFRRenderer(&ssfrRenderer_);
     ssfrTestPanel_.init();
 
+    // glTF background / environment / shared light (PLAN_physicsview_gltf_rendering.md).
+    renderBackground_.bind(&bgGltfRenderer_, &ssfrRenderer_);
+    dispatcher_.setRenderBackground(&renderBackground_);
+    renderingPanel_.bind(&renderBackground_);
+    renderingPanel_.init();
+
     volumeConvertPanel_.bindWorld(&world_);
     volumeConvertPanel_.bindConverter(&volumeConverter_);
     volumeConvertPanel_.bindMeshConverter(&meshConverter_);
@@ -276,6 +282,7 @@ void FluidApp::registerControlPages()
     controlHost_.registerPage(ControlPage::Flame,            &flameControlPanel_);
     controlHost_.registerPage(ControlPage::FluidRendering,   &fluidRenderer_);
     controlHost_.registerPage(ControlPage::SSFR,             &ssfrPanel_);
+    controlHost_.registerPage(ControlPage::Rendering,        &renderingPanel_);
     controlHost_.registerPage(ControlPage::VolumeConversion, &volumeConvertPanel_);
     controlHost_.registerPage(ControlPage::ScenarioBrowser,  &scenarioBrowserEmbed_);
     controlHost_.registerPage(ControlPage::SSFRTest,         &ssfrTestPanel_);
@@ -361,14 +368,12 @@ void FluidApp::onInit()
         ssfrRenderer_.setShaders(std::move(s));
     }
 
-    // Phase 0 glTF background: hard-coded document + shaders, wired before the
-    // base onInit() runs each sub-renderer's onInit() (VkAppBase.cpp:73).
-    bgGltfDoc_ = buildPhase0BackgroundDocument();
-    bgGltfRenderer_.setDocument(bgGltfDoc_);
+    // glTF background pass (PLAN_physicsview_gltf_rendering.md). Only extent +
+    // shaders are needed before the base onInit() runs each sub-renderer's
+    // onInit() (VkAppBase.cpp:73); the document is installed afterwards through
+    // RenderBackground::setInitialDocument() (the same hot-reload path
+    // LoadRenderBackground uses), so there is a single code path.
     bgGltfRenderer_.setExtent(getExtent());
-    bgGltfRenderer_.setLight(
-        glm::vec4(glm::normalize(glm::vec3(-0.3f, -1.0f, -0.25f)), 0.0f),
-        glm::vec4(1.0f, 1.0f, 1.0f, 3.0f));
     {
         Phantom::Gltf::GltfSceneRenderer::Shaders s;
         s.vertSpv = ::VKG::loadSPVRepo("shaders/gltf.vert.spv");
@@ -407,6 +412,13 @@ void FluidApp::onInit()
             ssfrRenderer_.loadEnvMap(paths);
         }
     }
+
+    // Install the default glTF background + push the shared light now that every
+    // sub-renderer is onInit'd. LoadRenderBackground / SetEnvironment / SetLight
+    // (CommandDispatcher) and the "glTF Rendering" Control page drive it from here on.
+    renderBackground_.setDefaultEnvDir(kEnvMapDir);
+    renderBackground_.setInitialDocument(buildPhase0BackgroundDocument());
+    renderBackground_.applyLight();
 }
 
 void FluidApp::onSwapChainCreated()

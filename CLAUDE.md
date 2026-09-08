@@ -72,7 +72,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 | 30–44 | `soft` — 軟体単体・軟体間/自己衝突 | 90–99 | `neg` — 異常系 |
 | 50–59 | `couple` — Rigid↔Fluid / Soft↔Fluid | | |
 
-現在 47 本。全シナリオが「事前条件・変化（`store_as`+`post_assert` または初期値を含まない `expect_range`/`expect_not`）・不変条件」の三点契約で構成されている（詳細は
+現在 48 本（`81_render_background` を含む、glTF レンダリング Phase 1）。全シナリオが「事前条件・変化（`store_as`+`post_assert` または初期値を含まない `expect_range`/`expect_not`）・不変条件」の三点契約で構成されている（詳細は
 シナリオテストガイドの「アサーション三点契約」節）。
 
 **タグ:** JSON トップレベルの `"tags": [...]` を `run_physics_scenarios.ps1` が読み、`-Tag`/`-ExcludeTag` で絞り込む
@@ -121,6 +121,10 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 | `SetFluidMaxParticles:<n>` | `FluidWorld::Params::maxParticles`（既定 50000、`*Fluid` 自身の既定と同じ——エミッター駆動のシーンだけ引き上げが要る） |
 | `SetPLYOutputDir:<dir>` / `SavePLY:<path>` / `StepFrameAndSavePLY:<substeps>` | `FluidPLYWriter.h`（位置のみの binary PLY）。`StepFrameAndSavePLY` は物理ステップ N 回＋自動採番 PLY 書き出しを1コマンドにまとめたもの——`"repeat": frame_end` の1行でベイク全体を表現できる |
 | `SetFluidBoundaryDamping:<ratio>` | `FluidWorld::Params::boundaryDampingRatio` → `ISPHSolver::setBoundaryDampingRatio()`（下記「境界の反発」節。2026-08-26 追加） |
+| `LoadRenderBackground:<path>` / `ClearRenderBackground` / `SetRenderBackgroundTransform:px,py,pz,rx,ry,rz,s` | `RenderBackground`（`bgGltfRenderer_` = `Phantom::Gltf::GltfSceneRenderer` 1 個）に glTF/GLB/OBJ/STL の背景セットを読み込む／解放／ワールド変換。fluid と同一カメラ（`FluidRenderer` が唯一のソース）。`docs/todo/PLAN_physicsview_gltf_rendering.md` Phase 1、2026-09-08 |
+| `SetEnvironment:<dir>` / `ClearRenderEnvironment` | `<dir>/{right,left,top,bottom,front,back}.png` を cubemap として `SSFluidRenderer::loadEnvMap()`（反射 + SSFR モード skybox）へ配布。glTF 側 skybox/実 IBL は Phase 6 送り |
+| `SetLight:dx,dy,dz,r,g,b,intensity` | 共有 directional light（glTF パス + SSFR。7 float、退化方向/負値は `Error:`） |
+| `SetRenderUseIBL:{0\|1}` / `GetRenderSceneState` | IBL フラグ（実 precompute は Phase 6 の TODO）／背景パス・primitive 数・環境・transform・ライトを JSON で返す |
 
 **既知の簡略化**（各シナリオ JSON の `_comment` にも記載）:
 - `showcase_dam_break.json`/`showcase_preview.json`: 崩れた水柱を裂く柱2本・段差1個の障害物は**入れていない**。
@@ -181,6 +185,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 - `SoftBodyWorld` — クロス/ロープ/ゼリーのシーン。`setSoftCouplingEnabled()`でSoftBody-Fluid結合も可能（UI・シナリオコマンドの配線は`FluidWorld`/`FluidApp`側）。
 - `FluidCommandDispatcher`/`RigidBodyCommandDispatcher`/`SoftBodyCommandDispatcher` — `IScenarioDispatcher` を実装するコマンド文字列ディスパッチャ（シナリオテストガイド参照）。`CommandDispatcher` の `AddEmitter:cx,cy,cz,radius,rate,dirX,dirY,dirZ,speed`/`ClearEmitters`/`GetEmitterCount` が `FluidWorld::addEmitter()`（上記 Emitter 節）を駆動する。`ControlPanel` にも同機能の ImGui セクション（"Emitters"）がある。シナリオ例: `scenarios/dfsph_emitter_faucet.json`。
 - 描画: `FluidRenderer`（パーティクル直接描画）と `SSFluidRenderer`（`Physics/FluidRenderer/` の SSFR、下記）を切替可能。`RigidBodyWireRenderer`/`SoftBodyWireRenderer` はワイヤーフレーム表示。
+- glTF レンダリング（`docs/todo/PLAN_physicsview_gltf_rendering.md`、Phase 0–1 実装済み 2026-09-08）: `bgGltfRenderer_`（`Phantom::Gltf::GltfSceneRenderer` 1 個、`add()` で最初のサブレンダラー）が不透明背景セットを流体と同一カメラ（`FluidRenderer` が唯一のソース、`syncBackgroundCamera()` が `inverse(view)[3]` を eye に）で PBR 描画する。ドキュメント・環境・共有 directional light は `RenderBackground.{h,cpp}` が所有し、`CommandDispatcher` の `LoadRenderBackground`/`SetEnvironment`/`SetLight`/… と `ControlPage::Rendering`（`RenderingPanel`、"glTF Rendering" ページ）が駆動する。gltf.{vert,frag} は `CGLib/GltfViewer/shaders` から `PhysicsView/shaders/` へコピー（SDR シェーダ内トーンマップ版、Universe と同一）。Flame ページ中は `setVisible(false)`。次フェーズ = Rigid/SoftBody の PBR 描画（`GltfBodyRenderer` 新規）。
 - `FlameWorld`/`FlameControlPanel`/`FlameRenderer` — 炎 SPH（旧 FlameView を統合、下記 Flame 節）。`ControlPage::Flame` を開いている間だけ描画する独立ドメイン。
 
 ### Fluid_GPU_Vk（`Physics/Fluid_GPU_Vk/`）

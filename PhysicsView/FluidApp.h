@@ -25,6 +25,8 @@
 
 #include "../../CGLib/GltfRenderer/Gltf/GltfDocument.h"
 #include "../../CGLib/GltfRenderer/Renderer/GltfSceneRenderer.h"
+#include "RenderBackground.h"
+#include "RenderingPanel.h"
 
 #include "../../CGLib/UIWidgets/MainMenuBar.h"
 #include "../../CGLib/UIWidgets/Menu.h"
@@ -89,14 +91,15 @@ private:
     FluidRenderer fluidRenderer_;
     SSFluidRenderer ssfrRenderer_;
 
-    // Phase 0 of docs/todo/PLAN_physicsview_gltf_rendering.md: a single
-    // GltfSceneRenderer drawing a hard-coded background (floor + block) on the
-    // shared FluidRenderer camera, to prove out the build wiring / camera path /
-    // resize stability before Phase 1 adds LoadRenderBackground + real assets.
-    // bgGltfDoc_ must outlive bgGltfRenderer_ (setDocument() stores a pointer
-    // into it) -- declared first so it is destroyed last.
-    Phantom::Gltf::GltfDocument      bgGltfDoc_;
+    // glTF background/set pass (docs/todo/PLAN_physicsview_gltf_rendering.md):
+    // one GltfSceneRenderer drawn on the shared FluidRenderer camera. Its
+    // document + environment + shared directional light are owned by
+    // renderBackground_ (which also holds the GltfDocument alive across
+    // in-flight frames -- loadDocument() stores a pointer into it), driven by
+    // CommandDispatcher and the "glTF Rendering" Control page.
     Phantom::Gltf::GltfSceneRenderer bgGltfRenderer_;
+    RenderBackground                 renderBackground_;
+    RenderingPanel                   renderingPanel_;
     ControlPanel controlPanel_;
     SSFRPanel ssfrPanel_;
     SSFRTestPanel ssfrTestPanel_;

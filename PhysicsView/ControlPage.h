@@ -18,6 +18,7 @@ enum class ControlPage {
     Flame,
     FluidRendering,
     SSFR,
+    Rendering,
     VolumeConversion,
     ScenarioBrowser,
     SSFRTest,
@@ -36,6 +37,7 @@ inline const char* toString(ControlPage page)
     case ControlPage::Flame:            return "Flame";
     case ControlPage::FluidRendering:   return "Fluid Rendering";
     case ControlPage::SSFR:             return "SSFR";
+    case ControlPage::Rendering:        return "glTF Rendering";
     case ControlPage::VolumeConversion: return "Volume / Mesh Conversion";
     case ControlPage::ScenarioBrowser:  return "Scenario Browser";
     case ControlPage::SSFRTest:         return "SSFR Test";

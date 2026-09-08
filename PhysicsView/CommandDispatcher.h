@@ -14,6 +14,7 @@ namespace Phantom {
     class FluidMeshConverter;
     class VolumeRenderer;
     class FluidMeshRenderer;
+    class RenderBackground;
 
     // Single IScenarioDispatcher for FluidApp, covering the fluid world,
     // (since the RigidBodyView -> FluidView merge) the rigid-body scene, and
@@ -120,6 +121,15 @@ namespace Phantom {
         void setVolumeRenderer(VolumeRenderer* r) { volumeRenderer_ = r; }
         void setMeshRenderer(FluidMeshRenderer* r) { meshRenderer_ = r; }
 
+        // Vulkan-native glTF background/environment/light surface
+        // (docs/todo/PLAN_physicsview_gltf_rendering.md Phase 1):
+        // LoadRenderBackground / ClearRenderBackground /
+        // SetRenderBackgroundTransform / SetEnvironment / ClearRenderEnvironment /
+        // SetLight / SetRenderUseIBL / GetRenderSceneState. Mirrors FluidStudio's
+        // VkFluidRenderer command set; unset (nullptr) makes them all
+        // "Error:render background not available".
+        void setRenderBackground(RenderBackground* b) { renderBg_ = b; }
+
         // Called after Reset or Step so the app can sync GPU buffers.
         void setOnWorldChanged(std::function<void()> cb) { onWorldChanged_ = std::move(cb); }
         void setOnRigidWorldChanged(std::function<void()> cb) { rigidDispatcher_.setOnWorldChanged(std::move(cb)); }
@@ -167,6 +177,7 @@ namespace Phantom {
         FluidMeshConverter* meshConverter_ = nullptr;
         VolumeRenderer* volumeRenderer_ = nullptr;
         FluidMeshRenderer* meshRenderer_ = nullptr;
+        RenderBackground* renderBg_ = nullptr;
         std::function<void()> onWorldChanged_;
         std::function<void()> onVolumeChanged_;
         std::function<void()> onMeshChanged_;

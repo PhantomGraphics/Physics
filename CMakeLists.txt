@@ -219,6 +219,8 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/FluidMeshRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidVolumeConvertPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/ControlPanelHost.cpp
+    ${PHYSICS_ROOT}/PhysicsView/RenderBackground.cpp
+    ${PHYSICS_ROOT}/PhysicsView/RenderingPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/SceneComponentRegistry.cpp
     ${PHYSICS_ROOT}/PhysicsView/ObjectListPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/CommandDispatcher.cpp
@@ -254,6 +256,15 @@ target_link_libraries(PhysicsView PRIVATE
     VkRendererCore
     GltfRendererCore
     AnimationCore
+    # VulkanGraphicsCore must precede GraphicsCore on the link line: GltfReader.cpp
+    # (GltfRendererCore) pulls stbi_load_from_memory, and both VulkanCubeMap.cpp
+    # (VulkanGraphicsCore, already linked for SSFluidRenderer's cube maps) and
+    # ImageFileReader.cpp (GraphicsCore) embed a full STB_IMAGE_IMPLEMENTATION.
+    # Resolving stbi_* from VulkanCubeMap.cpp first keeps ImageFileReader.cpp.obj
+    # out of the image, avoiding a duplicate stb_image (LNK2005). Nothing here
+    # references GraphicsCore's ImageFileReader/ImageFileWriter classes directly.
+    # (PLAN_physicsview_gltf_rendering.md Phase 1 / risk table item 8.)
+    VulkanGraphicsCore
     GraphicsCore
     ${PHANTOM_VULKAN_LIBRARY}
     ${PHANTOM_GLFW_LIBRARY}
