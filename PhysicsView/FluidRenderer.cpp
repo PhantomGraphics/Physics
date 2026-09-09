@@ -58,24 +58,37 @@ void FluidRenderer::clearDirectGpuBuffer()
 
 void FluidRenderer::handleMouseButton(bool pressed, float x, float y)
 {
-    mouseDown_ = pressed;
-    lastMouse_ = glm::vec2(x, y);
+    camera_.handleMouseButton(pressed, x, y);
 }
 
 void FluidRenderer::handleMouseMove(float x, float y)
 {
-    if (mouseDown_) {
-        const float dx = (x - lastMouse_.x) * 0.005f;
-        const float dy = (y - lastMouse_.y) * 0.005f;
-        yaw_ += dx;
-        pitch_ = std::max(0.05f, std::min(3.09f, pitch_ + dy));
-    }
-    lastMouse_ = glm::vec2(x, y);
+    camera_.handleMouseMove(x, y);
 }
 
 void FluidRenderer::handleScroll(float dy)
 {
-    distance_ = std::max(5.0f, distance_ - dy * 2.0f);
+    camera_.handleScroll(dy);
+}
+
+void FluidRenderer::viewXY()
+{
+    camera_.viewXY();
+}
+
+void FluidRenderer::viewYZ()
+{
+    camera_.viewYZ();
+}
+
+void FluidRenderer::viewZX()
+{
+    camera_.viewZX();
+}
+
+void FluidRenderer::fitCamera()
+{
+    camera_.fit();
 }
 
 void FluidRenderer::onInit(Phantom::VKG::VulkanContext& ctx,
@@ -186,9 +199,12 @@ std::string FluidRenderer::observedRangeText() const
 
 void FluidRenderer::buildUi()
 {
-    yawSlider_.bind([this] { return yaw_; },      [this](float v) { yaw_ = v; });
-    pitchSlider_.bind([this] { return pitch_; },  [this](float v) { pitch_ = v; });
-    distanceSlider_.bind([this] { return distance_; }, [this](float v) { distance_ = v; });
+    yawSlider_.bind([this] { return camera_.yaw(); },
+                    [this](float v) { camera_.setYaw(v); });
+    pitchSlider_.bind([this] { return camera_.pitch(); },
+                      [this](float v) { camera_.setPitch(v); });
+    distanceSlider_.bind([this] { return camera_.distance(); },
+                         [this](float v) { camera_.setDistance(v); });
     cameraSection_.add(&yawSlider_);
     cameraSection_.add(&pitchSlider_);
     cameraSection_.add(&distanceSlider_);
@@ -293,14 +309,7 @@ glm::mat4 FluidRenderer::computeMVP() const
 
 glm::mat4 FluidRenderer::getViewMatrix() const
 {
-    const float x = distance_ * sinf(pitch_) * cosf(yaw_);
-    const float y = distance_ * cosf(pitch_);
-    const float z = distance_ * sinf(pitch_) * sinf(yaw_);
-
-    glm::vec3 center(20.f, 20.f, 20.f);
-    glm::vec3 eye = center + glm::vec3(x, y, z);
-
-    return glm::lookAt(eye, center, glm::vec3(0.f, 1.f, 0.f));
+    return camera_.getViewMatrix();
 }
 
 glm::mat4 FluidRenderer::getProjMatrix() const

@@ -9,6 +9,7 @@
 #include "../../CGLib/UIWidgets/Label.h"
 
 #include "FluidPipeline.h"
+#include "Camera.h"
 #include "IEmbeddedPanel.h"
 
 #include <string>
@@ -46,7 +47,12 @@ public:
 
     glm::mat4 getViewMatrix() const;
     glm::mat4 getProjMatrix() const;
-    float     getCameraDistance() const { return distance_; }
+    float     getCameraDistance() const { return camera_.distance(); }
+
+    void viewXY();
+    void viewYZ();
+    void viewZX();
+    void fitCamera();
 
     void handleMouseButton(bool pressed, float x, float y);
     void handleMouseMove(float x, float y);
@@ -81,11 +87,7 @@ private:
     bool autoDensityRange_ = true;
     float observedDensityRange_ = 0.0f;
 
-    float yaw_ = 0.6f;
-    float pitch_ = 0.6f;
-    float distance_ = 120.f;
-    glm::vec2 lastMouse_{ 0.f, 0.f };
-    bool mouseDown_ = false;
+    Camera camera_;
     bool enabled_ = true;
     VkExtent2D extent_ = { 1280, 720 };
 

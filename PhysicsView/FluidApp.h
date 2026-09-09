@@ -163,27 +163,22 @@ private:
     CommandDispatcher dispatcher_;
     ScenarioRunner           runner_;
     ScenarioBrowserPanel     scenarioBrowser_;
-    // ScenarioBrowserPanel lives in CGLib and cannot derive from the
-    // PhysicsView-local IEmbeddedPanel, so bridge it through a callable.
-    FnEmbeddedPanel          scenarioBrowserEmbed_{
-        [this]() { scenarioBrowser_.drawEmbedded(); } };
-
     // The single shared "Control" window: the Physics menu picks its page,
     // this host renders the selected embedded panel plus a common status area.
     ControlPanelHost         controlHost_;
     FluidStatusView          statusView_;
 
-    // Standalone "Scene Objects" window (View menu toggle).
+    // Standalone windows (Window menu toggles).
     ObjectListPanel          objectListPanel_;
 
-    // Main menu bar, assembled once in buildMenuBar(). File / Physics / View.
+    // Main menu bar, assembled once in buildMenuBar(). File / Physics / Window.
     UI::MainMenuBar          menuBar_;
     UI::Menu                 fileMenu_    {"File"};
     UI::Menu                 physicsMenu_ {"Physics"};
+    UI::Menu                 windowMenu_  {"Window"};
     UI::Menu                 viewMenu_    {"View"};
     UI::Separator            fileMenuSeparator_;
-    // Quit + one item per ControlPage + "Control Window" -- non-copyable
-    // widgets, so held in a node-stable list rather than an array.
+    // Menu items are non-copyable widgets, so hold them in a node-stable list.
     std::list<UI::MenuItem>  menuItems_;
 
     bool exitOnComplete_ = true;

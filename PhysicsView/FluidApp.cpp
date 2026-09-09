@@ -153,6 +153,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     controlHost_.setLayoutFile("physicsview_control_layout.ini");
     add(&controlHost_);
     add(&objectListPanel_);
+    add(&scenarioBrowser_);
 
     buildMenuBar();
 }
@@ -205,16 +206,45 @@ void FluidApp::buildMenuBar()
     UI::MenuItem& ctrlWin = menuItems_.back();
     ctrlWin.setFunction([this] { controlHost_.setVisible(!controlHost_.isVisible()); });
     ctrlWin.setSelected([this] { return controlHost_.isVisible(); });
-    viewMenu_.add(&ctrlWin);
+    windowMenu_.add(&ctrlWin);
 
     menuItems_.emplace_back("Scene Objects");
     UI::MenuItem& objList = menuItems_.back();
     objList.setFunction([this] { objectListPanel_.setVisible(!objectListPanel_.isVisible()); });
     objList.setSelected([this] { return objectListPanel_.isVisible(); });
-    viewMenu_.add(&objList);
+    windowMenu_.add(&objList);
+
+    menuItems_.emplace_back("Scenario Browser");
+    UI::MenuItem& scenarioBrowser = menuItems_.back();
+    scenarioBrowser.setFunction([this] {
+        scenarioBrowser_.setVisible(!scenarioBrowser_.isVisible());
+    });
+    scenarioBrowser.setSelected([this] { return scenarioBrowser_.isVisible(); });
+    windowMenu_.add(&scenarioBrowser);
+
+    menuItems_.emplace_back("Camera XY");
+    UI::MenuItem& cameraXY = menuItems_.back();
+    cameraXY.setFunction([this] { fluidRenderer_.viewXY(); });
+    viewMenu_.add(&cameraXY);
+
+    menuItems_.emplace_back("Camera YZ");
+    UI::MenuItem& cameraYZ = menuItems_.back();
+    cameraYZ.setFunction([this] { fluidRenderer_.viewYZ(); });
+    viewMenu_.add(&cameraYZ);
+
+    menuItems_.emplace_back("Camera ZX");
+    UI::MenuItem& cameraZX = menuItems_.back();
+    cameraZX.setFunction([this] { fluidRenderer_.viewZX(); });
+    viewMenu_.add(&cameraZX);
+
+    menuItems_.emplace_back("Camera Fit");
+    UI::MenuItem& cameraFit = menuItems_.back();
+    cameraFit.setFunction([this] { fluidRenderer_.fitCamera(); });
+    viewMenu_.add(&cameraFit);
 
     menuBar_.add(&fileMenu_);
     menuBar_.add(&physicsMenu_);
+    menuBar_.add(&windowMenu_);
     menuBar_.add(&viewMenu_);
 }
 
@@ -228,7 +258,6 @@ void FluidApp::registerControlPages()
     controlHost_.registerPage(ControlPage::SSFR,             &ssfrPanel_);
     controlHost_.registerPage(ControlPage::Rendering,        &renderingPanel_);
     controlHost_.registerPage(ControlPage::VolumeConversion, &volumeConvertPanel_);
-    controlHost_.registerPage(ControlPage::ScenarioBrowser,  &scenarioBrowserEmbed_);
 }
 
 bool FluidApp::loadScenario(const std::string& jsonPath) {
@@ -711,7 +740,7 @@ void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
 
 void FluidApp::onImGui()
 {
-    // Menu bar (File / Physics / View) is a widget tree assembled once in
+    // Menu bar (File / Physics / Window / View) is a widget tree assembled once in
     // buildMenuBar(); the common status area is FluidStatusView, embedded into
     // controlHost_. Nothing here re-assembles UI per frame.
     menuBar_.show();

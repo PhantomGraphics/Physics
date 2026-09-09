@@ -216,6 +216,7 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/main.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidApp.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidPipeline.cpp
+    ${PHYSICS_ROOT}/PhysicsView/Camera.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidWorld.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidPLYWriter.cpp

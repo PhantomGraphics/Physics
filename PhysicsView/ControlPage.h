@@ -21,7 +21,6 @@ enum class ControlPage {
     SSFR,
     Rendering,
     VolumeConversion,
-    ScenarioBrowser,
     Count,
 };
 
@@ -39,7 +38,6 @@ inline const char* toString(ControlPage page)
     case ControlPage::SSFR:             return "SSFR";
     case ControlPage::Rendering:        return "glTF Rendering";
     case ControlPage::VolumeConversion: return "Volume / Mesh Conversion";
-    case ControlPage::ScenarioBrowser:  return "Scenario Browser";
     default:                            return "?";
     }
 }
