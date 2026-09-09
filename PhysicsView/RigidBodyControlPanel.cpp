@@ -25,7 +25,14 @@ void RigidBodyControlPanel::buildUi() {
     // --- Preset ---------------------------------------------------------
     for (int i = 0; i < kPresetCount; ++i) presetCombo_.addItem(kPresetNames[i]);
     presetCombo_.bind(
-        [this] { return static_cast<int>(world_->currentPreset()); },
+        // -1 (no selection) while the scene is empty -- e.g. right after launch
+        // or File > New -- so that picking any preset, including the one
+        // currentPreset() nominally still holds, actually rebuilds it.
+        [this] {
+            return world_->getWorld().getBodies().empty()
+                       ? -1
+                       : static_cast<int>(world_->currentPreset());
+        },
         [this](int i) {
             if (i < 0 || i >= kPresetCount) return;
             world_->setPreset(kPresetValues[i]);

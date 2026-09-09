@@ -26,6 +26,9 @@ namespace Phantom {
     // The three worlds are not physically coupled -- this class only routes
     // scenario command strings to whichever world they belong to.
     //
+    // "NewScene" (alias "New") tears every world down to an empty 3D scene
+    // (no fluid particles, no rigid/soft bodies, no glTF background) -- the
+    // File > New menu item routes through the same FluidApp::newScene().
     // "Reset"/"Step"/"Step:N"/"SetRunning:" are handled here directly and
     // affect *all three* worlds, so existing scenarios keep working
     // unchanged. "SetPreset:<name>" is disambiguated by name (soft-body vs.
@@ -144,6 +147,10 @@ namespace Phantom {
         // "Error:SSFR panel not available".
         void setSsfrPanel(SSFRPanel* p) { ssfrPanel_ = p; }
 
+        // Tears the whole 3D scene down to nothing (the "NewScene" command /
+        // File > New). Unset makes "NewScene" an "Error:".
+        void setOnNewScene(std::function<void()> cb) { onNewScene_ = std::move(cb); }
+
         // Called after Reset or Step so the app can sync GPU buffers.
         void setOnWorldChanged(std::function<void()> cb) { onWorldChanged_ = std::move(cb); }
         void setOnRigidWorldChanged(std::function<void()> cb) { rigidDispatcher_.setOnWorldChanged(std::move(cb)); }
@@ -195,6 +202,7 @@ namespace Phantom {
         GltfBodyRenderer* rigidBodyRenderer_ = nullptr;
         GltfSoftRenderer* softBodyRenderer_  = nullptr;
         SSFRPanel* ssfrPanel_ = nullptr;
+        std::function<void()> onNewScene_;
         std::function<void()> onWorldChanged_;
         std::function<void()> onVolumeChanged_;
         std::function<void()> onMeshChanged_;

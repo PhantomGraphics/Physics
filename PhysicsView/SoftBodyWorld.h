@@ -51,6 +51,11 @@ public:
     void setComponentRegistry(SceneComponentRegistry* registry);
 
     void           setPreset(SoftBodyPreset p);
+
+    // Removes every soft body. Used by FluidApp's "New" scene; the world then
+    // holds nothing until setPreset() is called again.
+    void           clear();
+
     SoftBodyPreset currentPreset() const { return preset_; }
 
     void step();

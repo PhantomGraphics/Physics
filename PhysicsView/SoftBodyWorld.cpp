@@ -8,7 +8,17 @@
 namespace Phantom {
 
 SoftBodyWorld::SoftBodyWorld(Physics::PhysicsSolver& solver) : physicsSolver_(solver) {
-    applyPreset();
+    // Starts empty -- no preset is built until setPreset() is called. The app
+    // opens on an empty 3D scene; see FluidApp::newScene().
+}
+
+void SoftBodyWorld::clear() {
+    getWorld().setRunning(false);
+    getWorld().clearBodies();
+    getWorld().clearRigidBodyColliders();
+    bodyPtrs_.clear();
+    ownedBodies_.clear();
+    clearComponents();
 }
 
 void SoftBodyWorld::setPreset(SoftBodyPreset p) {

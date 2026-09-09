@@ -280,6 +280,16 @@ public:
     void reset();
 
     /**
+     * @brief Tears the fluid scene down to nothing: drops the active solver
+     * (0 particles), and clears emitters, outflow regions, fluid sources,
+     * sphere/mesh boundaries and any rigid/soft coupling. Keeps params() and
+     * the selected SimulationType, so the next reset() rebuilds at the same
+     * scale. Used by FluidApp's "New" scene (rigid()/soft bodies are cleared
+     * separately by their own worlds).
+     */
+    void newScene();
+
+    /**
      * @brief Advances whichever of this fluid / rigid() are currently
      * running, independently -- unless coupling is enabled and both are
      * running, in which case they step together in RigidFluidSolver's

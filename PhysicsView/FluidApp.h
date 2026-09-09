@@ -181,6 +181,7 @@ private:
     UI::Menu                 fileMenu_    {"File"};
     UI::Menu                 physicsMenu_ {"Physics"};
     UI::Menu                 viewMenu_    {"View"};
+    UI::Separator            fileMenuSeparator_;
     // Quit + one item per ControlPage + "Control Window" -- non-copyable
     // widgets, so held in a node-stable list rather than an array.
     std::list<UI::MenuItem>  menuItems_;
@@ -194,6 +195,9 @@ private:
     void setupCallbacks();
     void registerControlPages();
     void buildMenuBar();
+    // Tears the shared 3D scene (fluid + rigid + soft + glTF background) down to
+    // nothing. Run at startup and from File > New.
+    void newScene();
     void syncParticlesToRenderer();
     void syncGpuCsphBufferToRenderer();
     void syncBackgroundCamera();

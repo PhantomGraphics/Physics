@@ -1,0 +1,30 @@
+{
+  "name": "04_smoke_new_scene",
+  "steps": [
+    { "label": "Precondition: the app opens on an empty scene", "command": "GetParticleCount", "expect": "Count:0" },
+    { "label": "Precondition: no rigid bodies", "command": "GetBodyCount", "expect": "Count:0" },
+    { "label": "Precondition: no soft bodies", "command": "GetSoftBodyCount", "expect": "Count:0" },
+
+    { "label": "Build a fluid block", "command": "SetFluidBounds:-2:8:-2:2:12:2", "expect": "OK" },
+    { "label": "Seed it", "command": "Reset", "expect": "OK" },
+    { "label": "Change: the fluid now has particles", "command": "GetParticleCount", "expect_not": "Count:0" },
+    { "label": "Build a rigid preset", "command": "SetPreset:SphereDrop", "expect": "OK" },
+    { "label": "Change: 2 rigid bodies (floor, sphere)", "command": "GetBodyCount", "expect": "Count:2" },
+    { "label": "Build a soft preset", "command": "SetPreset:ClothTwoPin", "expect": "OK" },
+    { "label": "Change: 1 soft body", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "Load a glTF background", "command": "LoadRenderBackground:${repo_root}/Physics/PhysicsView/scenarios/models/stage.glb", "expect": "OK" },
+    { "label": "Register an emitter", "command": "AddEmitter:0,10,0,1.0,5,0,-1,0,10", "expect": "OK" },
+    { "label": "Change: 1 emitter registered", "command": "GetEmitterCount", "expect": "1" },
+
+    { "label": "New scene tears everything down", "command": "NewScene", "expect": "OK" },
+    { "label": "Change: fluid back to 0 particles", "command": "GetParticleCount", "expect": "Count:0" },
+    { "label": "Change: 0 rigid bodies (not even a floor)", "command": "GetBodyCount", "expect": "Count:0" },
+    { "label": "Change: 0 soft bodies", "command": "GetSoftBodyCount", "expect": "Count:0" },
+    { "label": "Change: emitters cleared", "command": "GetEmitterCount", "expect": "0" },
+
+    { "label": "Invariant: the app is still alive after New", "command": "GetStatus", "expect": "OK" },
+    { "label": "Invariant: a fresh Reset still rebuilds the fluid from the default bounds", "command": "Reset", "expect": "OK" },
+    { "label": "Invariant: NewScene alias 'New' works too", "command": "New", "expect": "OK" },
+    { "label": "Invariant: empty again after the alias", "command": "GetParticleCount", "expect": "Count:0" }
+  ]
+}

@@ -72,12 +72,6 @@ std::array<std::string, 6> RenderBackground::cubeFacePaths(const std::string& di
              d + "/bottom.png", d + "/front.png", d + "/back.png" };
 }
 
-void RenderBackground::setInitialDocument(Phantom::Gltf::GltfDocument doc) {
-    doc_ = std::move(doc);
-    bgPath_.clear();
-    if (gltf_) gltf_->loadDocument(doc_);
-}
-
 void RenderBackground::applyLight() {
     // GltfSceneRenderer: pos.w == 0 -> directional; color.w == intensity.
     if (gltf_)

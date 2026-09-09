@@ -9,7 +9,17 @@ namespace Phantom {
 static constexpr float kPi = 3.14159265f;
 
 RigidBodyWorld::RigidBodyWorld(Physics::PhysicsSolver& solver) : physicsSolver_(solver) {
-    setPreset(ScenePreset::SphereDrop);
+    // Starts empty -- no preset is built until setPreset() is called (from the
+    // Rigid Body control panel, a scenario's SetPreset command, or never). The
+    // app opens on an empty 3D scene; see FluidApp::newScene().
+}
+
+void RigidBodyWorld::clear() {
+    physicsSolver_.rigidSolver().clear();
+    bodies_.clear();
+    shapes_.clear();
+    clearComponents();
+    physicsSolver_.rigidSolver().saveSnapshot();
 }
 
 void RigidBodyWorld::setPreset(ScenePreset preset) {

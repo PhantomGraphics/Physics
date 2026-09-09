@@ -38,7 +38,7 @@ class SSFluidRenderer;
  */
 class RenderBackground {
 public:
-    // Call before setInitialDocument()/any command. ssfr may be null.
+    // Call before any command. ssfr may be null.
     void bind(Phantom::Gltf::GltfSceneRenderer* gltf, SSFluidRenderer* ssfr) {
         gltf_ = gltf;
         ssfr_ = ssfr;
@@ -47,10 +47,6 @@ public:
     // The shipped cube-map directory (next to the executable). ClearRenderEnvironment
     // reloads it so the viewer returns to its default studio look.
     void setDefaultEnvDir(std::string dir) { defaultEnvDir_ = std::move(dir); }
-
-    // Install the startup background (Phase 0's synthesized stage, or a generated
-    // GLB). Requires gltf_ to have been onInit'd already.
-    void setInitialDocument(Phantom::Gltf::GltfDocument doc);
 
     // Push the current light to the glTF pass + SSFR (call once after init).
     void applyLight();

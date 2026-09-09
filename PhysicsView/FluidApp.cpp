@@ -2,7 +2,6 @@
 #include "FluidApp.h"
 
 #include "../../CGLib/VulkanGraphics/VulkanSPVResolver.h"
-#include "../../CGLib/GltfRenderer/Gltf/GltfAccessorBuilder.h"
 
 #include <random>
 
@@ -32,85 +31,6 @@ glm::vec3 smokeColorTint(float temperature, float tMin, float tMax) {
     return glm::mix(smokeColor, emberGlow, t * t);
 }
 
-// --- Phase 0 hard-coded glTF background --------------------------------------
-//
-// Synthesizes a GltfDocument in memory (a large ground quad + a single raised
-// block near the fluid scene centre) rather than loading a real .glb -- Phase 1
-// of docs/todo/PLAN_physicsview_gltf_rendering.md replaces this with the
-// LoadRenderBackground command + a generated asset. Every quad is emitted with
-// both windings so the surface shows regardless of GltfSceneRenderer's
-// VK_CULL_MODE_BACK_BIT + VK_FRONT_FACE_COUNTER_CLOCKWISE pipeline.
-//
-// Coordinates are in PhysicsView world space: FluidRenderer orbits (20,20,20),
-// so the floor sits at y=0 spanning roughly the fluid domain footprint.
-void addBothFacedQuad(std::vector<glm::vec3>& pos, std::vector<glm::vec3>& nrm,
-                      const glm::vec3& a, const glm::vec3& b,
-                      const glm::vec3& c, const glm::vec3& d,
-                      const glm::vec3& n) {
-    const glm::vec3 front[6] = { a, b, c, a, c, d };
-    for (const auto& v : front) { pos.push_back(v); nrm.push_back(n); }
-    const glm::vec3 back[6] = { a, c, b, a, d, c };
-    for (const auto& v : back)  { pos.push_back(v); nrm.push_back(-n); }
-}
-
-Phantom::Gltf::GltfDocument buildPhase0BackgroundDocument() {
-    using namespace Phantom::Gltf;
-
-    std::vector<glm::vec3> positions;
-    std::vector<glm::vec3> normals;
-
-    // Ground plane (y = 0).
-    addBothFacedQuad(positions, normals,
-                     { -30.f, 0.f, -30.f }, { 70.f, 0.f, -30.f },
-                     { 70.f, 0.f,  70.f }, { -30.f, 0.f,  70.f },
-                     { 0.f, 1.f, 0.f });
-
-    // A raised block near the scene centre so shading + depth occlusion of the
-    // fluid particles is visible.
-    const glm::vec3 lo(12.f, 0.f, 12.f);
-    const glm::vec3 hi(28.f, 16.f, 28.f);
-    addBothFacedQuad(positions, normals, { lo.x, lo.y, hi.z }, { hi.x, lo.y, hi.z }, { hi.x, hi.y, hi.z }, { lo.x, hi.y, hi.z }, { 0.f, 0.f, 1.f });
-    addBothFacedQuad(positions, normals, { hi.x, lo.y, lo.z }, { lo.x, lo.y, lo.z }, { lo.x, hi.y, lo.z }, { hi.x, hi.y, lo.z }, { 0.f, 0.f, -1.f });
-    addBothFacedQuad(positions, normals, { hi.x, lo.y, hi.z }, { hi.x, lo.y, lo.z }, { hi.x, hi.y, lo.z }, { hi.x, hi.y, hi.z }, { 1.f, 0.f, 0.f });
-    addBothFacedQuad(positions, normals, { lo.x, lo.y, lo.z }, { lo.x, lo.y, hi.z }, { lo.x, hi.y, hi.z }, { lo.x, hi.y, lo.z }, { -1.f, 0.f, 0.f });
-    addBothFacedQuad(positions, normals, { lo.x, hi.y, hi.z }, { hi.x, hi.y, hi.z }, { hi.x, hi.y, lo.z }, { lo.x, hi.y, lo.z }, { 0.f, 1.f, 0.f });
-
-    std::vector<uint32_t> indices(positions.size());
-    for (uint32_t i = 0; i < static_cast<uint32_t>(indices.size()); ++i) indices[i] = i;
-
-    GltfDocument doc;
-
-    GltfMaterial mat;
-    mat.name = "phase0_background";
-    mat.pbrMetallicRoughness.baseColorFactor  = { 0.62f, 0.63f, 0.66f, 1.f };
-    mat.pbrMetallicRoughness.metallicFactor   = 0.f;
-    mat.pbrMetallicRoughness.roughnessFactor  = 0.9f;
-    doc.materials.push_back(std::move(mat));
-
-    GltfPrimitive prim;
-    prim.positionAccessor = appendAccessor(doc, positions, GltfComponentType::Float,       GltfAccessorType::Vec3);
-    prim.normalAccessor   = appendAccessor(doc, normals,   GltfComponentType::Float,       GltfAccessorType::Vec3);
-    prim.indicesAccessor  = appendAccessor(doc, indices,   GltfComponentType::UnsignedInt, GltfAccessorType::Scalar);
-    prim.materialIndex    = 0;
-
-    GltfMesh mesh;
-    mesh.name = "phase0_background";
-    mesh.primitives.push_back(prim);
-    doc.meshes.push_back(std::move(mesh));
-
-    GltfNode node;
-    node.name      = "phase0_background";
-    node.meshIndex = 0;
-    doc.nodes.push_back(std::move(node));
-
-    GltfScene scene;
-    scene.nodes.push_back(0);
-    doc.scenes.push_back(std::move(scene));
-    doc.defaultScene = 0;
-
-    return doc;
-}
-
 } // namespace
 
 FluidApp::FluidApp(int width, int height, const std::string& title)
@@ -129,6 +49,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     objectListPanel_.bind(&sceneComponents_);
 
     dispatcher_.setWorld(&world_);
+    dispatcher_.setOnNewScene([this]() { newScene(); });
     dispatcher_.setOnWorldChanged([this]() {
         if (world_.getSimulationType() == FluidWorld::SimulationType::GPU_CSPH)
             syncGpuCsphBufferToRenderer();
@@ -238,6 +159,17 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
 
 void FluidApp::buildMenuBar()
 {
+    // File > New: tear the 3D scene down to nothing (no fluid particles, no
+    // rigid/soft bodies, no glTF background). This is the same routine onInit()
+    // runs at startup -- presets, scenarios and dispatcher commands populate the
+    // scene from an empty state.
+    menuItems_.emplace_back("New");
+    UI::MenuItem& newItem = menuItems_.back();
+    newItem.setFunction([this] { newScene(); });
+    fileMenu_.add(&newItem);
+
+    fileMenu_.add(&fileMenuSeparator_);
+
     menuItems_.emplace_back("Quit");
     UI::MenuItem& quit = menuItems_.back();
     quit.setFunction([this] {
@@ -306,9 +238,6 @@ bool FluidApp::loadScenario(const std::string& jsonPath) {
 void FluidApp::onInit()
 {
     world_.setVulkanContext(getContext(), getCommandPool());
-    world_.reset();
-    syncParticlesToRenderer();
-    syncGpuCsphBufferToRenderer();
 
     fluidRenderer_.setExtent(getExtent());
     ssfrRenderer_.setExtent(getExtent());
@@ -381,9 +310,8 @@ void FluidApp::onInit()
 
     // glTF background pass (PLAN_physicsview_gltf_rendering.md). Only extent +
     // shaders are needed before the base onInit() runs each sub-renderer's
-    // onInit() (VkAppBase.cpp:73); the document is installed afterwards through
-    // RenderBackground::setInitialDocument() (the same hot-reload path
-    // LoadRenderBackground uses), so there is a single code path.
+    // onInit() (VkAppBase.cpp:73); the app opens with no background loaded
+    // (newScene() below), and LoadRenderBackground installs one later.
     bgGltfRenderer_.setExtent(getExtent());
     {
         Phantom::Gltf::GltfSceneRenderer::Shaders s;
@@ -466,12 +394,30 @@ void FluidApp::onInit()
         }
     }
 
-    // Install the default glTF background + push the shared light now that every
-    // sub-renderer is onInit'd. LoadRenderBackground / SetEnvironment / SetLight
-    // (CommandDispatcher) and the "glTF Rendering" Control page drive it from here on.
+    // Push the shared light now that every sub-renderer is onInit'd.
+    // LoadRenderBackground / SetEnvironment / SetLight (CommandDispatcher) and the
+    // "glTF Rendering" Control page drive the background/environment from here on.
     renderBackground_.setDefaultEnvDir(kEnvMapDir);
-    renderBackground_.setInitialDocument(buildPhase0BackgroundDocument());
     renderBackground_.applyLight();
+
+    // Start from an empty 3D scene -- no fluid particles, no rigid/soft bodies,
+    // no glTF background. File > New runs this same routine; presets, scenarios
+    // and dispatcher commands populate the scene from here.
+    newScene();
+}
+
+void FluidApp::newScene()
+{
+    world_.newScene();          // drop the fluid solver -> 0 particles; clear
+                                // emitters / outflow / sources / boundaries / coupling
+    world_.rigid().clear();     // 0 rigid bodies (no preset, not even a floor)
+    softWorld_.clear();         // 0 soft bodies
+    renderBackground_.clearBackground();  // release the glTF background document
+
+    syncParticlesToRenderer();
+    syncGpuCsphBufferToRenderer();
+    syncRigidRenderer();
+    syncSoftRenderer();
 }
 
 bool FluidApp::createHdrTargets()

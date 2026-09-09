@@ -1,7 +1,9 @@
 {
   "name": "03_smoke_soft_reset",
   "steps": [
-    { "label": "Default preset is ClothTwoPin", "command": "GetSoftBodyCount", "expect": "Count:1" },
+    { "label": "The app opens on an empty scene -- no soft body until a preset is built", "command": "GetSoftBodyCount", "expect": "Count:0" },
+    { "label": "Build the ClothTwoPin preset", "command": "SetPreset:ClothTwoPin", "expect": "OK" },
+    { "label": "One body after building the preset", "command": "GetSoftBodyCount", "expect": "Count:1" },
     { "label": "Default particle count = 400 (20x20 cloth)", "command": "GetSoftParticleCount", "expect": "Particles:400" },
     { "label": "Cloth starts flat, resting on the always-on floor collider (y=0)", "command": "GetSoftMinPositionY", "expect": "0.000000" },
     { "label": "Flat sheet: max Y = min Y", "command": "GetSoftMaxPositionY", "expect": "0.000000" },

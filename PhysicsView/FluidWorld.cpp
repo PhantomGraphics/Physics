@@ -79,6 +79,32 @@ void FluidWorld::reset()
     syncComponents();
 }
 
+void FluidWorld::newScene()
+{
+    running_ = false;
+
+    // Drop coupling first (touches the solver's boundary registrations) while
+    // the solver is still alive.
+    setCouplingEnabled(false);
+    setSoftCouplingEnabled(false);
+
+    // Emitters / outflow regions live on the active *Fluid; clear them before
+    // clear() destroys it.
+    clearEmitters();
+    clearOutflowRegions();
+    clearFluidSources();
+    clearBoundarySpheres();
+    clearMeshBoundary();
+    customPositions_.clear();
+    customVelocities_.clear();
+
+    clear();            // fluidSolver_ / dfsphFluid_ / ... / gpuSolver_ / whiteWater_
+
+    // Reconcile the scene-object list: the fluid stays as a permanent entry
+    // (now "0 particles"); its emitters / outflow / mesh boundary are gone.
+    syncComponents();
+}
+
 void FluidWorld::addEmitter(const Physics::Emitter& e)
 {
     // Force particleRadius to match the scene's own particle radius,

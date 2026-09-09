@@ -72,7 +72,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 | 30–44 | `soft` — 軟体単体・軟体間/自己衝突 | 90–99 | `neg` — 異常系 |
 | 50–59 | `couple` — Rigid↔Fluid / Soft↔Fluid | | |
 
-現在 52 本（`81_render_background` / `82_render_rigid_shaded` / `83_render_soft_shaded` / `84_render_shadows` / `85_render_ssfr_scene` を含む、glTF レンダリング Phase 1–5）。全シナリオが「事前条件・変化（`store_as`+`post_assert` または初期値を含まない `expect_range`/`expect_not`）・不変条件」の三点契約で構成されている（詳細は
+現在 53 本（`04_smoke_new_scene`（File > New / `NewScene` コマンド）、`81_render_background` / `82_render_rigid_shaded` / `83_render_soft_shaded` / `84_render_shadows` / `85_render_ssfr_scene`（glTF レンダリング Phase 1–5）を含む）。全シナリオが「事前条件・変化（`store_as`+`post_assert` または初期値を含まない `expect_range`/`expect_not`）・不変条件」の三点契約で構成されている（詳細は
 シナリオテストガイドの「アサーション三点契約」節）。
 
 **タグ:** JSON トップレベルの `"tags": [...]` を `run_physics_scenarios.ps1` が読み、`-Tag`/`-ExcludeTag` で絞り込む
@@ -185,6 +185,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 がそれぞれ独立にPlay/Pause/Stepできる必要があり（`PhysicsSolver::setRunning()`はfluid/rigid/softを1つの
 フラグに束ねてしまう）、`FluidWorld::step()`/`stepOnce()`が`physicsSolver_.rigidFluidSolver()`/
 `softFluidSolver()`を直接オーケストレーションする（詳細は`FluidWorld.h`のクラス doc コメント参照）。
+- **起動時は空シーン**（2026-09-09）: `FluidApp::newScene()` が `onInit()` の最後に走り、3D シーンを空（流体粒子 0・剛体 0・軟体 0・glTF 背景なし）にする。`RigidBodyWorld`/`SoftBodyWorld` のコンストラクタはもうプリセットを組まず（旧: `SphereDrop`／`ClothTwoPin`）、`FluidWorld` も `world_.reset()` を起動時に呼ばない。プリセットは `RigidBody`/`SoftBody` 各パネルの Preset コンボ・シナリオの `SetPreset:` コマンド・`ControlPanel` の Reset で初めて構築される（コンボの getter は body 0 のとき `-1` を返し、同じプリセットを選び直しても再構築できるようにしてある）。**File メニューに `New`**（`FluidApp::newScene()` 直結）／シナリオコマンド **`NewScene`（別名 `New`）** — 同じ空シーン化ルーチンを手動／スクリプトから叩く（`CommandDispatcher::setOnNewScene()`、シナリオ `04_smoke_new_scene`）。`newScene()` = `FluidWorld::newScene()`（ソルバー破棄→粒子 0、emitter/outflow/source/境界/coupling を全クリア。`params()` と `SimulationType` は保持）+ `RigidBodyWorld::clear()` + `SoftBodyWorld::clear()` + `RenderBackground::clearBackground()`。Scene Objects パネルの "Fluid" だけは常設エントリとして残る（"0 particles" 表示）。
 - `FluidWorld`（`FluidWorld.h`）— SPH 流体 + 内包する `RigidBodyWorld`（`rigid()`）+ 任意の Rigid-Fluid 結合（`setCouplingEnabled()`）。旧 `PhysicsSceneWorld` はここに統合済み。
 - `SoftBodyWorld` — クロス/ロープ/ゼリーのシーン。`setSoftCouplingEnabled()`でSoftBody-Fluid結合も可能（UI・シナリオコマンドの配線は`FluidWorld`/`FluidApp`側）。
 - `FluidCommandDispatcher`/`RigidBodyCommandDispatcher`/`SoftBodyCommandDispatcher` — `IScenarioDispatcher` を実装するコマンド文字列ディスパッチャ（シナリオテストガイド参照）。`CommandDispatcher` の `AddEmitter:cx,cy,cz,radius,rate,dirX,dirY,dirZ,speed`/`ClearEmitters`/`GetEmitterCount` が `FluidWorld::addEmitter()`（上記 Emitter 節）を駆動する。`ControlPanel` にも同機能の ImGui セクション（"Emitters"）がある。シナリオ例: `scenarios/dfsph_emitter_faucet.json`。

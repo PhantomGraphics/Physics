@@ -119,6 +119,12 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
 
     const std::string_view sv(cmd);
 
+    if (cmd == "NewScene" || cmd == "New") {
+        if (!onNewScene_) return std::string("Error:new-scene handler not set");
+        onNewScene_();
+        if (onWorldChanged_) onWorldChanged_();
+        return std::string("OK");
+    }
     if (cmd == "Reset") {
         world_->reset();
         if (rigidWorld_) rigidWorld_->reset();

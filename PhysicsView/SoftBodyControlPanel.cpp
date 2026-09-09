@@ -32,7 +32,13 @@ void SoftBodyControlPanel::buildUi()
 
     for (int i = 0; i < kNumPresets; ++i) presetCombo_.addItem(kPresetNames[i]);
     presetCombo_.bind(
-        [this] { return static_cast<int>(world_->currentPreset()); },
+        // -1 (no selection) while the scene is empty -- e.g. right after launch
+        // or File > New -- so picking any preset actually rebuilds it.
+        [this] {
+            return world_->getBodyPointers().empty()
+                       ? -1
+                       : static_cast<int>(world_->currentPreset());
+        },
         [this](int i) {
             if (i < 0 || i >= kNumPresets) return;
             world_->setPreset(kPresetValues[i]);

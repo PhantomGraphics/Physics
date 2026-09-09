@@ -36,6 +36,12 @@ public:
     void setComponentRegistry(SceneComponentRegistry* registry);
 
     void setPreset(ScenePreset preset);
+
+    // Removes every rigid body (including any preset floor) and re-snapshots the
+    // now-empty solver so reset() keeps it empty. Unlike setPreset(Custom), this
+    // leaves no floor behind. Used by FluidApp's "New" scene.
+    void clear();
+
     void reset();
     void step();
 

@@ -3,7 +3,7 @@
   "steps": [
     { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
 
-    { "label": "Precondition: the render-scene state is queryable and returns a JSON object (the shipped default background is a synthesized stage)",
+    { "label": "Precondition: the render-scene state is queryable and returns a JSON object (the app opens with no background loaded)",
       "command": "GetRenderSceneState", "expect_prefix": "{" },
 
     { "label": "A visible fluid + rigid scene sharing the glTF background's camera",
