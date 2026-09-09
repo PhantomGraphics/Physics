@@ -34,9 +34,12 @@
 #include "GltfSoftRenderer.h"
 
 #include "../../CGLib/UIWidgets/MainMenuBar.h"
-#include "../../CGLib/UIWidgets/Menu.h"
-#include "../../CGLib/UIWidgets/MenuItem.h"
-#include "../../CGLib/UIWidgets/Separator.h"
+#include "FileMenu.h"
+#include "PhysicsMenu.h"
+#include "RenderingMenu.h"
+#include "ToolsMenu.h"
+#include "WindowMenu.h"
+#include "ViewMenu.h"
 
 #include "RigidBodyWireRenderer.h"
 #include "RigidBodyControlPanel.h"
@@ -50,7 +53,6 @@
 #include "FlameControlPanel.h"
 
 #include <filesystem>
-#include <list>
 #include <optional>
 
 namespace Phantom {
@@ -171,17 +173,14 @@ private:
     // Standalone windows (Window menu toggles).
     ObjectListPanel          objectListPanel_;
 
-    // Main menu bar, assembled once in buildMenuBar(). File / Physics / Window.
+    // Main menu bar, assembled once in buildMenuBar().
     UI::MainMenuBar          menuBar_;
-    UI::Menu                 fileMenu_    {"File"};
-    UI::Menu                 physicsMenu_ {"Physics"};
-    UI::Menu                 renderingMenu_{"Rendering"};
-    UI::Menu                 toolsMenu_   {"Tools"};
-    UI::Menu                 windowMenu_  {"Window"};
-    UI::Menu                 viewMenu_    {"View"};
-    UI::Separator            fileMenuSeparator_;
-    // Menu items are non-copyable widgets, so hold them in a node-stable list.
-    std::list<UI::MenuItem>  menuItems_;
+    FileMenu                fileMenu_;
+    PhysicsMenu             physicsMenu_;
+    RenderingMenu           renderingMenu_;
+    ToolsMenu               toolsMenu_;
+    WindowMenu              windowMenu_;
+    ViewMenu                viewMenu_;
 
     bool exitOnComplete_ = true;
     int  exitCode_       = 0;

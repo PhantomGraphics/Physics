@@ -164,93 +164,54 @@ void FluidApp::buildMenuBar()
     // rigid/soft bodies, no glTF background). This is the same routine onInit()
     // runs at startup -- presets, scenarios and dispatcher commands populate the
     // scene from an empty state.
-    menuItems_.emplace_back("New");
-    UI::MenuItem& newItem = menuItems_.back();
-    newItem.setFunction([this] { newScene(); });
-    fileMenu_.add(&newItem);
-
-    fileMenu_.add(&fileMenuSeparator_);
-
-    menuItems_.emplace_back("Quit");
-    UI::MenuItem& quit = menuItems_.back();
-    quit.setFunction([this] {
+    fileMenu_.build([this] { newScene(); }, [this] {
         glfwSetWindowShouldClose(getWindow().get(), GLFW_TRUE);
     });
-    fileMenu_.add(&quit);
 
-    // One entry per ControlPage: selecting it makes that page active in the
-    // shared Control window and shows the window if it was hidden. The order
-    // matches the ControlPage enum.
+    // One declarative entry per ControlPage. Rendering and tool pages are
+    // routed to their dedicated top-level menus.
     for (int i = 0; i < static_cast<int>(kControlPageCount); ++i) {
         const auto page = static_cast<ControlPage>(i);
-
-        menuItems_.emplace_back(toString(page));
-        UI::MenuItem& item = menuItems_.back();
-        item.setFunction([this, page] {
-            controlHost_.setPage(page);
-            controlHost_.setVisible(true);
-        });
-        item.setSelected([this, page] {
-            return controlHost_.getPage() == page && controlHost_.isVisible();
-        });
-        item.setEnabled([this, page] { return controlHost_.isPageEnabled(page); });
-        item.setTooltip([this, page]() -> std::string {
-            return controlHost_.isPageEnabled(page)
-                ? std::string{}
-                : controlHost_.pageDisabledReason(page);
-        });
         const bool isRenderingPage =
             page == ControlPage::FluidRendering ||
             page == ControlPage::SSFR ||
             page == ControlPage::Rendering;
         const bool isToolsPage = page == ControlPage::VolumeConversion;
-        if (isRenderingPage)
-            renderingMenu_.add(&item);
-        else if (isToolsPage)
-            toolsMenu_.add(&item);
-        else
-            physicsMenu_.add(&item);
+        DeclarativeMenu* targetMenu = isRenderingPage ? static_cast<DeclarativeMenu*>(&renderingMenu_)
+                                    : isToolsPage ? static_cast<DeclarativeMenu*>(&toolsMenu_)
+                                                  : static_cast<DeclarativeMenu*>(&physicsMenu_);
+
+        targetMenu->build({{toString(page), [this, page] {
+            controlHost_.setPage(page);
+            controlHost_.setVisible(true);
+        }, [this, page] {
+            return controlHost_.getPage() == page && controlHost_.isVisible();
+        }, [this, page] { return controlHost_.isPageEnabled(page); },
+        [this, page]() -> std::string {
+            return controlHost_.isPageEnabled(page)
+                ? std::string{}
+                : controlHost_.pageDisabledReason(page);
+        }}});
     }
 
-    menuItems_.emplace_back("Control Window");
-    UI::MenuItem& ctrlWin = menuItems_.back();
-    ctrlWin.setFunction([this] { controlHost_.setVisible(!controlHost_.isVisible()); });
-    ctrlWin.setSelected([this] { return controlHost_.isVisible(); });
-    windowMenu_.add(&ctrlWin);
+    windowMenu_.build({{"Control Window",
+                [this] { controlHost_.setVisible(!controlHost_.isVisible()); },
+                [this] { return controlHost_.isVisible(); }},
 
-    menuItems_.emplace_back("Scene Objects");
-    UI::MenuItem& objList = menuItems_.back();
-    objList.setFunction([this] { objectListPanel_.setVisible(!objectListPanel_.isVisible()); });
-    objList.setSelected([this] { return objectListPanel_.isVisible(); });
-    windowMenu_.add(&objList);
+        {"Scene Objects",
+                [this] { objectListPanel_.setVisible(!objectListPanel_.isVisible()); },
+                [this] { return objectListPanel_.isVisible(); }},
 
-    menuItems_.emplace_back("Scenario Browser");
-    UI::MenuItem& scenarioBrowser = menuItems_.back();
-    scenarioBrowser.setFunction([this] {
+        {"Scenario Browser", [this] {
         scenarioBrowser_.setVisible(!scenarioBrowser_.isVisible());
+    }, [this] { return scenarioBrowser_.isVisible(); }} });
+
+    viewMenu_.build({
+        {"Camera XY", [this] { fluidRenderer_.viewXY(); }},
+        {"Camera YZ", [this] { fluidRenderer_.viewYZ(); }},
+        {"Camera ZX", [this] { fluidRenderer_.viewZX(); }},
+        {"Camera Fit", [this] { fluidRenderer_.fitCamera(); }}
     });
-    scenarioBrowser.setSelected([this] { return scenarioBrowser_.isVisible(); });
-    windowMenu_.add(&scenarioBrowser);
-
-    menuItems_.emplace_back("Camera XY");
-    UI::MenuItem& cameraXY = menuItems_.back();
-    cameraXY.setFunction([this] { fluidRenderer_.viewXY(); });
-    viewMenu_.add(&cameraXY);
-
-    menuItems_.emplace_back("Camera YZ");
-    UI::MenuItem& cameraYZ = menuItems_.back();
-    cameraYZ.setFunction([this] { fluidRenderer_.viewYZ(); });
-    viewMenu_.add(&cameraYZ);
-
-    menuItems_.emplace_back("Camera ZX");
-    UI::MenuItem& cameraZX = menuItems_.back();
-    cameraZX.setFunction([this] { fluidRenderer_.viewZX(); });
-    viewMenu_.add(&cameraZX);
-
-    menuItems_.emplace_back("Camera Fit");
-    UI::MenuItem& cameraFit = menuItems_.back();
-    cameraFit.setFunction([this] { fluidRenderer_.fitCamera(); });
-    viewMenu_.add(&cameraFit);
 
     menuBar_.add(&fileMenu_);
     menuBar_.add(&viewMenu_);
