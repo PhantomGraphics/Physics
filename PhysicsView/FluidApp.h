@@ -175,6 +175,8 @@ private:
     UI::MainMenuBar          menuBar_;
     UI::Menu                 fileMenu_    {"File"};
     UI::Menu                 physicsMenu_ {"Physics"};
+    UI::Menu                 renderingMenu_{"Rendering"};
+    UI::Menu                 toolsMenu_   {"Tools"};
     UI::Menu                 windowMenu_  {"Window"};
     UI::Menu                 viewMenu_    {"View"};
     UI::Separator            fileMenuSeparator_;

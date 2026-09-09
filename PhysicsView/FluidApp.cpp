@@ -199,7 +199,17 @@ void FluidApp::buildMenuBar()
                 ? std::string{}
                 : controlHost_.pageDisabledReason(page);
         });
-        physicsMenu_.add(&item);
+        const bool isRenderingPage =
+            page == ControlPage::FluidRendering ||
+            page == ControlPage::SSFR ||
+            page == ControlPage::Rendering;
+        const bool isToolsPage = page == ControlPage::VolumeConversion;
+        if (isRenderingPage)
+            renderingMenu_.add(&item);
+        else if (isToolsPage)
+            toolsMenu_.add(&item);
+        else
+            physicsMenu_.add(&item);
     }
 
     menuItems_.emplace_back("Control Window");
@@ -243,9 +253,11 @@ void FluidApp::buildMenuBar()
     viewMenu_.add(&cameraFit);
 
     menuBar_.add(&fileMenu_);
-    menuBar_.add(&physicsMenu_);
-    menuBar_.add(&windowMenu_);
     menuBar_.add(&viewMenu_);
+    menuBar_.add(&physicsMenu_);
+    menuBar_.add(&renderingMenu_);
+    menuBar_.add(&toolsMenu_);
+    menuBar_.add(&windowMenu_);
 }
 
 void FluidApp::registerControlPages()
@@ -740,7 +752,7 @@ void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
 
 void FluidApp::onImGui()
 {
-    // Menu bar (File / Physics / Window / View) is a widget tree assembled once in
+    // Menu bar (File / Physics / Rendering / Tools / Window / View) is a widget tree assembled once in
     // buildMenuBar(); the common status area is FluidStatusView, embedded into
     // controlHost_. Nothing here re-assembles UI per frame.
     menuBar_.show();
