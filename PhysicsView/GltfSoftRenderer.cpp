@@ -36,35 +36,33 @@ GltfSoftRenderer::Instance GltfSoftRenderer::makeInstance(const Physics::ISoftBo
     inst.renderer->setDocument(inst.doc);
     inst.renderer->setShaders(makeShaders());
     inst.renderer->setCamera(view_, proj_, eye_);
-    inst.renderer->setLight(lightDirW0_, lightColorIntensity_);
     inst.renderer->onInit(*ctx_, *pool_, renderPass_, framesInFlight_);
-    if (shadowsEnabled_) {
-        inst.renderer->createShadowPipeline(shadowRP_);
-        inst.renderer->setShadowMap(shadowView_, shadowSampler_, shadowVP_);
-    }
+    // setLight() moving from before onInit() to inside applyLightShadowState() (after onInit())
+    // is behavior-preserving -- GltfSceneRenderer::setLight() only stores member fields that
+    // onUpdate() reads later, onInit() never touches them.
+    Phantom::Gltf::applyLightShadowState(*inst.renderer, state_);
     return inst;
 }
 
 void GltfSoftRenderer::enableShadows(VkRenderPass shadowRenderPass, VkImageView shadowView,
                                     VkSampler shadowSampler) {
-    shadowsEnabled_ = true;
-    shadowRP_       = shadowRenderPass;
-    shadowView_     = shadowView;
-    shadowSampler_  = shadowSampler;
+    state_.shadowCasterRenderPass = shadowRenderPass;
+    state_.shadowEnabled          = true;
+    state_.shadowView             = shadowView;
+    state_.shadowSampler          = shadowSampler;
     for (auto& [body, inst] : instances_) {
         (void)body;
-        inst.renderer->createShadowPipeline(shadowRP_);
-        inst.renderer->setShadowMap(shadowView_, shadowSampler_, shadowVP_);
+        Phantom::Gltf::applyLightShadowState(*inst.renderer, state_);
     }
 }
 
 void GltfSoftRenderer::setShadowLightVP(const glm::mat4& lightVP) {
-    shadowVP_ = lightVP;
+    state_.shadowVP = lightVP;
     for (auto& [body, inst] : instances_) { (void)body; inst.renderer->setShadowLightVP(lightVP); }
 }
 
 void GltfSoftRenderer::renderShadowCasters(VkCommandBuffer cmd, const glm::mat4& lightVP) {
-    if (!ready_ || !shadowsEnabled_) return;
+    if (!ready_ || !state_.shadowEnabled) return;
     for (auto& [body, inst] : instances_) { (void)body; inst.renderer->renderShadowCasters(cmd, lightVP); }
 }
 
@@ -109,8 +107,8 @@ void GltfSoftRenderer::setCamera(const glm::mat4& view, const glm::mat4& proj, c
 }
 
 void GltfSoftRenderer::setLight(const glm::vec4& dirW0, const glm::vec4& colorIntensityW) {
-    lightDirW0_          = dirW0;
-    lightColorIntensity_ = colorIntensityW;
+    state_.lightPos   = dirW0;
+    state_.lightColor = colorIntensityW;
 }
 
 void GltfSoftRenderer::onUpdate(uint32_t frameIndex) {
@@ -127,7 +125,7 @@ void GltfSoftRenderer::onUpdate(uint32_t frameIndex) {
         computeSoftBodyNormals(positions, mesh.faces, normalScratch_);
         inst.renderer->updateMorphedGeometry(0, 0, positions, normalScratch_);
         inst.renderer->setCamera(view_, proj_, eye_);
-        inst.renderer->setLight(lightDirW0_, lightColorIntensity_);
+        inst.renderer->setLight(state_.lightPos, state_.lightColor);
         inst.renderer->onUpdate(frameIndex);
     }
 }

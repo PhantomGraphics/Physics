@@ -6,6 +6,7 @@
 
 #include "../../CGLib/GltfRenderer/Gltf/GltfDocument.h"
 #include "../../CGLib/GltfRenderer/Renderer/GltfSceneRenderer.h"
+#include "../../CGLib/GltfRenderer/Renderer/GltfLightShadowState.h"
 #include "../../CGLib/VkAppBase/IVkSubRenderer.h"
 
 #include "BodyRenderMode.h"
@@ -93,11 +94,14 @@ private:
     std::vector<uint32_t> shadowVertSpv_;
     std::vector<uint32_t> shadowFragSpv_;
 
-    bool        shadowsEnabled_ = false;
-    VkRenderPass shadowRP_      = VK_NULL_HANDLE;
-    VkImageView  shadowView_    = VK_NULL_HANDLE;
-    VkSampler    shadowSampler_ = VK_NULL_HANDLE;
-    glm::mat4    shadowVP_{1.f};
+    // Shared light + shadow state (see enableShadows()/setLight()), applied to each instance via
+    // Phantom::Gltf::applyLightShadowState() (2026-09-16 -- shared with Universe's
+    // Rendering/GltfRenderer and GltfBodyRenderer, which duplicate this same shape). Default
+    // light direction/color preserved from this class's pre-refactor members.
+    Phantom::Gltf::GltfLightShadowState state_{
+        glm::vec4(glm::normalize(glm::vec3(-0.3f, -1.0f, -0.25f)), 0.0f),
+        glm::vec4(1.f, 1.f, 1.f, 3.f)
+    };
 
     Mode mode_    = Mode::Wireframe;
     bool enabled_ = true;
@@ -111,8 +115,6 @@ private:
     glm::mat4 view_{1.f};
     glm::mat4 proj_{1.f};
     glm::vec3 eye_{0.f};
-    glm::vec4 lightDirW0_{glm::vec4(glm::normalize(glm::vec3(-0.3f, -1.0f, -0.25f)), 0.0f)};
-    glm::vec4 lightColorIntensity_{1.f, 1.f, 1.f, 3.f};
 
     std::vector<glm::vec3> normalScratch_; // reused each frame
 
