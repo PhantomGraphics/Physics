@@ -12,6 +12,7 @@
 #include "GltfBodyRenderer.h"
 #include "GltfSoftRenderer.h"
 #include "SSFRPanel.h"
+#include "FluidRenderer.h"
 
 #include <glm/glm.hpp>
 
@@ -119,6 +120,34 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
 
     const std::string_view sv(cmd);
 
+    if (auto flameResp = flameDispatcher_.route(cmd)) return flameResp;
+
+    if (sv.rfind("SetCameraOrbit:", 0) == 0) {
+        if (!fluidRenderer_) return std::string("Error:camera not available");
+        const auto parts = split(sv.substr(15), ',');
+        float d = 0.0f, yaw = 0.0f, pitch = 0.0f;
+        if (parts.size() != 3 || !parseFlt(parts[0], d) || !parseFlt(parts[1], yaw) || !parseFlt(parts[2], pitch) ||
+            !std::isfinite(d) || !std::isfinite(yaw) || !std::isfinite(pitch) || d <= 0.0f) {
+            return std::string("Error:expected distance,yaw,pitch");
+        }
+        fluidRenderer_->setCameraOrbit(d, yaw, pitch);
+        return std::string("OK");
+    }
+    if (cmd == "GetCameraOrbit") {
+        if (!fluidRenderer_) return std::string("Error:camera not available");
+        return std::to_string(fluidRenderer_->getCameraDistance()) + "," +
+               std::to_string(fluidRenderer_->getCameraYaw()) + "," +
+               std::to_string(fluidRenderer_->getCameraPitch());
+    }
+    if (cmd == "SetUIVisible:true" || cmd == "SetUIVisible:false") {
+        if (!setUIVisible_) return std::string("Error:UI visibility hook not set");
+        setUIVisible_(cmd == "SetUIVisible:true");
+        return std::string("OK");
+    }
+    if (cmd == "IsUIVisible") {
+        if (!isUIVisible_) return std::string("Error:UI visibility hook not set");
+        return std::string(isUIVisible_() ? "true" : "false");
+    }
     if (cmd == "NewScene" || cmd == "New") {
         if (!onNewScene_) return std::string("Error:new-scene handler not set");
         onNewScene_();

@@ -1,0 +1,112 @@
+{
+  "name": "47_flame_render_modes",
+  "_comment": "Flame Normal vs PBVR render modes on the same paused 4 s state, captured with every ImGui window hidden (SetUIVisible:false). The PNGs under testdata/screenshots/ are for visual comparison between plan phases; the assertions cover mode switching and that the capture round-trips without advancing the sim.",
+  "steps": [
+    {
+      "label": "Liveness check",
+      "command": "GetStatus",
+      "expect": "OK"
+    },
+    {
+      "label": "Show the Flame page",
+      "command": "SetFlamePage:true",
+      "expect": "OK"
+    },
+    {
+      "label": "Keep paused",
+      "command": "SetFlameRunning:false",
+      "expect": "OK"
+    },
+    {
+      "label": "Rebuild the default scene",
+      "command": "FlameReset",
+      "expect": "OK"
+    },
+    {
+      "label": "Run 4 simulated seconds",
+      "command": "FlameStep:240",
+      "expect": "OK"
+    },
+    {
+      "label": "Hide the UI for a clean capture",
+      "command": "SetUIVisible:false",
+      "expect": "OK"
+    },
+    {
+      "label": "Fixed side view for comparable captures",
+      "command": "SetCameraOrbit:110,0,0.15",
+      "expect": "OK"
+    },
+    {
+      "label": "Precondition: UI hidden",
+      "command": "IsUIVisible",
+      "expect": "false"
+    },
+    {
+      "label": "Normal mode",
+      "command": "SetFlameRenderMode:Normal",
+      "expect": "OK"
+    },
+    {
+      "label": "Precondition: Normal",
+      "command": "GetFlameRenderMode",
+      "expect": "Normal"
+    },
+    {
+      "label": "Capture Normal",
+      "command": "SaveScreenshot:testdata/screenshots/47_flame_normal.png",
+      "expect": "OK"
+    },
+    {
+      "label": "PBVR mode",
+      "command": "SetFlameRenderMode:PBVR",
+      "expect": "OK"
+    },
+    {
+      "label": "Change: PBVR",
+      "command": "GetFlameRenderMode",
+      "expect": "PBVR"
+    },
+    {
+      "label": "Let the static frame converge (progressive ensemble average)",
+      "command": "GetStatus",
+      "expect": "OK",
+      "repeat": 90
+    },
+    {
+      "label": "Change: PBVR averaged many ensembles",
+      "command": "GetFlamePBVRStat:displayedEnsembles",
+      "expect_range": "16,100000"
+    },
+    {
+      "label": "Capture PBVR",
+      "command": "SaveScreenshot:testdata/screenshots/47_flame_pbvr.png",
+      "expect": "OK"
+    },
+    {
+      "label": "Invariant: capturing did not advance the sim",
+      "command": "GetFlameSimTime",
+      "expect_range": "3.99,4.01"
+    },
+    {
+      "label": "Back to Normal",
+      "command": "SetFlameRenderMode:Normal",
+      "expect": "OK"
+    },
+    {
+      "label": "Restore the UI",
+      "command": "SetUIVisible:true",
+      "expect": "OK"
+    },
+    {
+      "label": "Invariant: UI visible again",
+      "command": "IsUIVisible",
+      "expect": "true"
+    },
+    {
+      "label": "Leave the Flame page",
+      "command": "SetFlamePage:false",
+      "expect": "OK"
+    }
+  ]
+}

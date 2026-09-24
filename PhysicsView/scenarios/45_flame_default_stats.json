@@ -1,0 +1,26 @@
+{
+  "name": "45_flame_default_stats",
+  "_comment": "Default Flame scene (FlameWorld::buildScene) stepped 4 simulated seconds at the fixed 1/60 step, then asserted on FlameStats (docs/todo/PLAN_flame_sph_pbvr_improvement.md Phase 0). The sim is paused and advanced with FlameStep so the step count, not the frame rate, decides the state.",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "Show the Flame page", "command": "SetFlamePage:true", "expect": "OK" },
+    { "label": "Precondition: page switched", "command": "IsFlamePage", "expect": "true" },
+    { "label": "Keep the sim paused (FlameStep drives it)", "command": "SetFlameRunning:false", "expect": "OK" },
+    { "label": "Rebuild the default scene", "command": "FlameReset", "expect": "OK" },
+    { "label": "Precondition: empty until the emitter runs", "command": "GetFlameParticleCount", "expect": "Count:0" },
+    { "label": "Precondition: sim clock reset", "command": "GetFlameSimTime", "expect_range": "0,0" },
+
+    { "label": "Run 4 simulated seconds", "command": "FlameStep:240", "expect": "OK" },
+    { "label": "Stats summary (logged for the baseline)", "command": "GetFlameStats", "expect_prefix": "count=" },
+    { "label": "Sim clock advanced by 240 * 1/60", "command": "GetFlameSimTime", "expect_range": "3.99,4.01" },
+    { "label": "Change: the emitter filled the scene", "command": "GetFlameStat:count", "expect_range": "800,4000" },
+    { "label": "Change: air carriers are co-emitted", "command": "GetFlameStat:airCount", "expect_range": "100,4000" },
+    { "label": "Change: the plume rose off the emitter", "command": "GetFlameStat:avgY", "expect_range": "0.3,4.0" },
+    { "label": "Change: secondary sparks/smoke spawned", "command": "GetFlameStat:secondaryCount", "expect_range": "1000,200000" },
+    { "label": "Change: soot produced", "command": "GetFlameStat:avgSoot", "expect_range": "0.001,10" },
+    { "label": "Invariant: no NaN/inf particle", "command": "GetFlameStat:nanCount", "expect_range": "0,0" },
+    { "label": "Invariant: stays inside the domain box (y <= 4 + margin)", "command": "GetFlameStat:maxY", "expect_range": "0,4.3" },
+    { "label": "Invariant: temperatures bounded", "command": "GetFlameStat:maxT", "expect_range": "300,3000" },
+    { "label": "Invariant: speeds bounded", "command": "GetFlameStat:maxSpeed", "expect_range": "0,10" }
+  ]
+}

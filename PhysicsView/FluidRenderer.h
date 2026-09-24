@@ -48,6 +48,14 @@ public:
     glm::mat4 getViewMatrix() const;
     glm::mat4 getProjMatrix() const;
     float     getCameraDistance() const { return camera_.distance(); }
+    float     getCameraYaw() const      { return camera_.yaw(); }
+    float     getCameraPitch() const    { return camera_.pitch(); }
+    /** @brief Orbit camera around its fixed centre (20,20,20); distance clamps to >= 5. */
+    void      setCameraOrbit(float distance, float yaw, float pitch) {
+        camera_.setDistance(distance);
+        camera_.setYaw(yaw);
+        camera_.setPitch(pitch);
+    }
 
     void viewXY();
     void viewYZ();

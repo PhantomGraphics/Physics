@@ -41,6 +41,46 @@ public:
 		// see FlameApp for a tuned example).
 		float airRate = 0.0f;
 		float airAccumulator = 0.0f;
+
+		/**
+		 * Temperature fuel particles are spawned at. Negative (the default)
+		 * means "use the fluid's ignitionTemperature" -- the historical
+		 * behavior. Under CombustionModel::Physical this is a *preheat*: the
+		 * particle only burns once it has mixed with oxygen (see
+		 * FlameFluid::computeReactionRate()), so it may be below ignition.
+		 */
+		float fuelTemperature = -1.0f;
+
+		/**
+		 * Wick-like pilot: while > 0, every fuel particle inside the cylinder
+		 * of radius `radius` and height `pilotHeight` above `center` is held
+		 * at least at this temperature (see FlameFluid::applyPilots()). Keeps
+		 * the Physical model's diffusion flame anchored/ignited at its base --
+		 * the reaction itself is what lifts temperature above this further up.
+		 * 0 (the default) disables it.
+		 */
+		float pilotTemperature = 0.0f;
+		float pilotHeight = 0.1f;
+	};
+
+	/**
+	 * @brief Which combustion law FlameParticle::react() integrates.
+	 *
+	 * - Legacy: the original temperature-independent first-order reaction
+	 *   (df = -k f, no oxygen, no ignition threshold). Kept for comparison and
+	 *   for scenes tuned against it.
+	 * - Physical: rate = k(T) * f * o (docs/todo/PLAN_flame_sph_pbvr_improvement.md
+	 *   Phase 2): burns only where fuel and oxygen have mixed *and* the mixture
+	 *   is hot enough, consumes oxygen stoichiometrically, and -- together
+	 *   with the SPH scalar diffusion pass -- lets flame spread particle to
+	 *   particle instead of every particle being born already burning.
+	 */
+	enum class CombustionModel { Legacy, Physical };
+
+	/** @brief Temperature dependence k(T) used by CombustionModel::Physical. */
+	enum class ReactionRateModel {
+		Smoothstep, ///< burnRate * smoothstep(T_ign - dT, T_ign + dT, T)
+		Arrhenius,  ///< burnRate * exp(-Ta/T) / exp(-Ta/T_ign), clamped to kMaxArrheniusGain * burnRate
 	};
 
 	/** @brief What a SecondaryParticle represents, for rendering purposes. */
@@ -71,7 +111,8 @@ public:
 		float lifeMax = 1.0f;
 		float size = 1.0f;
 		float temperature = 300.0f; // Spark/smoke color (reuses the flame's temperature gradient).
-		float opacity = 0.0f;       // Smoke alpha.
+		float opacity = 0.0f;       // Smoke fade envelope (0..0.5).
+		float soot = 0.0f;          // Source particle's soot concentration at spawn (smoke optical density).
 		SecondaryKind kind = SecondaryKind::Spark;
 	};
 
@@ -134,6 +175,71 @@ public:
 	float getSootYield() const { return sootYield; }
 	void setSootYield(const float v) { sootYield = v; }
 
+	// ---- Physical combustion model (plan Phase 2) ----------------------------
+
+	CombustionModel getCombustionModel() const { return combustionModel; }
+	void setCombustionModel(const CombustionModel m) { combustionModel = m; }
+
+	ReactionRateModel getReactionRateModel() const { return reactionRateModel; }
+	void setReactionRateModel(const ReactionRateModel m) { reactionRateModel = m; }
+
+	/** @brief Half-width dT of the smoothstep ignition window around ignitionTemperature (K). */
+	float getIgnitionWidth() const { return ignitionWidth; }
+	void setIgnitionWidth(const float v) { ignitionWidth = v; }
+
+	/** @brief Arrhenius activation temperature Ta = Ea/R (K). */
+	float getActivationTemperature() const { return activationTemperature; }
+	void setActivationTemperature(const float v) { activationTemperature = v; }
+
+	/** @brief Oxygen mass consumed per unit fuel burned (stoichiometric ratio). */
+	float getOxygenPerFuel() const { return oxygenPerFuel; }
+	void setOxygenPerFuel(const float v) { oxygenPerFuel = v; }
+
+	/** @brief Hard temperature ceiling applied after each react() (stability net). */
+	float getMaxTemperature() const { return maxTemperature; }
+	void setMaxTemperature(const float v) { maxTemperature = v; }
+
+	/**
+	 * @brief SPH (Cleary-Monaghan) diffusivities for temperature / fuel /
+	 * oxygen / soot, in length^2/s. 0 disables that scalar's diffusion. The
+	 * solver clamps the effective value to kappa*dt/h^2 <= kMaxDiffusionNumber
+	 * (explicit-diffusion stability, plan section 6).
+	 */
+	float getThermalDiffusivity() const { return thermalDiffusivity; }
+	void setThermalDiffusivity(const float v) { thermalDiffusivity = v; }
+	float getFuelDiffusivity() const { return fuelDiffusivity; }
+	void setFuelDiffusivity(const float v) { fuelDiffusivity = v; }
+	float getOxygenDiffusivity() const { return oxygenDiffusivity; }
+	void setOxygenDiffusivity(const float v) { oxygenDiffusivity = v; }
+	float getSootDiffusivity() const { return sootDiffusivity; }
+	void setSootDiffusivity(const float v) { sootDiffusivity = v; }
+
+	/**
+	 * @brief When true, the pressure's rest density is lowered to
+	 * rho0 * T_ambient / T (ideal-gas thermal expansion, plan Phase 2 item 4),
+	 * so hot gas pushes its neighbors apart. Off by default: it acts on top of
+	 * the Boussinesq buoyancy term, so enabling it usually wants a smaller
+	 * buoyancyCoe to avoid counting the same lift twice.
+	 */
+	bool getThermalExpansionPressure() const { return thermalExpansionPressure; }
+	void setThermalExpansionPressure(const bool b) { thermalExpansionPressure = b; }
+
+	/**
+	 * @brief Reaction rate (1/s, per unit fuel consumed) for a particle state,
+	 * under the current CombustionModel / ReactionRateModel. Legacy ignores
+	 * temperature and oxygen: burnRate * fuel.
+	 */
+	float computeReactionRate(const float temperature, const float fuel, const float oxygen) const;
+
+	/** @brief k(T)/burnRate factor in [0, kMaxArrheniusGain] (Physical model only; 1 for Legacy). */
+	float computeTemperatureFactor(const float temperature) const;
+
+	/**
+	 * @brief Returns the rest density the pressure term compares against at
+	 * the given temperature (rho0, or rho0*T_amb/T with thermal-expansion pressure).
+	 */
+	float computeRestDensity(const float temperature) const;
+
 	// ---- Buoyancy / vorticity / curl-noise parameters (idea doc section 2) --
 
 	float getBuoyancyCoe() const { return buoyancyCoe; }
@@ -150,6 +256,13 @@ public:
 
 	float getCurlNoiseFrequency() const { return curlNoiseFrequency; }
 	void setCurlNoiseFrequency(const float v) { curlNoiseFrequency = v; }
+
+	/**
+	 * @brief How fast the curl-noise field evolves (1/s along the 4th noise
+	 * axis). 0 freezes the pattern in space (the pre-2026-09 behavior).
+	 */
+	float getCurlNoiseTimeScale() const { return curlNoiseTimeScale; }
+	void setCurlNoiseTimeScale(const float v) { curlNoiseTimeScale = v; }
 
 	float getLifeMax() const { return lifeMax; }
 	void setLifeMax(const float v) { lifeMax = v; }
@@ -193,6 +306,13 @@ public:
 	 * @param dt Time step (seconds).
 	 */
 	void updateEmitters(const float dt);
+
+	/**
+	 * @brief Raises every particle inside an emitter's pilot cylinder (see
+	 * Emitter::pilotTemperature/pilotHeight) to at least the pilot temperature.
+	 * No-op for emitters with pilotTemperature <= 0.
+	 */
+	void applyPilots();
 
 	/**
 	 * @brief Removes particles that are dead (see FlameParticle::isDead()), via
@@ -266,6 +386,14 @@ public:
 	 */
 	void updateSecondaryParticles(const float dt, const Math::Vector3df& gravity);
 
+	/**
+	 * @brief Rotates velocity about the vorticity axis by |vorticity|*strength*dt
+	 * (Rodrigues' formula) -- the length-preserving form of
+	 * v += (vorticity x v) * strength * dt used for the secondary swirl (plan A4).
+	 */
+	static Math::Vector3df rotateBySwirl(const Math::Vector3df& velocity, const Math::Vector3df& vorticity,
+		const float strength, const float dt);
+
 private:
 	float density = 1.0f;
 	float pressureCoe = 50.0f;
@@ -274,10 +402,31 @@ private:
 
 	float ambientTemperature = 300.0f;
 	float ignitionTemperature = 1200.0f;
-	float burnRate = 1.0f;
-	float heatRelease = 2000.0f;
-	float coolRate = 3.0f;
+	// Physical-model defaults (plan Phase 2): fast chemistry (k up to 10/s)
+	// so the burn rate is limited by fuel/air *mixing*, as in a real diffusion
+	// flame, and heat release large enough to outrun radiative cooling in the
+	// mixing layer (at the old 1/s, 2000 K, 3/s the reaction could not keep a
+	// lean mixture above ignition and the flame only survived at the pilot).
+	// Legacy scenes set their own values (the old defaults were 1 / 2000 / 3).
+	float burnRate = 10.0f;
+	float heatRelease = 2500.0f;
+	float coolRate = 2.0f;
 	float sootYield = 0.3f;
+
+	CombustionModel combustionModel = CombustionModel::Physical;
+	ReactionRateModel reactionRateModel = ReactionRateModel::Smoothstep;
+	float ignitionWidth = 150.0f;
+	float activationTemperature = 12000.0f;
+	float oxygenPerFuel = 1.0f;
+	float maxTemperature = 2600.0f;
+	// ~h^2/kappa = 0.5-1 s to diffuse across one 0.12 kernel radius: fast
+	// enough to form a mixing layer within a particle's ~2 s rise, slow enough
+	// that the fuel core stays rich (and so does not burn) near the base.
+	float thermalDiffusivity = 0.03f;
+	float fuelDiffusivity = 0.02f;
+	float oxygenDiffusivity = 0.02f;
+	float sootDiffusivity = 0.005f;
+	bool thermalExpansionPressure = false;
 	// buoyancyCoe/thermalExpansion are tuned so a freshly ignited particle
 	// (temperature == ignitionTemperature, deltaT == 900K against the defaults
 	// below) produces a lively but bounded ~3g rise. The previous defaults
@@ -289,8 +438,11 @@ private:
 	float buoyancyCoe = 2.0f;
 	float thermalExpansion = 0.0015f;
 	float vorticityEps = 2.0f;
-	float curlNoiseStrength = 0.5f;
+	// Acceleration (length/s^2). Was 0.5 applied as a per-step velocity kick
+	// without dt (= 0.5*60 at the 1/60 step); see FlameSolver::simulate() A1 note.
+	float curlNoiseStrength = 30.0f;
 	float curlNoiseFrequency = 0.3f;
+	float curlNoiseTimeScale = 0.25f;
 	float lifeMax = 4.0f;
 	float maxSpeed = 3.0f;
 

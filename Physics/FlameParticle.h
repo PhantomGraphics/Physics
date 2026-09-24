@@ -10,6 +10,18 @@ namespace Phantom {
 		class SPHKernel;
 
 /**
+ * @brief Per-particle d/dt of the scalars the SPH diffusion pass transports
+ * (FlameSolver::simulate(), plan Phase 2 item 2). Solver-local scratch -- not
+ * stored in FlameParticleSoA.
+ */
+struct FlameScalarRates {
+	float temperature = 0.0f;
+	float fuel = 0.0f;
+	float oxygen = 0.0f;
+	float soot = 0.0f;
+};
+
+/**
  * @brief Structure-of-Arrays storage for Flame (reacting hot gas) particle data.
  *
  * Owned by FlameFluid. FlameParticle is a non-owning (soa, index) view over
@@ -25,6 +37,7 @@ struct FlameParticleSoA {
 	std::vector<float> temperatures;
 	std::vector<float> fuels;
 	std::vector<float> soots;
+	std::vector<float> oxygens; ///< Oxidizer mass fraction (0..1); air carriers spawn at 1, emitted fuel at 0.
 	std::vector<float> ages;
 	std::vector<bool> airs;
 
@@ -44,6 +57,7 @@ struct FlameParticleSoA {
 		temperatures.clear();
 		fuels.clear();
 		soots.clear();
+		oxygens.clear();
 		ages.clear();
 		airs.clear();
 		vorticities.clear();
@@ -61,6 +75,10 @@ struct FlameParticleSoA {
 		temperatures.push_back(temperature);
 		fuels.push_back(0.0f);
 		soots.push_back(0.0f);
+		// 1 = "premixed with air": a bare createParticle() particle can burn
+		// under the Physical combustion model without any mixing. Emitted fuel
+		// particles override this to 0 (see FlameFluid::updateEmitters()).
+		oxygens.push_back(1.0f);
 		ages.push_back(0.0f);
 		airs.push_back(false);
 		vorticities.push_back(Math::Vector3df(0.0f, 0.0f, 0.0f));
@@ -86,6 +104,8 @@ struct FlameParticleSoA {
 		fuels.pop_back();
 		soots[index] = soots.back();
 		soots.pop_back();
+		oxygens[index] = oxygens.back();
+		oxygens.pop_back();
 		ages[index] = ages.back();
 		ages.pop_back();
 		airs[index] = airs.back();
@@ -205,16 +225,30 @@ public:
 	// ---- Combustion (idea doc section 1) -----------------------------------
 
 	/**
-	 * @brief Advances the per-particle combustion reaction (no neighbor access).
+	 * @brief Advances the per-particle combustion reaction by dt.
 	 *
-	 * df/dt = -k_burn * f
-	 * dT/dt = k_burn * f * heat_release - k_cool * (T - T_ambient)
-	 * ds/dt = k_burn * f * soot_yield
+	 * First applies the neighbor-diffusion rates (if given), then the reaction
+	 * with rate w = FlameFluid::computeReactionRate(T, f, o):
 	 *
-	 * O2_available is simplified to a constant 1 in Phase 1; a neighbor-soot
-	 * driven decay is left as a Phase 4 extension (see plan).
+	 *   df/dt = -w
+	 *   do/dt = -oxygenPerFuel * w          (Physical model only)
+	 *   dT/dt = heat_release * w - k_cool * (T - T_ambient)
+	 *   ds/dt = soot_yield * w
+	 *
+	 * Legacy: w = k_burn * f (no temperature/oxygen dependence -- the original
+	 * first-order law). Physical: w = k(T) * f * o, limited so a single step
+	 * never consumes more fuel/oxygen than the particle holds; T is clamped to
+	 * FlameFluid::getMaxTemperature().
+	 * @param diffusion Optional d/dt contributions from FlameSolver's scalar
+	 *        diffusion pass (nullptr = none, e.g. an isolated particle).
 	 */
-	void react(const float dt);
+	void react(const float dt, const FlameScalarRates* diffusion = nullptr);
+
+	/** @brief Returns the oxidizer mass fraction (0..1). */
+	float getOxygen() const { return soa_->oxygens[index_]; }
+
+	/** @brief Sets the oxidizer mass fraction. */
+	void setOxygen(const float o) { soa_->oxygens[index_] = o; }
 
 	/** @brief Returns the current temperature. */
 	float getTemperature() const { return soa_->temperatures[index_]; }

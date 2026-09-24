@@ -1,0 +1,36 @@
+#version 450
+
+// Turns flame_pbvr_generate.comp's per-ensemble atomic counters into
+// VkDrawIndirectCommand records (clamping to the segment capacity -- the
+// counter keeps counting past it when a segment overflows) and zeroes the
+// counters for the next frame's generation pass.
+layout(local_size_x = 8) in;
+
+struct DrawIndirect {
+    uint vertexCount;
+    uint instanceCount;
+    uint firstVertex;
+    uint firstInstance;
+};
+layout(std430, set = 0, binding = 0) buffer Counters { uint counts[]; };
+layout(std430, set = 0, binding = 1) writeonly buffer Args { DrawIndirect args[]; };
+layout(std430, set = 0, binding = 2) writeonly buffer Stats { uint generated[]; }; // unclamped counts (readback)
+
+layout(push_constant) uniform PC {
+    uint ensembleCount;
+    uint capacity;
+} pc;
+
+void main() {
+    uint e = gl_GlobalInvocationID.x;
+    if (e >= pc.ensembleCount) {
+        return;
+    }
+    uint c = counts[e];
+    args[e].vertexCount = min(c, pc.capacity);
+    args[e].instanceCount = 1u;
+    args[e].firstVertex = e * pc.capacity;
+    args[e].firstInstance = 0u;
+    generated[e] = c;
+    counts[e] = 0u;
+}

@@ -1,0 +1,34 @@
+{
+  "name": "49_flame_physical_combustion",
+  "_comment": "Physical combustion model (docs/todo/PLAN_flame_sph_pbvr_improvement.md Phase 2) vs the Legacy first-order law on the same scene. Physical: fuel only burns after mixing with air, the hottest gas sits above the wick-like pilot zone (heat that only the reaction can supply there) and oxygen is consumed. Legacy: particles are born at the ignition temperature and only cool, so nothing ever exceeds it.",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "Show the Flame page", "command": "SetFlamePage:true", "expect": "OK" },
+    { "label": "Keep paused", "command": "SetFlameRunning:false", "expect": "OK" },
+
+    { "label": "Default scene (Physical model)", "command": "FlameReset", "expect": "OK" },
+    { "label": "Precondition: Physical is the default", "command": "GetFlameParam:combustionModel", "expect_range": "1,1" },
+    { "label": "Run 4 simulated seconds", "command": "FlameStep:240", "expect": "OK" },
+    { "label": "Stats summary (logged)", "command": "GetFlameStats", "expect_prefix": "count=" },
+    { "label": "Change: burning keeps gas well above ignition (1200 K)", "command": "GetFlameStat:maxT", "expect_range": "1300,3000", "store_as": "maxT_physical" },
+    { "label": "Change: the hottest 10% sit above the 0.15-high pilot zone -- only reaction heat can keep them there", "command": "GetFlameStat:hotY", "expect_range": "0.3,4" },
+    { "label": "Change: part of the population is burning", "command": "GetFlameStat:burningFraction", "expect_range": "0.01,0.9" },
+    { "label": "Change: oxygen was consumed (air carriers start at 1)", "command": "GetFlameStat:avgOxygen", "expect_range": "0,0.6" },
+    { "label": "Change: most fuel burned", "command": "GetFlameStat:avgFuel", "expect_range": "0,0.5" },
+    { "label": "Invariant: no NaN", "command": "GetFlameStat:nanCount", "expect_range": "0,0" },
+
+    { "label": "Same scene, Legacy law", "command": "FlameReset", "expect": "OK" },
+    { "label": "Legacy model", "command": "SetFlameParam:combustionModel,0", "expect": "OK" },
+    { "label": "Legacy burn rate", "command": "SetFlameParam:burnRate,1", "expect": "OK" },
+    { "label": "Legacy heat release", "command": "SetFlameParam:heatRelease,2000", "expect": "OK" },
+    { "label": "Legacy cool rate", "command": "SetFlameParam:coolRate,3", "expect": "OK" },
+    { "label": "Legacy spawn temperature (= ignition)", "command": "SetFlameParam:emitterFuelTemperature,-1", "expect": "OK" },
+    { "label": "No pilot", "command": "SetFlameParam:emitterPilotTemperature,0", "expect": "OK" },
+    { "label": "Run 4 simulated seconds", "command": "FlameStep:240", "expect": "OK" },
+    { "label": "Stats summary (logged)", "command": "GetFlameStats", "expect_prefix": "count=" },
+    { "label": "Change: Legacy never meaningfully exceeds its 1200 K spawn temperature (explicit SPH diffusion may overshoot by a few K)", "command": "GetFlameStat:maxT", "expect_range": "1000,1230", "store_as": "maxT_legacy" },
+    { "label": "Invariant: no NaN", "command": "GetFlameStat:nanCount", "expect_range": "0,0" },
+    { "label": "Leave the Flame page", "command": "SetFlamePage:false", "expect": "OK" }
+  ],
+  "post_assert": "maxT_physical > maxT_legacy"
+}

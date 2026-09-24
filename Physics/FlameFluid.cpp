@@ -15,11 +15,58 @@ namespace {
 // particles consistent with the ~thousands-of-particles CPU budget.
 constexpr float kEmittedParticleRadius = 0.02f;
 constexpr float kTwoPi = 6.2831853f;
+
+// Arrhenius k(T) is normalized to burnRate at T_ign; above that it keeps
+// growing exponentially, so cap the gain to keep explicit integration sane.
+constexpr float kMaxArrheniusGain = 8.0f;
+
+float smoothstep01(const float e0, const float e1, const float x)
+{
+	if (e1 <= e0) {
+		return x >= e1 ? 1.0f : 0.0f;
+	}
+	const float t = std::clamp((x - e0) / (e1 - e0), 0.0f, 1.0f);
+	return t * t * (3.0f - 2.0f * t);
+}
 }
 
 FlameFluid::FlameFluid() :
 	rng(kDefaultRandomSeed)
 {
+}
+
+float FlameFluid::computeTemperatureFactor(const float temperature) const
+{
+	if (combustionModel == CombustionModel::Legacy) {
+		return 1.0f;
+	}
+	if (reactionRateModel == ReactionRateModel::Arrhenius) {
+		const float t = std::max(temperature, 1.0f);
+		const float tIgn = std::max(ignitionTemperature, 1.0f);
+		// exp(-Ta/T) / exp(-Ta/T_ign) == exp(Ta * (1/T_ign - 1/T)).
+		const float exponent = activationTemperature * (1.0f / tIgn - 1.0f / t);
+		return std::min(kMaxArrheniusGain, std::exp(std::min(exponent, 20.0f)));
+	}
+	return smoothstep01(ignitionTemperature - ignitionWidth, ignitionTemperature + ignitionWidth, temperature);
+}
+
+float FlameFluid::computeReactionRate(const float temperature, const float fuel, const float oxygen) const
+{
+	if (combustionModel == CombustionModel::Legacy) {
+		return burnRate * fuel;
+	}
+	return burnRate * computeTemperatureFactor(temperature) * std::max(0.0f, fuel) * std::max(0.0f, oxygen);
+}
+
+float FlameFluid::computeRestDensity(const float temperature) const
+{
+	if (!thermalExpansionPressure) {
+		return density;
+	}
+	// Ideal gas at constant pressure: rho ~ 1/T. Floor at 10% so a wildly hot
+	// particle cannot drive its rest density (and thus pressure base) to zero.
+	const float ratio = ambientTemperature / std::max(temperature, 1.0f);
+	return density * std::clamp(ratio, 0.1f, 1.0f);
 }
 
 Box3df FlameFluid::getBoundingBox() const
@@ -55,9 +102,13 @@ void FlameFluid::updateEmitters(const float dt)
 			const float theta = angleDist(rng);
 			const Vector3df offset(r * std::cos(theta), 0.0f, r * std::sin(theta));
 
-			particles.push_back(e.center + offset, kEmittedParticleRadius, density, ignitionTemperature);
+			const float fuelT = (e.fuelTemperature >= 0.0f) ? e.fuelTemperature : ignitionTemperature;
+			particles.push_back(e.center + offset, kEmittedParticleRadius, density, fuelT);
 			const size_t idx = particles.size() - 1;
 			particles.fuels[idx] = 1.0f;
+			// Pure fuel vapor: it has to mix with air carriers (via the
+			// solver's diffusion pass) before the Physical model lets it burn.
+			particles.oxygens[idx] = 0.0f;
 			particles.velocities[idx] = Vector3df(jitterDist(rng), 1.0f + jitterDist(rng), jitterDist(rng));
 		}
 
@@ -80,6 +131,23 @@ void FlameFluid::updateEmitters(const float dt)
 	}
 }
 
+void FlameFluid::applyPilots()
+{
+	for (const auto& e : emitters) {
+		if (e.pilotTemperature <= 0.0f) {
+			continue;
+		}
+		const float r2 = e.radius * e.radius;
+		for (size_t i = 0; i < particles.size(); ++i) {
+			const auto d = particles.positions[i] - e.center;
+			if (d.y < 0.0f || d.y > e.pilotHeight || d.x * d.x + d.z * d.z > r2) {
+				continue;
+			}
+			particles.temperatures[i] = std::max(particles.temperatures[i], e.pilotTemperature);
+		}
+	}
+}
+
 void FlameFluid::removeDead()
 {
 	for (size_t i = 0; i < particles.size();) {
@@ -90,6 +158,19 @@ void FlameFluid::removeDead()
 		}
 		++i;
 	}
+}
+
+Vector3df FlameFluid::rotateBySwirl(const Vector3df& velocity, const Vector3df& vorticity, const float strength, const float dt)
+{
+	const float omegaLen = Math::getLength(vorticity);
+	if (omegaLen <= 0.0f) {
+		return velocity;
+	}
+	const Vector3df axis = vorticity / omegaLen;
+	const float angle = omegaLen * strength * dt;
+	const float c = std::cos(angle);
+	const float s = std::sin(angle);
+	return velocity * c + glm::cross(axis, velocity) * s + axis * (glm::dot(axis, velocity) * (1.0f - c));
 }
 
 void FlameFluid::updateSecondaryParticles(const float dt, const Vector3df& gravity)
@@ -105,6 +186,8 @@ void FlameFluid::updateSecondaryParticles(const float dt, const Vector3df& gravi
 	std::uniform_real_distribution<float> jitterDist(-0.15f, 0.15f);
 
 	const int numPrimaries = static_cast<int>(particles.size());
+	constexpr float kSparkJitterRate = 1.1619f; // 0.15 * sqrt(60)
+	const float sparkJitterScale = kSparkJitterRate * std::sqrt(std::max(dt, 0.0f)) / 0.15f;
 
 	int sparkCount = 0;
 	int smokeCount = 0;
@@ -172,6 +255,7 @@ void FlameFluid::updateSecondaryParticles(const float dt, const Vector3df& gravi
 		sp.temperature = particles.temperatures[si];
 		sp.size = smokeStartSize;
 		sp.opacity = 0.0f;
+		sp.soot = particles.soots[si];
 		sp.lifeMax = smokeLifeMax * (0.7f + 0.6f * unit(rng));
 		secondaryParticles.push_back(sp);
 		--smokeDeficit;
@@ -187,8 +271,14 @@ void FlameFluid::updateSecondaryParticles(const float dt, const Vector3df& gravi
 		// keep curling after they decouple from the primary that spawned
 		// them. Decays over ~0.5s so the effect fades rather than spinning
 		// forever.
+		//
+		// Rotated exactly (Rodrigues) by angle |omega|*strength*dt about the
+		// omega axis rather than the explicit v += (omega x v)*s*dt, which
+		// lengthens v by a factor sqrt(1 + (|omega| s dt)^2) every step and
+		// so made swirling particles accelerate without bound (plan A4).
+		// To first order in dt the two are identical.
 		if (secondarySwirlStrength > 0.0f && Math::getLength(sp.vorticity) > 1.0e-5f) {
-			sp.velocity += glm::cross(sp.vorticity, sp.velocity) * secondarySwirlStrength * dt;
+			sp.velocity = rotateBySwirl(sp.velocity, sp.vorticity, secondarySwirlStrength, dt);
 			sp.vorticity *= std::max(0.0f, 1.0f - 2.0f * dt);
 		}
 
@@ -197,7 +287,11 @@ void FlameFluid::updateSecondaryParticles(const float dt, const Vector3df& gravi
 			// jitter. Cools toward ambient so the shared temperature-gradient
 			// shader (see FlameApp) fades it from bright to dark as it dies.
 			sp.velocity += gravity * 0.5f * dt;
-			sp.velocity += Vector3df(jitterDist(rng), jitterDist(rng), jitterDist(rng));
+			// Flicker as a velocity random walk: per-step kicks scaled by
+			// sqrt(dt) so the accumulated spread after a given *time* does not
+			// depend on the step size (plan A3). kSparkJitterRate matches the
+			// old fixed +-0.15 kick at dt = 1/60 (0.15 * sqrt(60)).
+			sp.velocity += Vector3df(jitterDist(rng), jitterDist(rng), jitterDist(rng)) * sparkJitterScale;
 			sp.position += sp.velocity * dt;
 			sp.temperature += (ambientTemperature - sp.temperature) * std::min(1.0f, 4.0f * dt);
 		} else {

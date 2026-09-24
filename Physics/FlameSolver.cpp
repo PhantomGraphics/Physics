@@ -13,29 +13,37 @@ using namespace Phantom::Physics;
 
 namespace {
 
+// Upper bound on kappa*dt/h^2 for the explicit scalar diffusion pass.
+constexpr float kMaxDiffusionNumber = 0.1f;
+
 // Standard curl-noise construction: evaluate a 3-component vector potential
 // field (three decorrelated Perlin fields) and take its curl via central
 // finite differences. Purely decorative (idea doc section 2: "実質的なコスト
 // なしで見た目を稼げる"), not meant to be physically accurate.
-Vector3df samplePotential(const Vector3df& p, const float frequency)
+//
+// The potential is 4D noise -- (x, y, z) * frequency plus time * timeScale on
+// the 4th axis -- so the flow pattern evolves instead of being frozen in space
+// (plan A2). timeScale == 0 reproduces the old static 3D-pattern behaviour
+// (a fixed 4th coordinate still gives a valid, divergence-free field).
+Vector3df samplePotential(const Vector3df& p, const float frequency, const float w)
 {
 	const Vector3df sp = p * frequency;
 	return Vector3df(
-		glm::perlin(sp + Vector3df(37.2f, 17.1f, 91.3f)),
-		glm::perlin(sp + Vector3df(3.7f, 61.9f, 5.5f)),
-		glm::perlin(sp + Vector3df(71.1f, 2.4f, 43.8f)));
+		glm::perlin(glm::vec4(sp + Vector3df(37.2f, 17.1f, 91.3f), w)),
+		glm::perlin(glm::vec4(sp + Vector3df(3.7f, 61.9f, 5.5f), w + 13.7f)),
+		glm::perlin(glm::vec4(sp + Vector3df(71.1f, 2.4f, 43.8f), w + 29.3f)));
 }
 
-Vector3df curlNoise(const Vector3df& p, const float frequency)
+Vector3df curlNoise(const Vector3df& p, const float frequency, const float w)
 {
 	constexpr float eps = 0.01f;
 
-	const auto dx = (samplePotential(p + Vector3df(eps, 0.0f, 0.0f), frequency) -
-		samplePotential(p - Vector3df(eps, 0.0f, 0.0f), frequency)) / (2.0f * eps);
-	const auto dy = (samplePotential(p + Vector3df(0.0f, eps, 0.0f), frequency) -
-		samplePotential(p - Vector3df(0.0f, eps, 0.0f), frequency)) / (2.0f * eps);
-	const auto dz = (samplePotential(p + Vector3df(0.0f, 0.0f, eps), frequency) -
-		samplePotential(p - Vector3df(0.0f, 0.0f, eps), frequency)) / (2.0f * eps);
+	const auto dx = (samplePotential(p + Vector3df(eps, 0.0f, 0.0f), frequency, w) -
+		samplePotential(p - Vector3df(eps, 0.0f, 0.0f), frequency, w)) / (2.0f * eps);
+	const auto dy = (samplePotential(p + Vector3df(0.0f, eps, 0.0f), frequency, w) -
+		samplePotential(p - Vector3df(0.0f, eps, 0.0f), frequency, w)) / (2.0f * eps);
+	const auto dz = (samplePotential(p + Vector3df(0.0f, 0.0f, eps), frequency, w) -
+		samplePotential(p - Vector3df(0.0f, 0.0f, eps), frequency, w)) / (2.0f * eps);
 
 	return Vector3df(
 		dy.z - dz.y,
@@ -92,6 +100,48 @@ void FlameSolver::simulate(const float dt)
 		p.addSelfDensity();
 	}
 
+	// ---- Scalar diffusion pass (plan Phase 2 item 2) --------------------------
+	// Cleary-Monaghan SPH diffusion of temperature / fuel / oxygen / soot:
+	//   dA_i/dt = sum_j (m_j / rho_ij) * 2 kappa * (A_j - A_i) * F_ij,
+	//   F_ij = -(r_ij . gradW_ij) / (|r_ij|^2 + eta^2) = |r|^2 w(r) / (|r|^2 + eta^2)
+	// with w(r) = |gradW|/r (SPHKernel::getSpikyKernelGradientWeight(), >= 0)
+	// and rho_ij the pair's mean density. Every factor is symmetric in (i, j)
+	// and (A_j - A_i) is antisymmetric, so sum_i m_i A_i is conserved exactly
+	// by the pass. Gathered per particle (writes only rates[i]), per the
+	// neighbor-search convention in Physics/CLAUDE.md.
+	std::vector<FlameScalarRates> rates(particleCount);
+	const float eta2 = 0.01f * effectLength * effectLength;
+	// Explicit diffusion is stable for kappa*dt/h^2 below ~0.1 (plan section 6);
+	// clamp instead of letting a UI slider blow the step up.
+	const float kappaMax = (dt > 0.0f) ? kMaxDiffusionNumber * effectLength * effectLength / dt : 0.0f;
+	const auto clampKappa = [kappaMax](const float k) { return std::clamp(k, 0.0f, kappaMax); };
+#pragma omp parallel for
+	for (int i = 0; i < particleCount; ++i) {
+		auto& pi = particles[i];
+		const auto* fluid = pi.getFluid();
+		const float kT = clampKappa(fluid->getThermalDiffusivity());
+		const float kF = clampKappa(fluid->getFuelDiffusivity());
+		const float kO = clampKappa(fluid->getOxygenDiffusivity());
+		const float kS = clampKappa(fluid->getSootDiffusivity());
+		if (kT == 0.0f && kF == 0.0f && kO == 0.0f && kS == 0.0f) {
+			continue;
+		}
+		FlameScalarRates r;
+		const auto posI = pi.getPosition();
+		for (const int j : neighbors[i]) {
+			const auto& pj = particles[j];
+			const float dist = Math::getDistance(posI, pj.getPosition());
+			const float d2 = dist * dist;
+			const float F = d2 * kernel.getSpikyKernelGradientWeight(dist) / (d2 + eta2);
+			const float coef = 2.0f * pj.getMass() / (0.5f * (pi.getDensity() + pj.getDensity())) * F;
+			r.temperature += kT * coef * (pj.getTemperature() - pi.getTemperature());
+			r.fuel += kF * coef * (pj.getFuel() - pi.getFuel());
+			r.oxygen += kO * coef * (pj.getOxygen() - pi.getOxygen());
+			r.soot += kS * coef * (pj.getSoot() - pi.getSoot());
+		}
+		rates[i] = r;
+	}
+
 	// ---- Pressure + viscosity pass -------------------------------------------
 #pragma omp parallel for
 	for (int i = 0; i < particleCount; ++i) {
@@ -117,20 +167,42 @@ void FlameSolver::simulate(const float dt)
 		}
 	}
 
-	// ---- Per-particle forces: vorticity confinement + Boussinesq buoyancy ---
-	for (auto& p : particles) {
-		p.applyVorticityConfinement(p.getFluid()->getVorticityEps(), effectLength);
+	// ---- Per-particle forces: vorticity confinement + Boussinesq buoyancy
+	// + curl noise ------------------------------------------------------------
+	// Curl noise is an *acceleration* (strength in length/s^2) added as a force
+	// before integration, so it scales with dt and goes through forwardTime()'s
+	// maxSpeed cap like every other force (plan A1). It used to be added to the
+	// velocity after integration with no dt -- i.e. strength*60 m/s^2 at the
+	// default 1/60 step, bypassing the speed cap (curlNoiseStrength defaults
+	// were multiplied by 60 when this changed, so the look is preserved).
+	const float noiseW = simTime_;
+#pragma omp parallel for
+	for (int i = 0; i < particleCount; ++i) {
+		auto& p = particles[i];
+		const auto* fluid = p.getFluid();
+		p.applyVorticityConfinement(fluid->getVorticityEps(), effectLength);
 		p.applyBuoyancy(gravity);
+		const float strength = fluid->getCurlNoiseStrength();
+		if (strength > 0.0f) {
+			const auto acc = curlNoise(p.getPosition(), fluid->getCurlNoiseFrequency(),
+				noiseW * fluid->getCurlNoiseTimeScale()) * strength;
+			p.addForce(acc * p.getDensity());
+		}
 	}
 
 	this->addBoundaryForce(particles, dt);
 
-	// ---- Integrate, react, and decorate with curl noise ----------------------
-	for (auto& p : particles) {
-		const auto* fluid = p.getFluid();
-		p.forwardTime(dt);
-		p.react(dt);
-		p.addVelocity(curlNoise(p.getPosition(), fluid->getCurlNoiseFrequency()) * fluid->getCurlNoiseStrength());
+	// ---- Integrate and react -------------------------------------------------
+#pragma omp parallel for
+	for (int i = 0; i < particleCount; ++i) {
+		particles[i].forwardTime(dt);
+		particles[i].react(dt, &rates[i]);
+	}
+	simTime_ += dt;
+
+	// ---- Pilot (wick) heating: keeps the Physical model's flame anchored ------
+	for (auto fluid : fluids) {
+		fluid->applyPilots();
 	}
 
 	// ---- Emitters and lifetime ------------------------------------------------

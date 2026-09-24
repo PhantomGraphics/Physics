@@ -161,6 +161,9 @@ private:
     FlameWorld        flameWorld_;
     FlameRenderer     flameRenderer_;
     FlameControlPanel flameControlPanel_;
+    bool              uiVisible_ = true; // SetUIVisible scenario command
+    float             flameAutoRefT_ = 2000.0f;  // smoothed hottest temperature (auto radiance reference)
+    float             flameLastSimTime_ = -1.0f; // sim time at the previous syncFlameRenderer()
 
     CommandDispatcher dispatcher_;
     ScenarioRunner           runner_;

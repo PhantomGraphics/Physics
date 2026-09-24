@@ -3,35 +3,10 @@
 
 #include "../../CGLib/VulkanGraphics/VulkanSPVResolver.h"
 
-#include <random>
+#include <algorithm>
+#include <cmath>
 
 namespace Phantom {
-
-namespace {
-
-// Mirrors flame_point.frag's blackbody-ish gradient -- kept in sync with that
-// shader since the Flame PBVR path pre-computes flame/spark colour on the CPU
-// (see FlamePBVRPipeline's class doc comment). Ported verbatim from the former
-// FlameView/FlameApp.cpp.
-glm::vec3 flameColor(float temperature, float tMin, float tMax) {
-    const float t = glm::clamp((temperature - tMin) / std::max(tMax - tMin, 1.0e-4f), 0.0f, 1.0f);
-    const glm::vec3 cold(0.35f, 0.02f, 0.0f);
-    const glm::vec3 mid(1.0f, 0.55f, 0.05f);
-    const glm::vec3 hot(1.0f, 0.95f, 0.75f);
-    glm::vec3 color = glm::mix(cold, mid, glm::clamp(t * 2.0f, 0.0f, 1.0f));
-    color = glm::mix(color, hot, glm::clamp(t * 2.0f - 1.0f, 0.0f, 1.0f));
-    return color;
-}
-
-// Mirrors flame_smoke.frag's ember-to-soot tint.
-glm::vec3 smokeColorTint(float temperature, float tMin, float tMax) {
-    const glm::vec3 smokeColor(0.22f, 0.20f, 0.18f);
-    const float t = glm::clamp((temperature - tMin) / std::max(tMax - tMin, 1.0e-4f), 0.0f, 1.0f);
-    const glm::vec3 emberGlow(1.0f, 0.45f, 0.12f);
-    return glm::mix(smokeColor, emberGlow, t * t);
-}
-
-} // namespace
 
 FluidApp::FluidApp(int width, int height, const std::string& title)
     : VkAppBase(width, height, title)
@@ -84,6 +59,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
         syncSoftRenderer();
     });
     flameControlPanel_.setOnWorldChanged([this]() { syncFlameRenderer(); });
+    flameControlPanel_.setPBVRStatsSource([this] { return flameRenderer_.pbvrStats(); });
     ssfrTestPanel_.bindSSFRRenderer(&ssfrRenderer_);
     ssfrTestPanel_.init();
     ssfrPanel_.bindRenderer(&ssfrRenderer_);
@@ -101,6 +77,18 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     softGltfRenderer_.bindWorld(&softWorld_);
     dispatcher_.setSoftBodyRenderer(&softGltfRenderer_);
     dispatcher_.setSsfrPanel(&ssfrPanel_);
+    dispatcher_.setFluidRenderer(&fluidRenderer_);
+    dispatcher_.setUIVisibilityHooks([this](bool v) { uiVisible_ = v; },
+                                     [this] { return uiVisible_; });
+    dispatcher_.flame().setWorld(&flameWorld_);
+    dispatcher_.flame().setPageHooks(
+        [this](bool on) {
+            controlHost_.setPage(on ? ControlPage::Flame : ControlPage::Fluid);
+            controlHost_.setVisible(true);
+        },
+        [this] { return controlHost_.getPage() == ControlPage::Flame; });
+    dispatcher_.flame().setPBVRStatsHook([this] { return flameRenderer_.pbvrStats(); });
+    dispatcher_.flame().setOnFlameChanged([this]() { syncFlameRenderer(); });
     renderingPanel_.bind(&renderBackground_);
     renderingPanel_.bindRigidBodyRenderer(&rigidGltfRenderer_);
     renderingPanel_.bindSoftBodyRenderer(&softGltfRenderer_);
@@ -280,15 +268,21 @@ void FluidApp::onInit()
     {
         // Flame's three self-contained point-sprite pipelines (additive flame/
         // spark, alpha-blended smoke, unified opaque PBVR) -- see FlameRenderer.
-        flameRenderer_.setShaders(
-            ::VKG::loadSPVRepo("shaders/flame_point.vert.spv"),
-            ::VKG::loadSPVRepo("shaders/flame_point.frag.spv"));
-        flameRenderer_.setSmokeShaders(
-            ::VKG::loadSPVRepo("shaders/flame_smoke.vert.spv"),
-            ::VKG::loadSPVRepo("shaders/flame_smoke.frag.spv"));
-        flameRenderer_.setPBVRShaders(
-            ::VKG::loadSPVRepo("shaders/flame_pbvr.vert.spv"),
-            ::VKG::loadSPVRepo("shaders/flame_pbvr.frag.spv"));
+        FlameRenderer::Shaders fs;
+        fs.flameVert = ::VKG::loadSPVRepo("shaders/flame_point.vert.spv");
+        fs.flameFrag = ::VKG::loadSPVRepo("shaders/flame_point.frag.spv");
+        fs.smokeVert = ::VKG::loadSPVRepo("shaders/flame_smoke.vert.spv");
+        fs.smokeFrag = ::VKG::loadSPVRepo("shaders/flame_smoke.frag.spv");
+        fs.pbvr.pointVert      = ::VKG::loadSPVRepo("shaders/flame_pbvr_point.vert.spv");
+        fs.pbvr.pointFrag      = ::VKG::loadSPVRepo("shaders/flame_pbvr_point.frag.spv");
+        fs.pbvr.emissiveVert   = fs.flameVert;
+        fs.pbvr.emissiveFrag   = fs.flameFrag;
+        fs.pbvr.fullscreenVert = ::VKG::loadSPVRepo("shaders/flame_fullscreen.vert.spv");
+        fs.pbvr.blendFrag      = ::VKG::loadSPVRepo("shaders/flame_pbvr_blend.frag.spv");
+        fs.pbvr.compositeFrag  = ::VKG::loadSPVRepo("shaders/flame_pbvr_composite.frag.spv");
+        fs.pbvr.generateComp   = ::VKG::loadSPVRepo("shaders/flame_pbvr_generate.comp.spv");
+        fs.pbvr.finalizeComp   = ::VKG::loadSPVRepo("shaders/flame_pbvr_finalize.comp.spv");
+        flameRenderer_.setShaders(std::move(fs));
     }
     {
         static constexpr auto kSS = "shaders/";
@@ -344,6 +338,7 @@ void FluidApp::onInit()
     if (createHdrTargets()) {
         for (auto* r : hdrRenderers_)
             r->onInit(getContext(), getCommandPool(), hdrScene_.getRenderPass(), MAX_FRAMES_IN_FLIGHT);
+        flameRenderer_.resize(hdrScene_.getExtent().width, hdrScene_.getExtent().height);
         ssfrRenderer_.setSceneInput(hdrScene_.getColorImageView(), hdrScene_.getDepthImageView(),
                                     hdrSampler_.get(), 0.1f, 1000.f);
     } else {
@@ -485,6 +480,7 @@ void FluidApp::onSwapChainCreated()
         rigidGltfRenderer_.setMainRenderPass(hdrScene_.getRenderPass());
         softGltfRenderer_.setMainRenderPass(hdrScene_.getRenderPass());
         ssfrRenderer_.resize(ext.width, ext.height);
+        flameRenderer_.resize(ext.width, ext.height);
         ssfrRenderer_.setSceneInput(hdrScene_.getColorImageView(), hdrScene_.getDepthImageView(),
                                     hdrSampler_.get(), 0.1f, 1000.f);
     }
@@ -701,6 +697,12 @@ void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
     // Phase 5: render the whole opaque scene into the linear-HDR target. SSFR's
     // pre-passes (below) sample its color + depth for refraction / occlusion,
     // and its composite (in the swapchain pass) tonemaps it once.
+    // Flame PBVR (plan Phase 4): GPU particle generation + ensemble passes
+    // run in their own offscreen targets before the HDR pass composites them.
+    if (flameActive) {
+        flameRenderer_.recordPreRender(cmd, frameIndex);
+    }
+
     if (hdrValid_) {
         const std::array<float, 4> clear{ 0.02f, 0.02f, 0.03f, 1.0f };
         hdrScene_.beginRenderPass(cmd, clear, 1.0f);
@@ -716,6 +718,8 @@ void FluidApp::onImGui()
     // Menu bar (File / Physics / Rendering / Tools / Window / View) is a widget tree assembled once in
     // buildMenuBar(); the common status area is FluidStatusView, embedded into
     // controlHost_. Nothing here re-assembles UI per frame.
+    // SetUIVisible:false (scenario screenshots) hides every window.
+    if (!uiVisible_) return;
     menuBar_.show();
     ::VKG::VkAppBase::onImGui();
 }
@@ -823,130 +827,121 @@ void FluidApp::syncSoftRenderer()
 
 void FluidApp::syncFlameRenderer()
 {
-    // Direct port of the former FlameView::FlameApp::uploadParticlesToRenderer(),
-    // with one addition: every particle position is mapped through the display
-    // transform (render().renderScale / renderOffset) so the native ~3-unit
-    // plume composes with PhysicsView's shared FluidRenderer camera. The SPH
-    // state itself is untouched.
+    // Maps the flame's particles onto FlameRenderer's two streams (plan
+    // Phases 3-4), through the display transform (render().renderScale /
+    // renderOffset) that puts the native ~3-unit plume into PhysicsView's
+    // shared FluidRenderer camera space. The SPH state itself is untouched.
+    //   emitters  = every SPH particle + sparks (blackbody radiance by temperature;
+    //               cold ones contribute ~nothing, see FlameBlackbody::relativeRadiance)
+    //   absorbers = smoke puffs (optical density = fade envelope * inherited soot)
+    // Both render modes consume the same streams.
     const auto& fluid       = flameWorld_.fluid();
     const auto& render      = flameWorld_.render();
     const auto& particles   = fluid.getParticles();
     const auto& secondaries = fluid.getSecondaryParticles();
-    const float tMin = fluid.getAmbientTemperature();
-    const float tMax = fluid.getIgnitionTemperature();
 
     const float     scale  = render.renderScale;
     const glm::vec3 offset = render.renderOffset;
     const auto xf = [&](const Phantom::Math::Vector3df& p) {
         return glm::vec3(p.x, p.y, p.z) * scale + offset;
     };
+    const float flameSize = render.particleSize * scale;
+    const float smokeSize = render.smokeParticleSize * scale;
 
-    if (render.pbvrMode) {
-        std::vector<float> pbvrPositions;
-        std::vector<float> pbvrColors;
-        std::vector<float> pbvrSizes;
-        std::uniform_real_distribution<float> keepDist(0.0f, 1.0f);
-        std::uniform_real_distribution<float> jitterDist(-1.0f, 1.0f);
-        auto& rng = flameWorld_.pbvrRng();
+    std::vector<float> positions, temperatures, sizes;
+    positions.reserve((particles.size() + secondaries.size()) * 3);
+    temperatures.reserve(particles.size() + secondaries.size());
+    sizes.reserve(particles.size() + secondaries.size());
+    std::vector<float> smokePositions, smokeDensities, smokeSizes, smokeTemperatures;
 
-        const auto ext = getExtent();
-        const float viewportHeight = (ext.height > 0) ? static_cast<float>(ext.height) : 720.0f;
-        const float camDistance = fluidRenderer_.getCameraDistance();
-        const float worldPerPixel =
-            (2.0f * camDistance * std::tan(glm::radians(45.0f) * 0.5f)) / viewportHeight;
-        const float subSizeScale = 1.0f / std::sqrt(static_cast<float>(render.pbvrRepeatCount));
+    const auto pushEmitter = [&](const glm::vec3& p, float t, float s) {
+        positions.push_back(p.x);
+        positions.push_back(p.y);
+        positions.push_back(p.z);
+        temperatures.push_back(t);
+        sizes.push_back(s);
+    };
 
-        const auto pushPBVR = [&](const glm::vec3& worldPos, float opacity,
-                                  const glm::vec3& color, float sizePixels) {
-            const float footprintRadius = 0.5f * sizePixels * worldPerPixel;
-            const float subSize = sizePixels * subSizeScale;
-            for (int r = 0; r < render.pbvrRepeatCount; ++r) {
-                if (keepDist(rng) >= opacity) {
-                    continue;
-                }
-                glm::vec3 jittered = worldPos;
-                if (render.pbvrRepeatCount > 1) {
-                    jittered.x += jitterDist(rng) * footprintRadius;
-                    jittered.y += jitterDist(rng) * footprintRadius;
-                    jittered.z += jitterDist(rng) * footprintRadius;
-                }
-                pbvrPositions.push_back(jittered.x);
-                pbvrPositions.push_back(jittered.y);
-                pbvrPositions.push_back(jittered.z);
-                pbvrColors.push_back(color.r);
-                pbvrColors.push_back(color.g);
-                pbvrColors.push_back(color.b);
-                pbvrColors.push_back(1.0f);
-                pbvrSizes.push_back(subSize);
-            }
-        };
-
-        const float flameOpacity = std::clamp(render.flameOpacityScale, 0.0f, 1.0f);
-        for (size_t i = 0; i < particles.size(); ++i) {
-            pushPBVR(xf(particles.positions[i]), flameOpacity,
-                     flameColor(particles.temperatures[i], tMin, tMax), render.pointSize);
+    float maxT = fluid.getAmbientTemperature();
+    for (size_t i = 0; i < particles.size(); ++i) {
+        const float t = particles.temperatures[i];
+        if (!std::isfinite(t)) continue;
+        maxT = std::max(maxT, t);
+        pushEmitter(xf(particles.positions[i]), t, flameSize);
+    }
+    for (const auto& sp : secondaries) {
+        if (sp.kind == Phantom::Physics::FlameFluid::SecondaryKind::Spark) {
+            pushEmitter(xf(sp.position), sp.temperature, flameSize * sp.size);
+        } else {
+            const glm::vec3 p = xf(sp.position);
+            smokePositions.push_back(p.x);
+            smokePositions.push_back(p.y);
+            smokePositions.push_back(p.z);
+            // sp.opacity is the 0..0.5 fade envelope (see updateSecondaryParticles()).
+            smokeDensities.push_back(std::max(0.0f, 2.0f * sp.opacity * sp.soot * render.smokeOpacityScale));
+            smokeSizes.push_back(smokeSize * sp.size);
+            smokeTemperatures.push_back(sp.temperature);
         }
-        for (const auto& sp : secondaries) {
-            if (sp.kind == Phantom::Physics::FlameFluid::SecondaryKind::Spark) {
-                pushPBVR(xf(sp.position), flameOpacity,
-                         flameColor(sp.temperature, tMin, tMax), render.pointSize * sp.size);
-            } else {
-                const float smokeOpacity = std::clamp(sp.opacity * render.smokeOpacityScale, 0.0f, 1.0f);
-                pushPBVR(xf(sp.position), smokeOpacity,
-                         smokeColorTint(sp.temperature, tMin, tMax), render.smokePointSize * sp.size);
-            }
-        }
-
-        flameRenderer_.setPBVRParticles(std::move(pbvrPositions), std::move(pbvrColors), std::move(pbvrSizes));
-    } else {
-        std::vector<float> positions;
-        std::vector<float> temperatures;
-        std::vector<float> sizes;
-        positions.reserve(particles.size() * 3);
-        temperatures.reserve(particles.size());
-        sizes.reserve(particles.size());
-
-        for (size_t i = 0; i < particles.size(); ++i) {
-            const glm::vec3 p = xf(particles.positions[i]);
-            positions.push_back(p.x);
-            positions.push_back(p.y);
-            positions.push_back(p.z);
-            temperatures.push_back(particles.temperatures[i]);
-            sizes.push_back(1.0f);
-        }
-
-        std::vector<float> smokePositions;
-        std::vector<float> smokeOpacities;
-        std::vector<float> smokeSizes;
-        std::vector<float> smokeTemperatures;
-
-        for (const auto& sp : secondaries) {
-            if (sp.kind == Phantom::Physics::FlameFluid::SecondaryKind::Spark) {
-                const glm::vec3 p = xf(sp.position);
-                positions.push_back(p.x);
-                positions.push_back(p.y);
-                positions.push_back(p.z);
-                temperatures.push_back(sp.temperature);
-                sizes.push_back(sp.size);
-            } else {
-                const glm::vec3 p = xf(sp.position);
-                smokePositions.push_back(p.x);
-                smokePositions.push_back(p.y);
-                smokePositions.push_back(p.z);
-                smokeOpacities.push_back(std::clamp(sp.opacity * render.smokeOpacityScale, 0.0f, 1.0f));
-                smokeSizes.push_back(sp.size);
-                smokeTemperatures.push_back(sp.temperature);
-            }
-        }
-
-        flameRenderer_.setParticles(std::move(positions), std::move(temperatures), std::move(sizes));
-        flameRenderer_.setSmokeParticles(std::move(smokePositions), std::move(smokeOpacities),
-                                         std::move(smokeSizes), std::move(smokeTemperatures));
     }
 
-    flameRenderer_.setTemperatureRange(tMin, tMax);
-    flameRenderer_.setPointSize(render.pointSize);
-    flameRenderer_.setSmokePointSize(render.smokePointSize);
+    // Radiance reference temperature. Auto mode follows the hottest particle
+    // with a frame EMA -- updated only while the sim advances, so a paused
+    // frame keeps identical shading (the PBVR history would otherwise reset
+    // every frame and never converge).
+    const float simTime = flameWorld_.getSimTime();
+    const bool animating = (simTime != flameLastSimTime_);
+    // More than ~one step at once (FlameStep:N, FlameReset) is a jump, not motion.
+    const bool jumped = std::abs(simTime - flameLastSimTime_) > 1.5f * flameWorld_.getTimeStep();
+    if (simTime < flameLastSimTime_) {
+        flameAutoRefT_ = render.referenceTemperature; // FlameReset
+    }
+    if (animating) {
+        // Smooth frame-to-frame flicker; after a multi-step jump there is no
+        // history worth keeping, so snap straight to the new values.
+        const float k = jumped ? 1.0f : 0.1f;
+        flameAutoRefT_ += k * (maxT - flameAutoRefT_);
+    }
+    flameLastSimTime_ = simTime;
+
+    FlameRenderer::Shading shading;
+    shading.ambientTemperature = fluid.getAmbientTemperature();
+    shading.referenceTemperature = std::max(
+        render.autoReferenceTemperature ? flameAutoRefT_ : render.referenceTemperature,
+        shading.ambientTemperature + 200.0f);
+    shading.exposure = render.exposure;
+    shading.whiteBalanceTemperature =
+        // Auto adapts to the smoothed hottest temperature (the radiance
+        // reference). Tried: the radiance-weighted mean temperature ("gray
+        // world" on the emitted light) -- at ~1000-1200 K it is so far from
+        // D65 that Bradford extrapolation + gamut clipping turned the halo
+        // magenta. The same happens, milder, for any white much below
+        // ~2000 K: von Kries/Bradford adaptation is validated down to about
+        // incandescent illuminants, and extrapolating along the curved
+        // Planckian locus beyond that tints the halo pink -- so clamp.
+        render.whiteBalance == 1 ? std::max(shading.referenceTemperature, 2000.0f) :
+        render.whiteBalance == 2 ? std::max(render.whiteBalanceTemperature, 500.0f) : 0.0f;
+    shading.whiteBalanceDegree = std::clamp(render.whiteBalanceDegree, 0.0f, 1.0f);
+    shading.smokeExtinction = render.smokeExtinction;
+    shading.smokeGlow = render.smokeGlow;
+    shading.smokeAlbedo = glm::vec3(render.smokeAlbedo);
+    shading.pbvrSubdivision = render.pbvrSubdivision;
+    shading.pbvrMinSubPixels = render.pbvrMinSubPixels;
+    shading.pbvrDensityScale = render.pbvrDensityScale;
+
+    auto& pbvr = flameRenderer_.pbvrSettings();
+    pbvr.lodMode = render.pbvrAdaptive ? FlamePBVRPass::LodMode::Adaptive : FlamePBVRPass::LodMode::Manual;
+    pbvr.ensemblesPerFrame = static_cast<uint32_t>(std::clamp(render.pbvrEnsembles, 1, 8));
+    pbvr.targetEnsembles = static_cast<uint32_t>(std::max(1, render.pbvrTargetEnsembles));
+    pbvr.temporalFrames = render.pbvrTemporalFrames;
+    pbvr.budgetMs = render.pbvrBudgetMs;
+
+    flameRenderer_.setEmitters(std::move(positions), std::move(temperatures), std::move(sizes));
+    flameRenderer_.setAbsorbers(std::move(smokePositions), std::move(smokeDensities), std::move(smokeSizes),
+                                std::move(smokeTemperatures));
+    const auto ext = getExtent();
+    flameRenderer_.setViewportHeight(ext.height > 0 ? static_cast<float>(ext.height) : 720.0f);
+    flameRenderer_.setShading(shading);
+    if (animating) flameRenderer_.notifySimulationAdvanced(jumped);
     flameRenderer_.setRenderMode(render.pbvrMode ? FlameRenderer::RenderMode::PBVR
                                                  : FlameRenderer::RenderMode::Normal);
     flameRenderer_.setCamera(fluidRenderer_.getProjMatrix(), fluidRenderer_.getViewMatrix());

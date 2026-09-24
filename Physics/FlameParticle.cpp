@@ -31,7 +31,10 @@ float FlameParticle::getDensityRatio() const
 
 float FlameParticle::getPressure() const
 {
-	return fluid_->getPressureCoe() * std::max(0.0f, getDensity() - fluid_->getDensity());
+	// Rest density drops as rho0*T_amb/T when thermal-expansion pressure is on
+	// (plan Phase 2 item 4); otherwise it is just rho0.
+	const float rest = fluid_->computeRestDensity(getTemperature());
+	return fluid_->getPressureCoe() * std::max(0.0f, getDensity() - rest);
 }
 
 float FlameParticle::getMass() const
@@ -110,21 +113,50 @@ void FlameParticle::move(const Vector3df& v)
 	positionRef() += v;
 }
 
-void FlameParticle::react(const float dt)
+void FlameParticle::react(const float dt, const FlameScalarRates* diffusion)
 {
-	const float kBurn = fluid_->getBurnRate();
 	const float ambient = fluid_->getAmbientTemperature();
+
+	if (diffusion) {
+		setTemperature(std::max(0.0f, getTemperature() + diffusion->temperature * dt));
+		setFuel(std::clamp(getFuel() + diffusion->fuel * dt, 0.0f, 1.0f));
+		setOxygen(std::clamp(getOxygen() + diffusion->oxygen * dt, 0.0f, 1.0f));
+		setSoot(std::max(0.0f, getSoot() + diffusion->soot * dt));
+	}
 
 	const float fuel = getFuel();
 	const float temperature = getTemperature();
 
-	const float dFuel = -kBurn * fuel;
-	const float dTemp = kBurn * fuel * fluid_->getHeatRelease() - fluid_->getCoolRate() * (temperature - ambient);
-	const float dSoot = kBurn * fuel * fluid_->getSootYield();
+	if (fluid_->getCombustionModel() == FlameFluid::CombustionModel::Legacy) {
+		const float kBurn = fluid_->getBurnRate();
+		const float dFuel = -kBurn * fuel;
+		const float dTemp = kBurn * fuel * fluid_->getHeatRelease() - fluid_->getCoolRate() * (temperature - ambient);
+		const float dSoot = kBurn * fuel * fluid_->getSootYield();
 
-	setFuel(std::max(0.0f, fuel + dFuel * dt));
-	setTemperature(temperature + dTemp * dt);
-	setSoot(std::max(0.0f, getSoot() + dSoot * dt));
+		setFuel(std::max(0.0f, fuel + dFuel * dt));
+		setTemperature(temperature + dTemp * dt);
+		setSoot(std::max(0.0f, getSoot() + dSoot * dt));
+		setAge(getAge() + dt);
+		return;
+	}
+
+	const float oxygen = getOxygen();
+	const float nu = fluid_->getOxygenPerFuel();
+	float w = fluid_->computeReactionRate(temperature, fuel, oxygen);
+	// Explicit step must not burn more than is there (keeps f, o >= 0 without
+	// a clamp that would silently break the fuel/oxygen/heat bookkeeping).
+	if (dt > 0.0f) {
+		w = std::min(w, fuel / dt);
+		if (nu > 0.0f) {
+			w = std::min(w, oxygen / (nu * dt));
+		}
+	}
+
+	setFuel(std::max(0.0f, fuel - w * dt));
+	setOxygen(std::max(0.0f, oxygen - nu * w * dt));
+	const float dTemp = w * fluid_->getHeatRelease() - fluid_->getCoolRate() * (temperature - ambient);
+	setTemperature(std::clamp(temperature + dTemp * dt, 0.0f, fluid_->getMaxTemperature()));
+	setSoot(std::max(0.0f, getSoot() + w * fluid_->getSootYield() * dt));
 	setAge(getAge() + dt);
 }
 

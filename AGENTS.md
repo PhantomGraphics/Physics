@@ -70,9 +70,10 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 | 10–19 | `fluid` — SPH ソルバー単体 | 70–79 | `pipe` — Volume/Mesh 変換パイプライン |
 | 20–29 | `rigid` — 剛体単体 | 80–89 | `capture` — スクリーンショット |
 | 30–44 | `soft` — 軟体単体・軟体間/自己衝突 | 90–99 | `neg` — 異常系 |
+| 45–49 | `flame` — 炎 SPH・Flame 描画（Normal/PBVR） | | |
 | 50–59 | `couple` — Rigid↔Fluid / Soft↔Fluid | | |
 
-現在 53 本（`04_smoke_new_scene`（File > New / `NewScene` コマンド）、`81_render_background` / `82_render_rigid_shaded` / `83_render_soft_shaded` / `84_render_shadows` / `85_render_ssfr_scene`（glTF レンダリング Phase 1–5）を含む）。全シナリオが「事前条件・変化（`store_as`+`post_assert` または初期値を含まない `expect_range`/`expect_not`）・不変条件」の三点契約で構成されている（詳細は
+現在 58 本（`45`〜`49_flame_*`（炎 SPH、`docs/todo/PLAN_flame_sph_pbvr_improvement.md`）、`04_smoke_new_scene`（File > New / `NewScene` コマンド）、`81_render_background` / `82_render_rigid_shaded` / `83_render_soft_shaded` / `84_render_shadows` / `85_render_ssfr_scene`（glTF レンダリング Phase 1–5）を含む）。全シナリオが「事前条件・変化（`store_as`+`post_assert` または初期値を含まない `expect_range`/`expect_not`）・不変条件」の三点契約で構成されている（詳細は
 シナリオテストガイドの「アサーション三点契約」節）。
 
 **タグ:** JSON トップレベルの `"tags": [...]` を `run_physics_scenarios.ps1` が読み、`-Tag`/`-ExcludeTag` で絞り込む
@@ -210,32 +211,42 @@ Screen Space Fluid Rendering（SSFR）パイプライン。`ParticleDepthRendere
 `Physics/FlameView/` スタンドアロンビューアを PhysicsView へ統合したが、この「結合しない独立系統」
 という性質は変えていない（PhysicsView の中でも fluid/rigid/soft とは一切カップリングしない）。
 
-- `FlameParticle`/`FlameFluid`/`FlameSolver`（`Physics/Physics/`）— コアシミュレーション。
-  `FlameParticle` は position/velocity/force/density に加え `temperature`/`fuel`/`soot`/`age` を保持し、
-  `react(dt)` で近傍不要の燃焼反応（燃料減衰・発熱・煤生成）を独立に更新する。表面張力/法線は実装しない
-  （炎は自由に拡散してよいため）。`FlameSolver::simulate(dt)` は密度→圧力/粘性パスに加え、渦度閉じ込め
-  （2 パス: `addVorticity`/`addVorticityGradient`）・Boussinesq 浮力（`FlameParticle::applyBuoyancy()`、
-  温度ベースの実効密度差から計算。素朴な符号（`-coe*(rhoEff-rho0)*gravity`）は熱い粒子で下向きになる
-  バグを生むため、`FlameSolver.cpp`/`FlameParticle.cpp` のコメント参照の上で符号を反転してある点に注意）・
-  カールノイズ（`glm::perlin` ベース、速度に直接加算）を実装する。`FlameFluid::updateEmitters()`/
-  `removeDead()` がエミッタ生成と寿命管理（`age > lifeMax` または燃え尽きて常温近傍まで冷えたら削除）を担う。
-- **PhysicsView 統合**（`Physics/PhysicsView/`、2026-09-08）— 旧 `FlameView` の中身を PhysicsView に
-  折り込んだ。`FlameWorld`（`FlameFluid`+`FlameSolver` を所有、旧 `FlameApp::setupInitialScene` と同一の
-  初期シーン・同じ固定 1/60 ステップ・同じ決定的シード）、`FlameControlPanel`（`ControlPage::Flame`、
-  旧 `FlameApp::onImGui` の移植）、`FlameRenderer`/`FlamePipeline`/`FlameSmokePipeline`/`FlamePBVRPipeline`
-  （旧 FlameView から移動、`namespace FlameView` → `Phantom` へ改名）で構成される。`FluidApp` は fluid/
-  rigid/soft と並ぶ 1 ドメインとして扱い、独立に Play/Pause/Step できる。**軽量統合**——`CommandDispatcher`
-  への配線・シナリオコマンド・シナリオテストは追加していない（旧 FlameView 同様、手動確認のみ）。
-  - シミュレーションはネイティブの ~3 unit スケールのまま動かし、`FlameControlPanel` の「Display
-    Transform」（`FlameWorld::RenderParams::renderScale`/`renderOffset`、既定 12 / (20,4,20)）で
-    PhysicsView 共有カメラ（中心 (20,20,20)）空間へ写す純粋な描画変換をかける。SPH 状態は旧 FlameView と
-    バイト一致。
-  - `flame_*.{vert,frag}` は `PhysicsView/shaders/` に移動済み。`FlameRenderer` の 3 パイプラインが
-    `VulkanSPVResolver` 経由で他シェーダーと同じ `shaders/` から名前で読む。
+- `FlameParticle`/`FlameFluid`/`FlameSolver`（`Physics/Physics/`）— コアシミュレーション
+  （`docs/todo/PLAN_flame_sph_pbvr_improvement.md` Phase 0–4 で改修、2026-09-24）。
+  `FlameParticle` は position/velocity/force/density に加え `temperature`/`fuel`/`soot`/`oxygen`/`age` を保持する。
+  - **燃焼モデル** `FlameFluid::CombustionModel`: 既定 `Physical`（反応速度 `k(T)·f·o`、`k(T)` は着火温度まわりの
+    smoothstep か正規化 Arrhenius、酸素を化学量論比で消費、温度上限クランプ）。旧来の温度非依存一次反応は
+    `Legacy` として残す。エミッタの燃料粒子は酸素 0・予熱温度で生まれ、air 粒子（酸素 1）と混ざって初めて燃える。
+    `Emitter::pilotTemperature`（芯）で根元を着火温度以上に保つ。
+  - **スカラー拡散**: 密度パスの後に温度・燃料・酸素・煤の Cleary–Monaghan 拡散（粒子単位ループ、`Σ m A` 保存、
+    `κ dt/h² ≤ 0.1` にクランプ）。これで高温粒子から隣へ燃え移る。熱膨張圧力（`ρ0·T_amb/T`）はオプション。
+  - `FlameSolver::simulate(dt)`: 密度→拡散→圧力/粘性→渦度閉じ込め（2 パス）→ Boussinesq 浮力（符号反転に注意、
+    `FlameParticle.cpp` 参照）＋カールノイズ（**加速度**として力に加え `maxSpeed` 制限の対象、4D ノイズで時間発展）
+    →境界→積分＋`react(dt, 拡散レート)`→パイロット→エミッタ/寿命→二次粒子（渦回転は Rodrigues、火花の揺らぎは √dt）。
+  - `FlameStats`（`computeFlameStats()`）: 平均高さ・最高温度・`hotY`（上位 10% の平均高さ）・燃焼割合・NaN 数など。
+- **PhysicsView 統合**（`Physics/PhysicsView/`）— `FlameWorld`（`FlameFluid`+`FlameSolver` を所有、固定ステップ
+  `setTimeStep()` 既定 1/60、決定的シード）、`FlameControlPanel`（`ControlPage::Flame`）、`FlameRenderer`。
+  `FluidApp` は fluid/rigid/soft と並ぶ 1 ドメインとして扱い、独立に Play/Pause/Step できる。
+  - **シナリオコマンド**は `FlameCommandDispatcher`（`CommandDispatcher::route()` が最初に問い合わせる。全コマンド名に
+    "Flame" を含む）: `SetFlamePage`/`FlameReset`/`FlameStep:N`/`SetFlameParam:name,value`/`GetFlameParam`/
+    `SetFlameRenderParam`/`GetFlameStats`/`GetFlameStat:<name>`/`SetFlameRenderMode`/`GetFlamePBVRStat:<name>` ほか
+    （一覧は `FlameCommandDispatcher.h`）。撮影用に汎用の `SetUIVisible`/`SetCameraOrbit`/`GetCameraOrbit` もある。
+    `FlameReset` はシミュレーションパラメータを既定に戻す（時間刻みと描画パラメータは残る）。
+  - シミュレーションはネイティブの ~3 unit スケールのまま動かし、`RenderParams::renderScale`/`renderOffset`
+    （既定 12 / (20,4,20)）で共有カメラ空間へ写す純粋な描画変換をかける。粒子サイズはワールド径で、各粒子の深度で
+    投影する（`particleSize`/`smokeParticleSize` はシミュレーション単位）。
+  - **描画は放射・吸収モデル**（`FlameRenderer`）: 放射体（全 SPH 粒子＋火花、`FlameBlackbody` の Planck×CIE 色 LUT、
+    Stefan–Boltzmann 輝度、HDR）と吸収体（煙、Beer–Lambert、高温の煤は発光）の 2 ストリーム。色順応
+    （Bradford ホワイトバランス、auto は最高温度に順応・2000 K 下限）あり。
+    Normal は premultiplied の煙＋加算の炎を HDR へ直接描く（順序依存の近似）。
+    PBVR は `FlamePBVRPass`: compute で煙を不透明サブ粒子に変換（密度は不透明度から導出）、R アンサンブルを描いて
+    進行平均/EMA（RGBA32F 履歴）、放射体は各アンサンブルの煙で遮蔽、HDR へ premultiplied 合成。R は Manual か
+    `CGLib/Graphics/EnsembleLodController`（GSView と共有、header-only）による Adaptive。ノイズの 1/√R 減衰は
+    `run_flame_pbvr_evaluation.ps1` で確認（tail 傾き ≈ −0.5）。
+  - 共有シェーダヘッダ `shaders/flame_common.glsl`（`FlamePointUBO` と同期）。`#include` は Ninja の depfile で追跡される。
   - Flame ページを開いている間は `FlameRenderer` のみ描画し、fluid/SSFR/rigid/soft の各レンダラーは
-    `setEnabled(false)`（`RigidBodyWireRenderer`/`SoftBodyWireRenderer` に `setEnabled` を追加した）。
-    fluid/rigid/soft のシミュレーション自体は他ページと同様バックグラウンドで進む。
-- **非スコープ（意図的）**: `RigidBoundary`/`addRigidBoundary()` 等の Rigid/SoftBody 境界結合、GPU 化
+    `setEnabled(false)`。fluid/rigid/soft のシミュレーション自体は他ページと同様バックグラウンドで進む。
+- **非スコープ（意図的）**: `RigidBoundary`/`addRigidBoundary()` 等の Rigid/SoftBody 境界結合、シミュレーションの GPU 化
   （`Fluid_GPU_Vk` 相当）、煙レイヤー分離。将来の拡張候補として 内部設計メモ の Phase 4 に記載。
 
 ## Key Conventions

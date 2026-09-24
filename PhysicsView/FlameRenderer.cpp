@@ -1,117 +1,175 @@
 #include "FlameRenderer.h"
 
-#include "CGLib/VulkanGraphics/VulkanContext.h"
+#include "FlameBlackbody.h"
+
 #include "CGLib/VulkanGraphics/VulkanCommandPool.h"
+#include "CGLib/VulkanGraphics/VulkanContext.h"
+
+#include <cmath>
+#include <cstdio>
 
 using namespace Phantom::VKG;
 
 namespace Phantom {
 
-void FlameRenderer::setShaders(std::vector<uint32_t> vertSpv, std::vector<uint32_t> fragSpv)
+bool FlameRenderer::Shading::operator==(const Shading& o) const
 {
-	vertSpv_ = std::move(vertSpv);
-	fragSpv_ = std::move(fragSpv);
+	return ambientTemperature == o.ambientTemperature && referenceTemperature == o.referenceTemperature &&
+		exposure == o.exposure && whiteBalanceTemperature == o.whiteBalanceTemperature &&
+		whiteBalanceDegree == o.whiteBalanceDegree && smokeExtinction == o.smokeExtinction && smokeGlow == o.smokeGlow &&
+		smokeAlbedo == o.smokeAlbedo && pbvrSubdivision == o.pbvrSubdivision &&
+		pbvrMinSubPixels == o.pbvrMinSubPixels && pbvrDensityScale == o.pbvrDensityScale;
 }
 
-void FlameRenderer::setSmokeShaders(std::vector<uint32_t> vertSpv, std::vector<uint32_t> fragSpv)
+void FlameRenderer::setEmitters(std::vector<float> positions, std::vector<float> temperatures, std::vector<float> sizes)
 {
-	smokeVertSpv_ = std::move(vertSpv);
-	smokeFragSpv_ = std::move(fragSpv);
+	emitPositions_ = std::move(positions);
+	emitTemperatures_ = std::move(temperatures);
+	emitSizes_ = std::move(sizes);
 }
 
-void FlameRenderer::setPBVRShaders(std::vector<uint32_t> vertSpv, std::vector<uint32_t> fragSpv)
-{
-	pbvrVertSpv_ = std::move(vertSpv);
-	pbvrFragSpv_ = std::move(fragSpv);
-}
-
-void FlameRenderer::setParticles(std::vector<float> positions, std::vector<float> temperatures, std::vector<float> sizes)
-{
-	positions_ = std::move(positions);
-	temperatures_ = std::move(temperatures);
-	sizes_ = std::move(sizes);
-}
-
-void FlameRenderer::setSmokeParticles(std::vector<float> positions, std::vector<float> opacities, std::vector<float> sizes,
+void FlameRenderer::setAbsorbers(std::vector<float> positions, std::vector<float> densities, std::vector<float> sizes,
 	std::vector<float> temperatures)
 {
-	smokePositions_ = std::move(positions);
-	smokeOpacities_ = std::move(opacities);
-	smokeSizes_ = std::move(sizes);
-	smokeTemperatures_ = std::move(temperatures);
-}
-
-void FlameRenderer::setPBVRParticles(std::vector<float> positions, std::vector<float> colors, std::vector<float> sizes)
-{
-	pbvrPositions_ = std::move(positions);
-	pbvrColors_ = std::move(colors);
-	pbvrSizes_ = std::move(sizes);
+	absPositions_ = std::move(positions);
+	absDensities_ = std::move(densities);
+	absSizes_ = std::move(sizes);
+	absTemperatures_ = std::move(temperatures);
 }
 
 void FlameRenderer::onInit(VulkanContext& ctx, const VulkanCommandPool& pool,
 	VkRenderPass renderPass, uint32_t framesInFlight)
 {
 	ctx_ = &ctx;
-	pool_ = &pool;
 
-	FlamePipeline::Config cfg;
-	cfg.vertSpv = vertSpv_;
-	cfg.fragSpv = fragSpv_;
-	pipeline_.emplace(std::move(cfg));
-	pipeline_->create(ctx, pool, renderPass, framesInFlight);
+	FlamePointPipeline::Config flameCfg;
+	flameCfg.vertSpv = shaders_.flameVert;
+	flameCfg.fragSpv = shaders_.flameFrag;
+	flameCfg.streamComponents = { 3, 1, 1 }; // position, temperature, size
+	flameCfg.blend = FlamePointPipeline::Blend::Additive;
+	flameCfg.depthWrite = false; // emission never occludes
+	flamePipeline_.emplace(std::move(flameCfg));
+	flamePipeline_->create(ctx, renderPass, framesInFlight);
 
-	FlameSmokePipeline::Config smokeCfg;
-	smokeCfg.vertSpv = smokeVertSpv_;
-	smokeCfg.fragSpv = smokeFragSpv_;
+	FlamePointPipeline::Config smokeCfg;
+	smokeCfg.vertSpv = shaders_.smokeVert;
+	smokeCfg.fragSpv = shaders_.smokeFrag;
+	smokeCfg.streamComponents = { 3, 1, 1, 1 }; // position, density, size, temperature
+	smokeCfg.blend = FlamePointPipeline::Blend::Premultiplied; // Beer-Lambert absorption + glow
+	smokeCfg.depthWrite = false;
 	smokePipeline_.emplace(std::move(smokeCfg));
-	smokePipeline_->create(ctx, pool, renderPass, framesInFlight);
+	smokePipeline_->create(ctx, renderPass, framesInFlight);
 
-	FlamePBVRPipeline::Config pbvrCfg;
-	pbvrCfg.vertSpv = pbvrVertSpv_;
-	pbvrCfg.fragSpv = pbvrFragSpv_;
-	pbvrPipeline_.emplace(std::move(pbvrCfg));
-	pbvrPipeline_->create(ctx, pool, renderPass, framesInFlight);
+	// Real size arrives with resize() once the HDR target exists.
+	if (!pbvr_.create(ctx, pool, renderPass, framesInFlight, shaders_.pbvr, 1280, 720)) {
+		std::fprintf(stderr, "[FlameRenderer] PBVR pass creation failed; PBVR mode will draw nothing\n");
+	}
 }
 
-void FlameRenderer::onUpdate(uint32_t /*frameIndex*/)
+void FlameRenderer::resize(uint32_t width, uint32_t height)
 {
-	if (!enabled_) {
+	if (ctx_ && pbvr_.isValid()) {
+		pbvr_.resize(*ctx_, width, height);
+	}
+}
+
+FlamePointUBO FlameRenderer::makeUBO()
+{
+	FlamePointUBO ubo;
+	ubo.mvp = proj_ * view_;
+	// Vulkan projections often flip Y (negative [1][1]); only the scale matters here.
+	ubo.view = glm::vec4(std::abs(proj_[1][1]), viewportHeight_, shading_.pbvrMinSubPixels, shading_.pbvrDensityScale);
+	ubo.thermal = glm::vec4(shading_.ambientTemperature, shading_.referenceTemperature, shading_.exposure, 0.0f);
+	ubo.smoke = glm::vec4(shading_.smokeExtinction, shading_.smokeGlow, shading_.pbvrSubdivision, 0.0f);
+	ubo.smokeAlbedo = glm::vec4(shading_.smokeAlbedo, 0.0f);
+	ubo.lutRange = glm::vec4(FlameBlackbody::kLutMinT, FlameBlackbody::kLutMaxT, 0.0f, 0.0f);
+	if (shading_.whiteBalanceTemperature != lutWhite_ || shading_.whiteBalanceDegree != lutDegree_) {
+		lut_ = FlameBlackbody::makeLut(shading_.whiteBalanceTemperature, shading_.whiteBalanceDegree);
+		lutWhite_ = shading_.whiteBalanceTemperature;
+		lutDegree_ = shading_.whiteBalanceDegree;
+	}
+	for (int i = 0; i < FlamePointUBO::kLutSize; ++i) {
+		ubo.lut[i] = lut_[i];
+	}
+	return ubo;
+}
+
+void FlameRenderer::onUpdate(uint32_t frameIndex)
+{
+	pbvrRecordedThisFrame_ = false;
+	if (!enabled_ || !ctx_ || !flamePipeline_ || !smokePipeline_) {
+		pbvrWasActive_ = false;
 		return;
 	}
-	if (!pipeline_ || !smokePipeline_ || !pbvrPipeline_ || !ctx_ || !pool_) {
-		return;
-	}
+	const FlamePointUBO ubo = makeUBO();
+	const auto nEmit = static_cast<uint32_t>(emitPositions_.size() / 3);
 
 	if (renderMode_ == RenderMode::PBVR) {
-		FlamePBVRPipeline::Buffer pbvrBuffer;
-		pbvrBuffer.positions = pbvrPositions_;
-		pbvrBuffer.colors = pbvrColors_;
-		pbvrBuffer.sizes = pbvrSizes_;
-		pbvrBuffer.mvp = proj_ * view_;
-		pbvrPipeline_->upload(*ctx_, *pool_, pbvrBuffer);
+		const auto nAbs = absPositions_.size() / 3;
+		absPacked_.resize(nAbs * 8);
+		for (size_t i = 0; i < nAbs; ++i) {
+			float* d = &absPacked_[i * 8];
+			d[0] = absPositions_[i * 3 + 0];
+			d[1] = absPositions_[i * 3 + 1];
+			d[2] = absPositions_[i * 3 + 2];
+			d[3] = absSizes_[i];
+			d[4] = absDensities_[i];
+			d[5] = absTemperatures_[i];
+			d[6] = 0.0f;
+			d[7] = 0.0f;
+		}
+
+		const auto now = std::chrono::steady_clock::now();
+		const float dtMs = pbvrWasActive_
+			? std::chrono::duration<float, std::milli>(now - lastFrameTime_).count() : 0.0f;
+		lastFrameTime_ = now;
+
+		// Any change to what an ensemble *would* look like invalidates the average.
+		// So does a jump in the sim, and pausing: a static frame should converge
+		// to exactly the paused state, not keep the EMA of the frames before it.
+		const bool paused = wasAnimating_ && !animating_;
+		// While the sim runs, the auto reference temperature follows the flame
+		// every frame -- that is content motion for the EMA to absorb, not a
+		// view change, so it must not restart the history (it would pin the
+		// LOD controller at R=1 in its Moving state).
+		Shading compare = shading_;
+		if (animating_) {
+			compare.referenceTemperature = lastShading_.referenceTemperature;
+			compare.whiteBalanceTemperature = lastShading_.whiteBalanceTemperature; // auto WB follows it
+		}
+		const bool reset = !pbvrWasActive_ || ubo.mvp != lastMvp_ || !(compare == lastShading_) ||
+			viewportHeight_ != lastViewportHeight_ || jumped_ || paused;
+		lastMvp_ = ubo.mvp;
+		lastShading_ = shading_;
+		lastViewportHeight_ = viewportHeight_;
+		pbvrWasActive_ = true;
+
+		pbvr_.update(*ctx_, frameIndex, ubo, absPacked_, nEmit, emitPositions_.data(), emitTemperatures_.data(),
+			emitSizes_.data(), reset, animating_ && !jumped_, dtMs);
+		wasAnimating_ = animating_ && !jumped_;
+		animating_ = false;
+		jumped_ = false;
 		return;
 	}
+	pbvrWasActive_ = false;
+	animating_ = false;
+	jumped_ = false;
+	wasAnimating_ = false;
 
-	FlamePipeline::Buffer buffer;
-	buffer.positions = positions_;
-	buffer.temperatures = temperatures_;
-	buffer.sizes = sizes_;
-	buffer.mvp = proj_ * view_;
-	buffer.pointSize = pointSize_;
-	buffer.tMin = tMin_;
-	buffer.tMax = tMax_;
-	pipeline_->upload(*ctx_, *pool_, buffer);
+	flamePipeline_->upload(*ctx_, frameIndex, nEmit,
+		{ emitPositions_.data(), emitTemperatures_.data(), emitSizes_.data() }, ubo);
+	const auto nAbs = static_cast<uint32_t>(absPositions_.size() / 3);
+	smokePipeline_->upload(*ctx_, frameIndex, nAbs,
+		{ absPositions_.data(), absDensities_.data(), absSizes_.data(), absTemperatures_.data() }, ubo);
+}
 
-	FlameSmokePipeline::Buffer smokeBuffer;
-	smokeBuffer.positions = smokePositions_;
-	smokeBuffer.opacities = smokeOpacities_;
-	smokeBuffer.sizes = smokeSizes_;
-	smokeBuffer.temperatures = smokeTemperatures_;
-	smokeBuffer.mvp = proj_ * view_;
-	smokeBuffer.pointSize = smokePointSize_;
-	smokeBuffer.tMin = tMin_;
-	smokeBuffer.tMax = tMax_;
-	smokePipeline_->upload(*ctx_, *pool_, smokeBuffer);
+void FlameRenderer::recordPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
+{
+	if (!enabled_ || renderMode_ != RenderMode::PBVR || !pbvr_.isValid()) {
+		return;
+	}
+	pbvr_.record(cmd, frameIndex);
+	pbvrRecordedThisFrame_ = true;
 }
 
 void FlameRenderer::onRender(VkCommandBuffer cmd, uint32_t frameIndex)
@@ -121,35 +179,32 @@ void FlameRenderer::onRender(VkCommandBuffer cmd, uint32_t frameIndex)
 	}
 
 	if (renderMode_ == RenderMode::PBVR) {
-		if (pbvrPipeline_ && pbvrPipeline_->isValid()) {
-			pbvrPipeline_->render(cmd, frameIndex);
+		if (pbvrRecordedThisFrame_) {
+			pbvr_.composite(cmd, frameIndex);
 		}
 		return;
 	}
 
-	// Smoke first (alpha-blended, so draw order affects the result), then the
-	// additive flame/sparks on top -- see the class doc comment.
+	// Absorbers first (premultiplied over the background), then the additive
+	// emitters on top -- see the class doc comment.
 	if (smokePipeline_ && smokePipeline_->isValid()) {
 		smokePipeline_->render(cmd, frameIndex);
 	}
-	if (pipeline_ && pipeline_->isValid()) {
-		pipeline_->render(cmd, frameIndex);
+	if (flamePipeline_ && flamePipeline_->isValid()) {
+		flamePipeline_->render(cmd, frameIndex);
 	}
 }
 
 void FlameRenderer::onCleanup(VkDevice device)
 {
-	if (pipeline_) {
-		pipeline_->destroy(device);
-		pipeline_.reset();
+	for (auto* p : { &flamePipeline_, &smokePipeline_ }) {
+		if (*p) {
+			(*p)->destroy(device);
+			p->reset();
+		}
 	}
-	if (smokePipeline_) {
-		smokePipeline_->destroy(device);
-		smokePipeline_.reset();
-	}
-	if (pbvrPipeline_) {
-		pbvrPipeline_->destroy(device);
-		pbvrPipeline_.reset();
+	if (ctx_) {
+		pbvr_.destroy(*ctx_);
 	}
 }
 

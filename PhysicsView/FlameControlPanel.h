@@ -2,6 +2,7 @@
 
 #include "IEmbeddedPanel.h"
 #include "FlameWorld.h"
+#include "FlamePBVRPass.h"
 
 #include <functional>
 
@@ -24,12 +25,14 @@ public:
     explicit FlameControlPanel(FlameWorld* world) : world_(world) {}
 
     void setOnWorldChanged(std::function<void()> fn) { onWorldChanged_ = std::move(fn); }
+    void setPBVRStatsSource(std::function<FlamePBVRPass::Stats()> fn) { pbvrStats_ = std::move(fn); }
 
     void drawContents() override;
 
 private:
     FlameWorld*           world_ = nullptr;
     std::function<void()> onWorldChanged_;
+    std::function<FlamePBVRPass::Stats()> pbvrStats_;
 
     void notifyWorldChanged() { if (onWorldChanged_) onWorldChanged_(); }
 };

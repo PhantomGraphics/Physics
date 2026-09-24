@@ -110,7 +110,7 @@ if(PHANTOM_GTEST_FOUND)
     list(FILTER PHYSICSTEST_SOURCES EXCLUDE REGEX
         "(FluidPoolStabilityTest|WaterSphereEmitterStabilityTest|SPHScaleInvarianceTest)\\.cpp$")
 
-    # PrimitiveGltf.cpp / SoftMeshGltf.cpp (PhysicsView) are pure logic --
+    # PrimitiveGltf.cpp / SoftMeshGltf.cpp / FlameBlackbody.cpp (PhysicsView) are pure logic --
     # GltfRenderer's header-only GltfDocument/GltfAccessorBuilder + glm (+
     # PhysicsCore's SoftMesh.h for the soft one), no Vulkan. Compiled straight
     # into PhysicsTest so PrimitiveGltfTest.cpp / SoftMeshGltfTest.cpp can
@@ -118,7 +118,8 @@ if(PHANTOM_GTEST_FOUND)
     # (PLAN_physicsview_gltf_rendering.md Phase 2/3 / §6).
     add_executable(PhysicsTest ${PHYSICSTEST_SOURCES}
         ${PHYSICS_ROOT}/PhysicsView/PrimitiveGltf.cpp
-        ${PHYSICS_ROOT}/PhysicsView/SoftMeshGltf.cpp)
+        ${PHYSICS_ROOT}/PhysicsView/SoftMeshGltf.cpp
+        ${PHYSICS_ROOT}/PhysicsView/FlameBlackbody.cpp)
     set_target_properties(PhysicsTest PROPERTIES
         CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON
@@ -248,11 +249,14 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/SoftBodyControlPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/SoftBodyCommandDispatcher.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameWorld.cpp
+    ${PHYSICS_ROOT}/PhysicsView/FlameCommandDispatcher.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameControlPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameRenderer.cpp
-    ${PHYSICS_ROOT}/PhysicsView/FlamePipeline.cpp
-    ${PHYSICS_ROOT}/PhysicsView/FlameSmokePipeline.cpp
-    ${PHYSICS_ROOT}/PhysicsView/FlamePBVRPipeline.cpp
+    ${PHYSICS_ROOT}/PhysicsView/FlamePointPipeline.cpp
+    ${PHYSICS_ROOT}/PhysicsView/FlameBlackbody.cpp
+    ${PHYSICS_ROOT}/PhysicsView/FlameFullscreenPass.cpp
+    ${PHYSICS_ROOT}/PhysicsView/FlamePBVRPass.cpp
+    ${PHYSICS_ROOT}/PhysicsView/FlameStreamBuffer.cpp
 )
 target_include_directories(PhysicsView PRIVATE
     ${CGLIB_ROOT}/ThirdParty/VulkanMemoryAllocator

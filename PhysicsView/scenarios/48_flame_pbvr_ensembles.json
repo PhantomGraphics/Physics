@@ -1,0 +1,55 @@
+{
+  "name": "48_flame_pbvr_ensembles",
+  "_comment": "GPU PBVR ensemble averaging (docs/todo/PLAN_flame_sph_pbvr_improvement.md Phase 4): progressive convergence to targetEnsembles on a static frame, history reset on a shading change, EMA capping while the sim runs, no temporal reuse at pbvrTemporalFrames=0, and the adaptive (EnsembleLodController) path. Each GetStatus repeat is one rendered frame.",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "Show the Flame page", "command": "SetFlamePage:true", "expect": "OK" },
+    { "label": "Keep paused", "command": "SetFlameRunning:false", "expect": "OK" },
+    { "label": "Rebuild the default scene", "command": "FlameReset", "expect": "OK" },
+    { "label": "Run 2 simulated seconds (smoke exists)", "command": "FlameStep:120", "expect": "OK" },
+    { "label": "Precondition: smoke puffs to generate PBVR particles from", "command": "GetFlameSecondaryCount", "expect_not": "Count:0" },
+    { "label": "Hide the UI", "command": "SetUIVisible:false", "expect": "OK" },
+    { "label": "Fixed side view", "command": "SetCameraOrbit:110,0,0.15", "expect": "OK" },
+    { "label": "Manual R", "command": "SetFlameRenderParam:pbvrAdaptive,0", "expect": "OK" },
+    { "label": "R = 2 ensembles per frame", "command": "SetFlameRenderParam:pbvrEnsembles,2", "expect": "OK" },
+    { "label": "Converge at 16 ensembles", "command": "SetFlameRenderParam:pbvrTargetEnsembles,16", "expect": "OK" },
+    { "label": "PBVR mode", "command": "SetFlameRenderMode:PBVR", "expect": "OK" },
+    { "label": "Render ~20 frames", "command": "GetStatus", "expect": "OK", "repeat": 20 },
+
+    { "label": "Change: static frame converged to exactly the target", "command": "GetFlamePBVRStat:displayedEnsembles", "expect_range": "16,16" },
+    { "label": "Change: converged -> no new ensembles rendered", "command": "GetFlamePBVRStat:ensemblesThisFrame", "expect_range": "0,0" },
+    { "label": "Change: sub-particles were generated on the GPU", "command": "GetFlamePBVRStat:generated", "expect_range": "1,100000000" },
+    { "label": "Invariant: no ensemble segment overflowed", "command": "GetFlamePBVRStat:overflowed", "expect_range": "0,0" },
+    { "label": "Summary (logged)", "command": "GetFlamePBVRStats", "expect_prefix": "displayedEnsembles=" },
+    { "label": "Capture the converged frame", "command": "SaveScreenshot:testdata/screenshots/48_flame_pbvr_converged.png", "expect": "OK" },
+
+    { "label": "Raise the target", "command": "SetFlameRenderParam:pbvrTargetEnsembles,32", "expect": "OK" },
+    { "label": "Render ~20 frames", "command": "GetStatus", "expect": "OK", "repeat": 20 },
+    { "label": "Change: refinement resumed up to the new target", "command": "GetFlamePBVRStat:displayedEnsembles", "expect_range": "32,32" },
+
+    { "label": "A shading change invalidates the average", "command": "SetFlameRenderParam:exposure,3.5", "expect": "OK" },
+    { "label": "Two frames", "command": "GetStatus", "expect": "OK", "repeat": 2 },
+    { "label": "Change: history restarted (well below 32)", "command": "GetFlamePBVRStat:displayedEnsembles", "expect_range": "1,12" },
+    { "label": "Restore exposure", "command": "SetFlameRenderParam:exposure,4", "expect": "OK" },
+
+    { "label": "EMA over 4 frames while running", "command": "SetFlameRenderParam:pbvrTemporalFrames,4", "expect": "OK" },
+    { "label": "Run the sim", "command": "SetFlameRunning:true", "expect": "OK" },
+    { "label": "A few running frames", "command": "GetStatus", "expect": "OK", "repeat": 8 },
+    { "label": "Change: effective samples capped at temporalFrames * R = 8", "command": "GetFlamePBVRStat:displayedEnsembles", "expect_range": "1,8" },
+    { "label": "No temporal reuse", "command": "SetFlameRenderParam:pbvrTemporalFrames,0", "expect": "OK" },
+    { "label": "A few running frames", "command": "GetStatus", "expect": "OK", "repeat": 4 },
+    { "label": "Change: each frame shows only its own R = 2 ensembles", "command": "GetFlamePBVRStat:displayedEnsembles", "expect_range": "2,2" },
+    { "label": "Pause", "command": "SetFlameRunning:false", "expect": "OK" },
+
+    { "label": "Adaptive R", "command": "SetFlameRenderParam:pbvrAdaptive,1", "expect": "OK" },
+    { "label": "Let the controller settle and refine", "command": "GetStatus", "expect": "OK", "repeat": 30 },
+    { "label": "Invariant: R within [0, 8]", "command": "GetFlamePBVRStat:ensemblesThisFrame", "expect_range": "0,8" },
+    { "label": "Invariant: a valid EnsembleLodController state", "command": "GetFlamePBVRStat:lodState", "expect_range": "0,3" },
+    { "label": "Invariant: GPU time measured and finite", "command": "GetFlamePBVRStat:gpuMs", "expect_range": "0,1000" },
+    { "label": "Negative: unknown PBVR stat", "command": "GetFlamePBVRStat:bogus", "expect_prefix": "Error:" },
+
+    { "label": "Back to Normal", "command": "SetFlameRenderMode:Normal", "expect": "OK" },
+    { "label": "Restore the UI", "command": "SetUIVisible:true", "expect": "OK" },
+    { "label": "Leave the Flame page", "command": "SetFlamePage:false", "expect": "OK" }
+  ]
+}

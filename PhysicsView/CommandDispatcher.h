@@ -3,6 +3,7 @@
 
 #include "RigidBodyCommandDispatcher.h"
 #include "SoftBodyCommandDispatcher.h"
+#include "FlameCommandDispatcher.h"
 
 #include <optional>
 
@@ -18,6 +19,7 @@ namespace Phantom {
     class GltfBodyRenderer;
     class GltfSoftRenderer;
     class SSFRPanel;
+    class FluidRenderer;
 
     // Single IScenarioDispatcher for FluidApp, covering the fluid world,
     // (since the RigidBodyView -> FluidView merge) the rigid-body scene, and
@@ -147,9 +149,28 @@ namespace Phantom {
         // "Error:SSFR panel not available".
         void setSsfrPanel(SSFRPanel* p) { ssfrPanel_ = p; }
 
+        // Flame page surface (SetFlamePage / FlameReset / FlameStep:N /
+        // SetFlameParam:name,value / GetFlameStat:name / ...), see
+        // FlameCommandDispatcher.h. Asked first by route(); every one of its
+        // command names contains "Flame" so nothing else is shadowed.
+        FlameCommandDispatcher& flame() { return flameDispatcher_; }
+
         // Tears the whole 3D scene down to nothing (the "NewScene" command /
         // File > New). Unset makes "NewScene" an "Error:".
         void setOnNewScene(std::function<void()> cb) { onNewScene_ = std::move(cb); }
+
+        // "SetUIVisible:{true|false}" / "IsUIVisible": hides every ImGui window
+        // (menu bar, Control, Scenario Browser, ...) so a SaveScreenshot shows
+        // the viewport alone. Unset makes them "Error:".
+        // "SetCameraOrbit:distance,yaw,pitch" / "GetCameraOrbit": the shared
+        // FluidRenderer orbit camera (the one every page renders with), so a
+        // scenario screenshot can pin its framing. Unset makes them "Error:".
+        void setFluidRenderer(FluidRenderer* r) { fluidRenderer_ = r; }
+
+        void setUIVisibilityHooks(std::function<void(bool)> set, std::function<bool()> get) {
+            setUIVisible_ = std::move(set);
+            isUIVisible_ = std::move(get);
+        }
 
         // Called after Reset or Step so the app can sync GPU buffers.
         void setOnWorldChanged(std::function<void()> cb) { onWorldChanged_ = std::move(cb); }
@@ -194,6 +215,7 @@ namespace Phantom {
         RigidBodyCommandDispatcher rigidDispatcher_;
         SoftBodyWorld* softWorld_ = nullptr;
         SoftBodyCommandDispatcher softDispatcher_;
+        FlameCommandDispatcher flameDispatcher_;
         FluidVolumeConverter* volumeConverter_ = nullptr;
         FluidMeshConverter* meshConverter_ = nullptr;
         VolumeRenderer* volumeRenderer_ = nullptr;
@@ -203,6 +225,9 @@ namespace Phantom {
         GltfSoftRenderer* softBodyRenderer_  = nullptr;
         SSFRPanel* ssfrPanel_ = nullptr;
         std::function<void()> onNewScene_;
+        FluidRenderer* fluidRenderer_ = nullptr;
+        std::function<void(bool)> setUIVisible_;
+        std::function<bool()> isUIVisible_;
         std::function<void()> onWorldChanged_;
         std::function<void()> onVolumeChanged_;
         std::function<void()> onMeshChanged_;

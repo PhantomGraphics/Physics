@@ -74,6 +74,9 @@ public:
 		boundaryPlanes_ = std::move(planes);
 	}
 
+	/** @brief Simulated seconds accumulated by simulate() (curl-noise clock). */
+	float getSimTime() const { return simTime_; }
+
 	/** @brief Returns the list of registered fluid objects. */
 	std::vector<FlameFluid*> getFluids() const { return fluids; }
 
@@ -82,6 +85,8 @@ private:
 	Math::Vector3df gravity{ 0.0f, -9.8f, 0.0f };
 	std::vector<FlameFluid*> fluids;
 	std::vector<PlaneBoundary> boundaryPlanes_;
+	// Accumulated simulated time; drives the curl-noise field's 4th (time) axis.
+	float simTime_ = 0.0f;
 
 	void addBoundaryForce(std::vector<FlameParticle>& particles, const float dt);
 };
