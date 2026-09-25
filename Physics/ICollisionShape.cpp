@@ -75,5 +75,52 @@ Math::Vector3df BoxShape::getSurfaceNormal(const Math::Vector3df& worldPoint,
     return orient * localNormal;
 }
 
+Math::Vector3df closestPointOnSegment(const Math::Vector3df& p,
+                                      const Math::Vector3df& a,
+                                      const Math::Vector3df& b)
+{
+    const Math::Vector3df ab = b - a;
+    const float len2 = glm::dot(ab, ab);
+    if (len2 < 1e-12f) return a;
+    const float t = std::clamp(glm::dot(p - a, ab) / len2, 0.f, 1.f);
+    return a + ab * t;
+}
+
+void CapsuleShape::getSegment(const Math::Vector3df& pos, const Math::Quaternion& orient,
+                              Math::Vector3df& a, Math::Vector3df& b) const
+{
+    const Math::Vector3df axis = orient * Math::Vector3df(0.f, halfHeight, 0.f);
+    a = pos - axis;
+    b = pos + axis;
+}
+
+Math::Box3df CapsuleShape::getAABB(const Math::Vector3df& pos,
+                                   const Math::Quaternion& orient) const {
+    Math::Vector3df a, b;
+    getSegment(pos, orient, a, b);
+    const Math::Vector3df r(radius, radius, radius);
+    return Math::Box3df(glm::min(a, b) - r, glm::max(a, b) + r);
+}
+
+float CapsuleShape::getSignedDistance(const Math::Vector3df& worldPoint,
+                                      const Math::Vector3df& pos,
+                                      const Math::Quaternion& orient) const {
+    Math::Vector3df a, b;
+    getSegment(pos, orient, a, b);
+    return Math::getDistance(worldPoint, closestPointOnSegment(worldPoint, a, b)) - radius;
+}
+
+Math::Vector3df CapsuleShape::getSurfaceNormal(const Math::Vector3df& worldPoint,
+                                               const Math::Vector3df& pos,
+                                               const Math::Quaternion& orient) const {
+    Math::Vector3df a, b;
+    getSegment(pos, orient, a, b);
+    const Math::Vector3df d = worldPoint - closestPointOnSegment(worldPoint, a, b);
+    const float len = Math::getLength(d);
+    if (len > 1e-8f) return d / len;
+    // On the core segment: any direction perpendicular to the axis is valid.
+    return orient * Math::Vector3df(1.f, 0.f, 0.f);
+}
+
 } // namespace Physics
 } // namespace Phantom

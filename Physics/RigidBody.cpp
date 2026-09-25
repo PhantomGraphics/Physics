@@ -41,6 +41,22 @@ void RigidBody::computeLocalInertia() {
             0, 1.f / Iyy, 0,
             0, 0, 1.f / Izz
         );
+    } else if (shape->getType() == ShapeType::Capsule) {
+        // Cylinder along local Y plus two hemispherical caps; mass split by volume.
+        auto* c = static_cast<CapsuleShape*>(shape);
+        const float r = c->radius, h = 2.f * c->halfHeight;
+        const float vCyl  = r * r * h;                 // common factor pi dropped
+        const float vCaps = (4.f / 3.f) * r * r * r;
+        const float mCyl  = mass * vCyl / (vCyl + vCaps);
+        const float mCaps = mass - mCyl;
+        const float Iyy = mCyl * r * r * 0.5f + mCaps * 0.4f * r * r;
+        const float Ixx = mCyl * (h * h / 12.f + r * r / 4.f)
+                        + mCaps * (0.4f * r * r + h * h / 4.f + 3.f * h * r / 8.f);
+        invI_local_ = Math::Matrix3df(
+            1.f / Ixx, 0, 0,
+            0, 1.f / Iyy, 0,
+            0, 0, 1.f / Ixx
+        );
     } else {
         invI_local_ = Math::Matrix3df(0.f);
     }

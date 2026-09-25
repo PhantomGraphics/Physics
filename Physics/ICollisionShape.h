@@ -13,7 +13,8 @@ namespace Physics {
 // Mesh: static fluid-boundary shape only (MeshBoundaryShape). No mesh-vs-X
 // narrow-phase routine exists, so it must not be attached to a simulated
 // RigidBody for rigid-rigid collision (see NarrowPhase.cpp).
-enum class ShapeType { Sphere, Box, Plane, Mesh };
+// Capsule is appended after Mesh so existing enumerator values stay unchanged.
+enum class ShapeType { Sphere, Box, Plane, Mesh, Capsule };
 
 struct ICollisionShape {
     virtual ShapeType    getType()                                            const = 0;
@@ -101,6 +102,37 @@ struct PlaneShape : ICollisionShape {
         return normal;
     }
 };
+
+// Capsule whose core segment runs along the shape's local Y axis from
+// -halfHeight to +halfHeight; the surface is every point at `radius` from that
+// segment. Local Y matches a Blender capsule's local Z after the glTF Y-up
+// conversion, so an authored capsule needs no extra axis remap.
+struct CapsuleShape : ICollisionShape {
+    float radius     = 0.25f;
+    float halfHeight = 0.5f; // half the length of the cylindrical part (excludes the caps)
+
+    ShapeType getType() const override { return ShapeType::Capsule; }
+
+    // World-space endpoints of the core segment.
+    void getSegment(const Math::Vector3df& pos, const Math::Quaternion& orient,
+                    Math::Vector3df& a, Math::Vector3df& b) const;
+
+    Math::Box3df getAABB(const Math::Vector3df& pos,
+                         const Math::Quaternion& orient) const override;
+
+    float getSignedDistance(const Math::Vector3df& worldPoint,
+                            const Math::Vector3df& pos,
+                            const Math::Quaternion& orient) const override;
+
+    Math::Vector3df getSurfaceNormal(const Math::Vector3df& worldPoint,
+                                     const Math::Vector3df& pos,
+                                     const Math::Quaternion& orient) const override;
+};
+
+// Closest point to `p` on segment [a, b] (a when the segment is degenerate).
+Math::Vector3df closestPointOnSegment(const Math::Vector3df& p,
+                                      const Math::Vector3df& a,
+                                      const Math::Vector3df& b);
 
 } // namespace Physics
 } // namespace Phantom

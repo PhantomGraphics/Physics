@@ -163,6 +163,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 
 **剛体**
 - `RigidBody`、衝突は `BroadPhase`（`Phantom::Space::BVH` ベース）→ `NarrowPhase` → `CollisionPair`（`ContactManifold`）。
+- 剛体形状（`ICollisionShape.h`）: `SphereShape`/`BoxShape`（非一様 half extents）/`PlaneShape`/`CapsuleShape`（2026-09-25、ローカル Y 軸の線分＋半径、`NarrowPhase` は capsule×{plane,sphere,box,capsule}、慣性は円柱＋半球2個を体積比で合成）。`MeshBoundaryShape` は流体境界専用で剛体同士の衝突ルーチンを持たない。`ShapeType::Capsule` は既存値を変えないよう `Mesh` の後ろに追加している。
 - コライダー: `ICollisionShape`／`ISoftCollider` を実装する `SphereCollider`/`PlaneCollider`/`RigidBodyCollider`。
 - `RigidBodySolver` が積分・拘束解決を担当。`SelfCollision`/`CrossBodyCollision` は複数剛体間の追加チェック。
 
