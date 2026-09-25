@@ -163,7 +163,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 
 **剛体**
 - `RigidBody`、衝突は `BroadPhase`（`Phantom::Space::BVH` ベース）→ `NarrowPhase` → `CollisionPair`（`ContactManifold`）。
-- 剛体形状（`ICollisionShape.h`）: `SphereShape`/`BoxShape`（非一様 half extents）/`PlaneShape`/`CapsuleShape`（2026-09-25、ローカル Y 軸の線分＋半径、`NarrowPhase` は capsule×{plane,sphere,box,capsule}、慣性は円柱＋半球2個を体積比で合成）。`MeshBoundaryShape` は流体境界専用で剛体同士の衝突ルーチンを持たない。`ShapeType::Capsule` は既存値を変えないよう `Mesh` の後ろに追加している。
+- 剛体形状（`ICollisionShape.h`）: `SphereShape`/`BoxShape`（非一様 half extents）/`PlaneShape`/`CapsuleShape`（2026-09-25、ローカル Y 軸の線分＋半径、`NarrowPhase` は capsule×{plane,sphere,box,capsule}、慣性は円柱＋半球2個を体積比で合成）。`ConvexHullShape`（2026-09-25、点群から凸包を作り同一平面の三角形を多角形の面へまとめ、重心へ再センタリング——外したオフセットは `getCenterOffset()`。SAT の辺ペア数を抑えるため頂点数は既定 64 まで、超えたら黄金角方向のサポート点へ間引く。慣性は四面体分解の完全テンソル）/`TriangleMeshShape`（同日、**静的専用**——`RigidBody::setMass()` が常に質量 0 に固定、三角形は両面、AABB 木で候補三角形を引く）。box/hull/三角形どうしは `PolyhedronCollision`（面・辺の SAT、面接触は参照面の側面で入射面をクリップして最大 4 点、辺は参照面より明確に浅い時だけ採用）、hull×sphere/capsule は最近点、三角形×sphere/capsule は `ContactGeometry` の最近点で、隣接三角形が同じ点を二重に報告しないよう近接接触をまとめる。mesh×mesh / mesh×plane は無い（どちらも静的）。`MeshBoundaryShape` は流体境界専用で剛体同士の衝突ルーチンを持たない。`ShapeType::Capsule`/`ConvexHull`/`TriangleMesh` は既存値を変えないよう `Mesh` の後ろに追加している。
 - コライダー: `ICollisionShape`／`ISoftCollider` を実装する `SphereCollider`/`PlaneCollider`/`RigidBodyCollider`。
 - `RigidBodySolver` が積分・拘束解決を担当。`SelfCollision`/`CrossBodyCollision` は複数剛体間の追加チェック。
 

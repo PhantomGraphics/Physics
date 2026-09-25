@@ -1,5 +1,9 @@
 #include "pch.h"
 #include "NarrowPhase.h"
+#include "ContactGeometry.h"
+#include "ConvexHullShape.h"
+#include "PolyhedronCollision.h"
+#include "TriangleMeshShape.h"
 
 #include "CGLib/ThirdParty/glm-0.9.9.8/glm/gtc/quaternion.hpp"
 
@@ -151,6 +155,43 @@ bool NarrowPhase::detect(RigidBody& a, RigidBody& b, ContactManifold& out) {
         ContactManifold tmp;
         tmp.bodyA = &b; tmp.bodyB = &a;
         return flipAndMerge(boxPlane(b, a, tmp), tmp, out);
+    }
+
+    if (typeA == ShapeType::TriangleMesh || typeB == ShapeType::TriangleMesh) {
+        // Put the mesh in slot B; flip the normals back if it was A.
+        const bool swap = (typeA == ShapeType::TriangleMesh);
+        if (swap && typeB == ShapeType::TriangleMesh) return false; // static-static
+        RigidBody& other = swap ? b : a;
+        RigidBody& mesh  = swap ? a : b;
+        ContactManifold tmp;
+        tmp.bodyA = &other; tmp.bodyB = &mesh;
+        const bool hit = convexMesh(other, mesh, tmp);
+        if (swap) return flipAndMerge(hit, tmp, out);
+        if (!hit) return false;
+        out.contacts = std::move(tmp.contacts);
+        return true;
+    }
+
+    if (typeA == ShapeType::ConvexHull || typeB == ShapeType::ConvexHull) {
+        // Put the hull in slot A; flip the normals back if we swapped.
+        const bool swap = (typeA != ShapeType::ConvexHull);
+        RigidBody& hull  = swap ? b : a;
+        RigidBody& other = swap ? a : b;
+        ContactManifold tmp;
+        tmp.bodyA = &hull; tmp.bodyB = &other;
+        bool hit = false;
+        switch (other.shape->getType()) {
+            case ShapeType::Plane:      hit = hullPlane(hull, other, tmp);   break;
+            case ShapeType::Sphere:     hit = hullSphere(hull, other, tmp);  break;
+            case ShapeType::Capsule:    hit = hullCapsule(hull, other, tmp); break;
+            case ShapeType::Box:
+            case ShapeType::ConvexHull: hit = hullConvex(hull, other, tmp);  break;
+            default: return false; // no hull-vs-SDF-mesh routine (see ShapeType)
+        }
+        if (swap) return flipAndMerge(hit, tmp, out);
+        if (!hit) return false;
+        out.contacts = std::move(tmp.contacts);
+        return true;
     }
 
     if (typeA == ShapeType::Capsule || typeB == ShapeType::Capsule) {
@@ -374,6 +415,209 @@ bool NarrowPhase::capsuleCapsule(RigidBody& a, RigidBody& b, ContactManifold& ou
     cb->getSegment(b.position, b.orientation, p2, q2);
     closestSegmentSegment(p1, q1, p2, q2, c1, c2);
     return pointSpheres(c1, ca->radius, c2, cb->radius, out);
+}
+
+// -------------------------------------------------------------- Hull-Plane --
+
+bool NarrowPhase::hullPlane(RigidBody& a, RigidBody& b, ContactManifold& out) {
+    auto* sh = static_cast<ConvexHullShape*>(a.shape);
+    auto* sp = static_cast<PlaneShape*>(b.shape);
+    const Math::Matrix3df R = glm::mat3_cast(a.orientation);
+
+    std::vector<ContactPoint> found;
+    for (const auto& v : sh->getVertices()) {
+        const Math::Vector3df w = a.position + R * v;
+        const float d = glm::dot(w, sp->normal) - sp->offset;
+        if (d >= 0.f) continue;
+        ContactPoint cp;
+        cp.normal      = sp->normal;
+        cp.penetration = -d;
+        cp.position    = w - sp->normal * d;
+        found.push_back(cp);
+    }
+    if (found.empty()) return false;
+    reduceContacts(found, sp->normal);
+    out.contacts.insert(out.contacts.end(), found.begin(), found.end());
+    return true;
+}
+
+// Sphere (world center c, radius r) of body B against hull body A.
+// Normal points from B toward A, i.e. into the hull.
+static bool hullVsSphere(const RigidBody& hull, const Math::Vector3df& c, float r,
+                         ContactManifold& out) {
+    auto* sh = static_cast<ConvexHullShape*>(hull.shape);
+    Math::Vector3df q, n;
+    const float dist = sh->closestLocal(glm::inverse(hull.orientation) * (c - hull.position), q, n);
+    if (dist >= r) return false;
+    ContactPoint cp;
+    cp.normal      = -(hull.orientation * n);
+    cp.penetration = r - dist;
+    cp.position    = hull.position + hull.orientation * q;
+    out.contacts.push_back(cp);
+    return true;
+}
+
+// ------------------------------------------------------------- Hull-Sphere --
+
+bool NarrowPhase::hullSphere(RigidBody& a, RigidBody& b, ContactManifold& out) {
+    return hullVsSphere(a, b.position, static_cast<SphereShape*>(b.shape)->radius, out);
+}
+
+// ------------------------------------------------------------ Hull-Capsule --
+
+bool NarrowPhase::hullCapsule(RigidBody& a, RigidBody& b, ContactManifold& out) {
+    auto* sh = static_cast<ConvexHullShape*>(a.shape);
+    auto* sc = static_cast<CapsuleShape*>(b.shape);
+    Math::Vector3df p, q;
+    sc->getSegment(b.position, b.orientation, p, q);
+
+    // Segment point closest to the hull by alternating projections (as capsuleBox).
+    const Math::Quaternion invR = glm::inverse(a.orientation);
+    Math::Vector3df onSeg = closestPointOnSegment(a.position, p, q);
+    for (int i = 0; i < 4; ++i) {
+        Math::Vector3df local, n;
+        sh->closestLocal(invR * (onSeg - a.position), local, n);
+        onSeg = closestPointOnSegment(a.position + a.orientation * local, p, q);
+    }
+
+    const float segLen = glm::length(q - p);
+    const float mergeDist = std::max(1e-4f, segLen * 1e-3f);
+    bool hit = hullVsSphere(a, p, sc->radius, out);
+    hit = hullVsSphere(a, q, sc->radius, out) || hit;
+    if (glm::length(onSeg - p) > mergeDist && glm::length(onSeg - q) > mergeDist)
+        hit = hullVsSphere(a, onSeg, sc->radius, out) || hit;
+    return hit;
+}
+
+static WorldPolyhedron worldPolyhedron(const RigidBody& body) {
+    if (body.shape->getType() == ShapeType::Box)
+        return WorldPolyhedron::fromBox(*static_cast<BoxShape*>(body.shape), body.position, body.orientation);
+    return WorldPolyhedron::fromHull(*static_cast<ConvexHullShape*>(body.shape), body.position, body.orientation);
+}
+
+// ----------------------------------------------------------- Hull-Box/Hull --
+
+bool NarrowPhase::hullConvex(RigidBody& a, RigidBody& b, ContactManifold& out) {
+    return collidePolyhedra(worldPolyhedron(a), worldPolyhedron(b), out.contacts);
+}
+
+// --------------------------------------------------------- Convex-Triangles --
+
+// Sphere of body A (world center c, radius r) against one mesh triangle.
+// Triangles are two-sided; a center lying exactly on the triangle is pushed
+// toward `side` (the body's center).
+static bool sphereVsTriangle(const Math::Vector3df& c, float r,
+                             const Math::Vector3df& ta, const Math::Vector3df& tb,
+                             const Math::Vector3df& tc, const Math::Vector3df& side,
+                             std::vector<ContactPoint>& out) {
+    const Math::Vector3df q = closestPointOnTriangle(c, ta, tb, tc);
+    const Math::Vector3df delta = c - q;
+    const float dist = glm::length(delta);
+    if (dist >= r) return false;
+    ContactPoint cp;
+    if (dist > 1e-6f) {
+        cp.normal = delta / dist;
+        cp.penetration = r - dist;
+    } else {
+        Math::Vector3df n = glm::normalize(glm::cross(tb - ta, tc - ta));
+        if (glm::dot(n, side - ta) < 0.f) n = -n;
+        cp.normal = n;
+        cp.penetration = r;
+    }
+    cp.position = q;
+    out.push_back(cp);
+    return true;
+}
+
+// Adds `cp` unless an existing contact is at (nearly) the same place with a
+// similar normal -- neighbouring triangles report their shared edge/vertex
+// twice -- in which case the deeper one is kept.
+static void addMerged(std::vector<ContactPoint>& contacts, const ContactPoint& cp, float mergeDist) {
+    for (auto& existing : contacts) {
+        if (glm::length(existing.position - cp.position) < mergeDist
+            && glm::dot(existing.normal, cp.normal) > 0.95f) {
+            if (cp.penetration > existing.penetration) existing = cp;
+            return;
+        }
+    }
+    contacts.push_back(cp);
+}
+
+bool NarrowPhase::convexMesh(RigidBody& a, RigidBody& b, ContactManifold& out) {
+    auto* mesh = static_cast<TriangleMeshShape*>(b.shape);
+    const ShapeType typeA = a.shape->getType();
+    if (typeA != ShapeType::Sphere && typeA != ShapeType::Capsule
+        && typeA != ShapeType::Box && typeA != ShapeType::ConvexHull)
+        return false; // no mesh-vs-plane/mesh routine (both are static anyway)
+
+    // The other body's world AABB, expressed as a box in the mesh's local frame.
+    const Math::Box3df worldBox = a.getAABB();
+    const Math::Quaternion invR = glm::inverse(b.orientation);
+    const Math::Vector3df mn = worldBox.getMin(), mx = worldBox.getMax();
+    Math::Box3df localBox(invR * (mn - b.position));
+    for (int i = 1; i < 8; ++i) {
+        const Math::Vector3df corner((i & 1) ? mx.x : mn.x, (i & 2) ? mx.y : mn.y, (i & 4) ? mx.z : mn.z);
+        localBox.add(invR * (corner - b.position));
+    }
+    std::vector<int> candidates;
+    mesh->queryTriangles(localBox, candidates);
+    if (candidates.empty()) return false;
+
+    const Math::Matrix3df R = glm::mat3_cast(b.orientation);
+    const auto& verts = mesh->getVertices();
+    const float mergeDist = std::max(1e-4f, 0.02f * glm::length(mx - mn));
+
+    WorldPolyhedron poly;
+    if (typeA == ShapeType::Box || typeA == ShapeType::ConvexHull) poly = worldPolyhedron(a);
+
+    std::vector<ContactPoint> found;
+    std::vector<ContactPoint> tri;
+    for (int t : candidates) {
+        const auto& idx = mesh->getTriangle(static_cast<size_t>(t));
+        const Math::Vector3df ta = b.position + R * verts[idx[0]];
+        const Math::Vector3df tb = b.position + R * verts[idx[1]];
+        const Math::Vector3df tc = b.position + R * verts[idx[2]];
+        tri.clear();
+        switch (typeA) {
+            case ShapeType::Sphere:
+                sphereVsTriangle(a.position, static_cast<SphereShape*>(a.shape)->radius,
+                                 ta, tb, tc, a.position, tri);
+                break;
+            case ShapeType::Capsule: {
+                auto* sc = static_cast<CapsuleShape*>(a.shape);
+                Math::Vector3df p, q, onSeg, onTri;
+                sc->getSegment(a.position, a.orientation, p, q);
+                sphereVsTriangle(p, sc->radius, ta, tb, tc, a.position, tri);
+                sphereVsTriangle(q, sc->radius, ta, tb, tc, a.position, tri);
+                closestPointsSegmentTriangle(p, q, ta, tb, tc, onSeg, onTri);
+                const float mergeSeg = std::max(1e-4f, glm::length(q - p) * 1e-3f);
+                if (glm::length(onSeg - p) > mergeSeg && glm::length(onSeg - q) > mergeSeg)
+                    sphereVsTriangle(onSeg, sc->radius, ta, tb, tc, a.position, tri);
+                break;
+            }
+            default:
+                collidePolyhedra(poly, WorldPolyhedron::fromTriangle(ta, tb, tc), tri);
+                break;
+        }
+        for (const auto& cp : tri) addMerged(found, cp, mergeDist);
+    }
+    if (found.empty()) return false;
+
+    // Keep at most 4 contacts per distinct normal direction (a box in a mesh
+    // corner keeps both walls' contacts).
+    std::vector<bool> used(found.size(), false);
+    for (size_t i = 0; i < found.size(); ++i) {
+        if (used[i]) continue;
+        std::vector<ContactPoint> group;
+        for (size_t j = i; j < found.size(); ++j) {
+            if (used[j] || glm::dot(found[i].normal, found[j].normal) < 0.95f) continue;
+            used[j] = true;
+            group.push_back(found[j]);
+        }
+        reduceContacts(group, found[i].normal);
+        out.contacts.insert(out.contacts.end(), group.begin(), group.end());
+    }
+    return true;
 }
 
 } // namespace Physics

@@ -39,6 +39,8 @@ public:
     bool isStatic() const { return inverseMass == 0.f; }
 
     void setMass(float m);
+    // Call before setMass(): the inertia (and, for a TriangleMesh, forcing the
+    // body static) is derived from the shape there.
     void setShape(ICollisionShape* s) { shape = s; }
 
     void applyForce (const Math::Vector3df& f) { forceAccum  += f; }

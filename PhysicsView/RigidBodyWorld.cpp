@@ -159,6 +159,9 @@ std::string RigidBodyWorld::describeBody(std::size_t index) const {
         case Physics::ShapeType::Box:    shape = "Box";    break;
         case Physics::ShapeType::Plane:  shape = "Plane";  break;
         case Physics::ShapeType::Mesh:   shape = "Mesh";   break;
+        case Physics::ShapeType::Capsule:      shape = "Capsule"; break;
+        case Physics::ShapeType::ConvexHull:   shape = "Hull";    break;
+        case Physics::ShapeType::TriangleMesh: shape = "TriMesh"; break;
         }
     }
     char buf[96];

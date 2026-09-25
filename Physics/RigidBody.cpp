@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "RigidBody.h"
+#include "ConvexHullShape.h"
 
 #include "CGLib/Math/Quaternion.h"
 #include "CGLib/ThirdParty/glm-0.9.9.8/glm/gtc/quaternion.hpp"
@@ -8,6 +9,8 @@ namespace Phantom {
 namespace Physics {
 
 void RigidBody::setMass(float m) {
+    // A triangle mesh has no volume to integrate: always static (TriangleMeshShape.h).
+    if (shape && shape->getType() == ShapeType::TriangleMesh) m = 0.f;
     if (m <= 0.f) {
         mass        = 0.f;
         inverseMass = 0.f;
@@ -57,6 +60,11 @@ void RigidBody::computeLocalInertia() {
             0, 1.f / Iyy, 0,
             0, 0, 1.f / Ixx
         );
+    } else if (shape->getType() == ShapeType::ConvexHull) {
+        // Full (generally non-diagonal) tensor about the hull's center of mass.
+        auto* h = static_cast<ConvexHullShape*>(shape);
+        const Math::Matrix3df I = h->getUnitInertia() * mass;
+        invI_local_ = (glm::determinant(I) > 1e-20f) ? glm::inverse(I) : Math::Matrix3df(0.f);
     } else {
         invI_local_ = Math::Matrix3df(0.f);
     }

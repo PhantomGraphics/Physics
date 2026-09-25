@@ -13,8 +13,12 @@ namespace Physics {
 // Mesh: static fluid-boundary shape only (MeshBoundaryShape). No mesh-vs-X
 // narrow-phase routine exists, so it must not be attached to a simulated
 // RigidBody for rigid-rigid collision (see NarrowPhase.cpp).
-// Capsule is appended after Mesh so existing enumerator values stay unchanged.
-enum class ShapeType { Sphere, Box, Plane, Mesh, Capsule };
+// Capsule, ConvexHull and TriangleMesh are appended after Mesh so existing
+// enumerator values stay unchanged. ConvexHull (ConvexHullShape.h) is a full
+// rigid-body collider; TriangleMesh (TriangleMeshShape.h) is the rigid-body
+// counterpart of Mesh and is static-only -- RigidBody::setMass() forces it
+// static, and NarrowPhase has no mesh-vs-mesh routine.
+enum class ShapeType { Sphere, Box, Plane, Mesh, Capsule, ConvexHull, TriangleMesh };
 
 struct ICollisionShape {
     virtual ShapeType    getType()                                            const = 0;
