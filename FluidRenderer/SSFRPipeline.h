@@ -22,6 +22,7 @@ struct SSFRPassConfig {
     VkPrimitiveTopology topology      = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     bool                depthTest     = true;
     bool                depthWrite    = true;
+    VkCompareOp         depthCompareOp = VK_COMPARE_OP_LESS;
     bool                additiveBlend = false;  // ONE+ONE additive blend for particle pass
     uint32_t            framesInFlight = 2;
     uint32_t            uboSize        = 0;     // per-frame UBO byte size (0 = no UBO)

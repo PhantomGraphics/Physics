@@ -18,6 +18,7 @@ layout(set=0,binding=8) uniform sampler2D uSceneColor;
 layout(set=0,binding=9) uniform sampler2D uSceneDepth;
 
 vec3 aces(vec3 x) {
+    if ((transparent & 2) != 0) return x;
     const float a=2.51,b=0.03,c=2.43,d=0.59,e=0.14;
     return clamp((x*(a*x+b))/(x*(c*x+d)+e),0.0,1.0);
 }
@@ -27,15 +28,19 @@ void main() {
     // test) so the sequence composites over a plate. Otherwise alpha is 1.
     vec4 sceneTex = hasScene != 0 ? texture(uSceneColor,vUV) : vec4(0.0);
     vec3 scene = sceneTex.rgb;
+    // Universe scene color already includes exposure. Apply it only once.
+    if ((transparent & 2) != 0) scene /= max(exposure, 0.001);
     float sceneA = sceneTex.a;
-    float bgA = transparent != 0 ? sceneA : 1.0;
+    float bgA = (transparent & 1) != 0 ? sceneA : 1.0;
+    float sceneDepth=hasScene!=0?texture(uSceneDepth,vUV).r:1.0;
+    gl_FragDepth = sceneDepth;
     if (mode == -1) { outColor=vec4(aces(scene*exposure),bgA); return; }
     float depth=texture(uDepth,vUV).r;
     float raw=texture(uThicknessRaw,vUV).r;
     float thick=texture(uThicknessSmooth,vUV).r;
-    float sceneDepth=hasScene!=0?texture(uSceneDepth,vUV).r:1.0;
     bool visible=depth>0.0 && (hasScene==0 || depth<sceneDepth-0.00005);
-    float coverA = transparent != 0 ? (visible ? 1.0 : sceneA) : 1.0;
+    if (visible && thick > 0.0001) gl_FragDepth = depth;
+    float coverA = (transparent & 1) != 0 ? (visible ? 1.0 : sceneA) : 1.0;
     if (mode==0 || mode==6) { vec3 c=visible?vec3(depth):scene; outColor=vec4(aces(c*exposure),coverA); return; }
     if (mode==1) { vec3 c=visible?vec3(raw*0.3):scene; outColor=vec4(aces(c*exposure),coverA); return; }
     if (mode==2) { vec3 c=visible?vec3(thick*0.3):scene; outColor=vec4(aces(c*exposure),coverA); return; }
@@ -43,6 +48,7 @@ void main() {
     vec4 reflectionSample=texture(uReflection,vUV);
     vec3 refl=reflectionSample.rgb;
     vec3 refr=texture(uRefraction,vUV).rgb;
+    if ((transparent & 2) != 0 && hasScene != 0) refr /= max(exposure, 0.001);
     if(mode==3){outColor=vec4(aces(refl*exposure),coverA);return;}
     if(mode==4){outColor=vec4(aces(refr*exposure),coverA);return;}
     float scaledThickness=max(thick*thicknessScale,0.0);

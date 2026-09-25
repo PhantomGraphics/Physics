@@ -1,4 +1,4 @@
-﻿#include "SSFluidRenderer.h"
+#include "SSFluidRenderer.h"
 
 #include "../../CGLib/VulkanGraphics/VulkanContext.h"
 
@@ -180,7 +180,7 @@ bool SSFluidRenderer::createPassResources(VkRenderPass mainRenderPass)
     initializeSSFRTargetLayouts(*pool_, targets_);
 
     depthPass_.create(*ctx_, framesInFlight_, targets_.depth().getRenderPass(),
-                      std::move(shaders_.depthVert), std::move(shaders_.depthFrag));
+                      shaders_.depthVert, shaders_.depthFrag);
     if (!depthPass_.isValid()) {
         std::cerr << "[VKSSFR] Failed to create depth pass" << std::endl;
         return false;
@@ -200,7 +200,7 @@ bool SSFluidRenderer::createPassResources(VkRenderPass mainRenderPass)
         return false;
     }
     foamPass_.create(*ctx_, framesInFlight_, targets_.foam().getRenderPass(),
-                     std::move(shaders_.thicknessVert), std::move(shaders_.thicknessFrag));
+                     shaders_.thicknessVert, shaders_.thicknessFrag);
     if (!foamPass_.isValid()) {
         std::cerr << "[VKSSFR] Failed to create foam pass" << std::endl;
         return false;
@@ -214,20 +214,20 @@ bool SSFluidRenderer::createPassResources(VkRenderPass mainRenderPass)
         return false;
     }
     bilateralDepthPass_.create(*ctx_, framesInFlight_, targets_.smoothedDepth().getRenderPass(),
-                               std::move(shaders_.bilateralVert), std::move(shaders_.bilateralFrag));
+                               shaders_.bilateralVert, shaders_.bilateralFrag);
     if (!bilateralDepthPass_.isValid()) {
         std::cerr << "[VKSSFR] Failed to create bilateral depth pass" << std::endl;
         return false;
     }
 
     reflectionPass_.create(*ctx_, *pool_, framesInFlight_, targets_.reflection().getRenderPass(),
-                           std::move(shaders_.reflectionVert), std::move(shaders_.reflectionFrag));
+                           shaders_.reflectionVert, shaders_.reflectionFrag);
     if (!reflectionPass_.isValid()) {
         std::cerr << "[VKSSFR] Failed to create reflection pass" << std::endl;
         return false;
     }
     refractionPass_.create(*ctx_, framesInFlight_, targets_.refraction().getRenderPass(),
-                           std::move(shaders_.refractionVert), std::move(shaders_.refractionFrag));
+                           shaders_.refractionVert, shaders_.refractionFrag);
     if (!refractionPass_.isValid()) {
         std::cerr << "[VKSSFR] Failed to create refraction pass" << std::endl;
         return false;
@@ -240,8 +240,8 @@ bool SSFluidRenderer::createPassResources(VkRenderPass mainRenderPass)
 
     if (!shaders_.skyboxVert.empty() && !shaders_.skyboxFrag.empty()) {
         Phantom::VKG::VkSkyBoxRenderer::Config sbCfg;
-        sbCfg.vertSpv = std::move(shaders_.skyboxVert);
-        sbCfg.fragSpv = std::move(shaders_.skyboxFrag);
+        sbCfg.vertSpv = shaders_.skyboxVert;
+        sbCfg.fragSpv = shaders_.skyboxFrag;
         skyBoxRenderer_ = std::make_unique<Phantom::VKG::VkSkyBoxRenderer>(std::move(sbCfg));
         skyBoxRenderer_->create(*ctx_, *pool_, mainRenderPass, framesInFlight_);
         if (!skyBoxRenderer_->isValid()) {
@@ -308,11 +308,12 @@ bool SSFluidRenderer::createPassResources(VkRenderPass mainRenderPass)
     sceneDepthBinding.binding = 9;
 
     SSFRPassConfig cfg;
-    cfg.vertSpv            = std::move(shaders_.compositeVert);
-    cfg.fragSpv            = std::move(shaders_.compositeFrag);
+    cfg.vertSpv            = shaders_.compositeVert;
+    cfg.fragSpv            = shaders_.compositeFrag;
     cfg.topology           = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    cfg.depthTest          = false;
-    cfg.depthWrite         = false;
+    cfg.depthTest          = linearOutput_;
+    cfg.depthWrite         = linearOutput_;
+    cfg.depthCompareOp     = VK_COMPARE_OP_ALWAYS;
     cfg.additiveBlend      = false;
     cfg.framesInFlight     = framesInFlight_;
     cfg.uboSize            = sizeof(CompositeUBO);
@@ -419,7 +420,7 @@ void SSFluidRenderer::onUpdate(uint32_t)
 
 void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
 {
-    if (!enabled_) {
+    if (!isValid() || !enabled_) {
         return;
     }
 
@@ -430,7 +431,7 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
     // The reconstruction kernel must overlap neighbouring particles at their
     // rest spacing (normally 2*r).  1.35*r left a scalloped silhouette and
     // visible vertical particle columns at close camera distances.
-    const float surfaceRadius = particleRadius_ * 1.5f;
+    const float surfaceRadius = particleRadiiInBuffer_ ? -1.5f : particleRadius_ * 1.5f;
     const float viewportHeight = static_cast<float>(extent_.height);
     depthPass_.render(cmd, frameIndex, targets_, proj_, view_,
                       surfaceRadius, viewportHeight);
@@ -490,8 +491,10 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
                                targets_.smoothedDepth());
     gpuMark("ssfr.bilateral");
 
-    VkImageView envView    = hasEnvMap_ ? envMap_.getImageView()   : dummyCubeMap_.getImageView();
-    VkSampler   envSampler = hasEnvMap_ ? envMap_.getSampler()     : dummyCubeMap_.getSampler();
+    const bool externalEnv = externalEnvView_ && externalEnvSampler_;
+    const bool useEnv = externalEnv || hasEnvMap_;
+    VkImageView envView    = externalEnv ? externalEnvView_ : (hasEnvMap_ ? envMap_.getImageView() : dummyCubeMap_.getImageView());
+    VkSampler   envSampler = externalEnv ? externalEnvSampler_ : (hasEnvMap_ ? envMap_.getSampler() : dummyCubeMap_.getSampler());
 
     VkImageView depthForNormals = useDepthSmoothing_
         ? targets_.smoothedDepth().getColorImageView()
@@ -501,7 +504,7 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
                            depthForNormals,
                            glm::inverse(proj_),
                            glm::mat4(glm::transpose(glm::mat3(view_))),
-                           envView, envSampler, hasEnvMap_,
+                           envView, envSampler, useEnv,
                            lightDirection_, lightColor_, lightIntensity_, roughness_);
     gpuMark("ssfr.reflection");
 
@@ -510,7 +513,7 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
     refractionPass_.render(*ctx_, cmd, frameIndex, targets_, depthForNormals,
                            sceneColor_, sceneDepth_, sceneSampler_, envView, envSampler,
                            glm::inverse(proj_), glm::mat4(glm::transpose(glm::mat3(view_))),
-                           extent_, nearPlane_, farPlane_, hasScene, hasEnvMap_, ior_, absorptionColor_);
+                           extent_, nearPlane_, farPlane_, hasScene, useEnv, ior_, absorptionColor_);
     gpuMark("ssfr.refraction");
     sprayPass_.render(cmd, frameIndex, targets_.spray(), proj_, view_,
                       particleRadius_ * 0.55f, viewportHeight, 0.5f);
@@ -521,6 +524,7 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
 
 void SSFluidRenderer::onRender(VkCommandBuffer cmd, uint32_t frameIndex)
 {
+    if (!isValid()) return;
     const bool hasScene = sceneColor_ != VK_NULL_HANDLE && sceneDepth_ != VK_NULL_HANDLE &&
                           sceneSampler_ != VK_NULL_HANDLE;
     if (!enabled_ && !hasScene) {
@@ -544,7 +548,7 @@ void SSFluidRenderer::onRender(VkCommandBuffer cmd, uint32_t frameIndex)
     ubo.showFoam = showFoam_ ? 1 : 0;
     ubo.hasScene = hasScene ? 1 : 0;
     ubo.exposure = exposure_;
-    ubo.transparent = transparentBackground_ ? 1 : 0;
+    ubo.transparent = (transparentBackground_ ? 1 : 0) | (linearOutput_ ? 2 : 0);
     ubo.absorptionColor = glm::vec4(absorptionColor_, 1.0f);
     ubo.absorptionDistance = absorptionDistance_;
     ubo.thicknessScale = thicknessScale_;

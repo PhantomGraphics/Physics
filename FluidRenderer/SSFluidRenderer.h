@@ -98,6 +98,16 @@ public:
     void resize(uint32_t width, uint32_t height);
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
+    bool isValid() const { return compositePipeline_.isValid(); }
+    // External vec4 buffers may carry a world-space particle radius in w.
+    // Default remains false for GPU_CSPH's position/density layout.
+    void setParticleRadiiInBuffer(bool v) { particleRadiiInBuffer_ = v; }
+    // Host supplies an already exposed HDR scene and performs the final display transform.
+    void setLinearOutput(bool v) { linearOutput_ = v; }
+    // Borrowed environment: caller keeps it alive until all submitted draws complete.
+    void setEnvironment(VkImageView view, VkSampler sampler) {
+        externalEnvView_ = view; externalEnvSampler_ = sampler;
+    }
 
     void setMode(Mode mode) { mode_ = mode; }
     Mode getMode() const { return mode_; }
@@ -182,6 +192,10 @@ private:
     VkRenderPass mainRenderPass_ = VK_NULL_HANDLE; // for resize()'s recreate
 
     bool enabled_ = false;
+    bool particleRadiiInBuffer_ = false;
+    bool linearOutput_ = false;
+    VkImageView externalEnvView_ = VK_NULL_HANDLE;
+    VkSampler externalEnvSampler_ = VK_NULL_HANDLE;
     Mode mode_ = Mode::SSFRMain;
 
     glm::mat4 proj_ = glm::mat4(1.0f);

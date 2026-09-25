@@ -1,4 +1,4 @@
-﻿#include "SSFROffscreenSet.h"
+#include "SSFROffscreenSet.h"
 #include "../../CGLib/VulkanGraphics/VulkanContext.h"
 
 namespace Phantom {
@@ -16,8 +16,8 @@ void SSFROffscreenSet::create(const Phantom::VKG::VulkanContext& ctx, uint32_t w
     smoothed_.create     (ctx, width, height, VK_FORMAT_R32_SFLOAT,     kDepthFmt);
     smoothedDepth_.create(ctx, width, height, VK_FORMAT_R32_SFLOAT,     kDepthFmt);
     filterTemp_.create   (ctx, width, height, VK_FORMAT_R32_SFLOAT,     kDepthFmt);
-    reflection_.create   (ctx, width, height, VK_FORMAT_R8G8B8A8_UNORM, kDepthFmt);
-    refraction_.create   (ctx, width, height, VK_FORMAT_R8G8B8A8_UNORM, kDepthFmt);
+    reflection_.create   (ctx, width, height, VK_FORMAT_R16G16B16A16_SFLOAT, kDepthFmt);
+    refraction_.create   (ctx, width, height, VK_FORMAT_R16G16B16A16_SFLOAT, kDepthFmt);
     spray_.create        (ctx, width, height, VK_FORMAT_R32_SFLOAT,     kDepthFmt);
     foam_.create         (ctx, width, height, VK_FORMAT_R32_SFLOAT,     kDepthFmt);
 

@@ -71,11 +71,13 @@ void main() {
     float viewDepth = max(-p.z, 1.0e-3);
     vec2 incidentSlope = v.xy / max(-v.z, 0.05);
     vec2 refractedSlope = rd.xy / max(-rd.z, 0.05);
-    vec2 focal = 0.5 / max(abs(vec2(invProj[0][0], invProj[1][1])), vec2(1.0e-4));
+    vec2 focal = 0.5 * sign(vec2(invProj[0][0], invProj[1][1])) / max(abs(vec2(invProj[0][0], invProj[1][1])), vec2(1.0e-4));
     float pathRatio = min(max(t, 0.0), viewDepth * 0.5) / viewDepth;
     vec2 uv = vUV + limitOffset((refractedSlope - incidentSlope) * focal * pathRatio * strength,
                                 0.08);
     bool inside = all(greaterThanEqual(uv, vec2(0.001))) && all(lessThanEqual(uv, vec2(0.999)));
+    // Reject an offset that lands on geometry in front of the water.
+    if (hasScene != 0 && inside && texture(uSceneDepth, uv).r < d) uv = vUV;
     vec3 c;
     if (hasScene != 0 && inside) c = texture(uSceneColor, uv).rgb;
     else if (hasEnvMap != 0) c = texture(uEnvMap, normalize(mat3(invViewRot) * rd)).rgb;

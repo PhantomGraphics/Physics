@@ -1,4 +1,4 @@
-﻿#include "ParticleDepthRenderer.h"
+#include "ParticleDepthRenderer.h"
 #include "../../CGLib/VulkanGraphics/VulkanContext.h"
 
 namespace Phantom {
@@ -50,6 +50,7 @@ void ParticleDepthRenderer::create(
     bindingVec4.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     SSFRPassConfig cfgV4 = cfg;
     cfgV4.bindingDescs = { bindingVec4 };
+    cfgV4.attrDescs[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
     pipelineVec4_.create(ctx, renderPass, cfgV4);
 }
 

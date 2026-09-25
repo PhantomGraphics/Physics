@@ -76,7 +76,7 @@ bool SSFRPipeline::create(const Phantom::VKG::VulkanContext& ctx,
     ds.sType            = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     ds.depthTestEnable  = cfg.depthTest  ? VK_TRUE : VK_FALSE;
     ds.depthWriteEnable = cfg.depthWrite ? VK_TRUE : VK_FALSE;
-    ds.depthCompareOp   = VK_COMPARE_OP_LESS;
+    ds.depthCompareOp   = cfg.depthCompareOp;
 
     // --- Color blend ---
     VkPipelineColorBlendAttachmentState cba{};
