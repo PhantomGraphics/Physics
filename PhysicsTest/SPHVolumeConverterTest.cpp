@@ -146,12 +146,13 @@ TEST(SPHVolumeConverterTest, IsotropicReusedConverterGivesFreshResult)
 //
 // For a single particle in isolation the neighbourhood count is 1 (self only),
 // which falls below the 25-neighbour threshold in calculateAnisotoropicMatrix.
-// The fallback sets scaleMatrix = 0.5 * I, yielding G = 2 * I / h (with h =
-// particleRadius).  All geometric expectations below are derived from this
-// known G.
+// The fallback sets scaleMatrix = 0.5 * I, yielding G = 2 * I.  G is
+// dimensionless: |Gv| is a world-space distance compared against the kernel
+// support h = particleRadius.  All geometric expectations below are derived
+// from this known G.
 //
-// Effective world-space support with G = 2*I/h:
-//   |Gv| = 2*d/h < h  ⟹  d < h²/2 = h/2  (when h = 1)
+// Effective world-space support with G = 2*I:
+//   |Gv| = 2*d < h  ⟹  d < h/2
 // ============================================================================
 
 // ---- Empty input ------------------------------------------------------------
@@ -225,7 +226,7 @@ TEST(SPHVolumeConverterTest, AnisotropicValueDecaysWithDistance)
 
 TEST(SPHVolumeConverterTest, AnisotropicCenterVoxelDiffersFromIsotropic)
 {
-    // G = 2*I/h multiplies by |det(G)| = (2/h)³ = 8, so the centre-voxel
+    // G = 2*I multiplies by |det(G)| = 2³ = 8, so the centre-voxel
     // contribution changes.  Verify the two modes produce distinct values.
     const std::vector<Vector3dd> positions = {{0.0, 0.0, 0.0}};
 
@@ -258,6 +259,122 @@ TEST(SPHVolumeConverterTest, AnisotropicReusedConverterGivesFreshResult)
 
     EXPECT_FLOAT_EQ(svA->getValue(Coord(0, 0, 0)),
                     svB->getValue(Coord(0, 0, 0)));
+}
+
+// ---- Neighbourhood-driven anisotropy (>= 25 neighbours) ---------------------
+
+namespace
+{
+// n^3 lattice with the given spacing, centred on `center`.
+std::vector<Vector3df> makeLattice(int n, float spacing, const Vector3df& center)
+{
+    std::vector<Vector3df> pts;
+    const float off = (n - 1) * 0.5f;
+    for (int i = 0; i < n; ++i)
+        for (int j = 0; j < n; ++j)
+            for (int k = 0; k < n; ++k)
+                pts.emplace_back(center + Vector3df(i - off, j - off, k - off) * spacing);
+    return pts;
+}
+
+struct VolumeSummary
+{
+    int   activeCount = 0;
+    float sum = 0.0f;
+    float maxValue = 0.0f;
+};
+
+VolumeSummary summarize(const SparseVolumef& sv)
+{
+    VolumeSummary s;
+    s.activeCount = sv.getActiveVoxelCount();
+    sv.forEachActive([&](const Coord&, const Vector3df&, const float& v) {
+        s.sum += v;
+        s.maxValue = std::max(s.maxValue, v);
+    });
+    return s;
+}
+} // namespace
+
+TEST(SPHVolumeConverterTest, AnisotropicLatticeIsDeterministic)
+{
+    // calculateAnisotropy() used to move each particle to its smoothed centre
+    // inside the OpenMP loop while other threads read it as a neighbour, so the
+    // same input produced a different volume on every run.
+    const auto pts = makeLattice(10, 0.02f, Vector3df(-0.03f, 0.05f, -0.08f));
+
+    SPHVolumeConverter convA, convB;
+    auto svA = convA.buildAnisotoropic(pts, 0.04f, 0.01f);
+    auto svB = convB.buildAnisotoropic(pts, 0.04f, 0.01f);
+    ASSERT_NE(svA, nullptr);
+    ASSERT_NE(svB, nullptr);
+
+    ASSERT_EQ(svA->getActiveVoxelCount(), svB->getActiveVoxelCount());
+    int mismatches = 0;
+    svA->forEachActive([&](const Coord& c, const Vector3df&, const float& v) {
+        if (svB->getValue(c) != v)
+            ++mismatches;
+    });
+    EXPECT_EQ(mismatches, 0);
+}
+
+TEST(SPHVolumeConverterTest, AnisotropicUniformLatticeMatchesIsotropicScale)
+{
+    // Inside a uniform lattice the weighted covariance is isotropic, so the
+    // normalized stretch is 1 on every axis and G = I: the anisotropic volume
+    // must cover the same region with the same magnitude as the isotropic one.
+    // Before the fix the unnormalized covariance (~spacing²) made |Gv| ~1e4x
+    // too large -- the kernel collapsed to ~2% of the isotropic voxel count and
+    // det(G) blew individual voxels up to ~1e14.
+    const auto pts = makeLattice(10, 0.02f, Vector3df(0.0f, 0.0f, 0.0f));
+
+    SPHVolumeConverter convIso, convAniso;
+    auto svIso   = convIso.buildIsotoropic(pts, 0.04f, 0.01f);
+    auto svAniso = convAniso.buildAnisotoropic(pts, 0.04f, 0.01f);
+    ASSERT_NE(svIso, nullptr);
+    ASSERT_NE(svAniso, nullptr);
+
+    const auto iso   = summarize(*svIso);
+    const auto aniso = summarize(*svAniso);
+    EXPECT_GT(aniso.activeCount, iso.activeCount / 2);
+    EXPECT_LT(aniso.activeCount, iso.activeCount * 2);
+    // det(G) * W(|Gv|) integrates to 1 for any G, so the total volume fraction
+    // is conserved up to voxel sampling (the old G gave ~1e14 here).
+    EXPECT_NEAR(aniso.sum, iso.sum, iso.sum * 0.25f);
+
+    // Deep inside the lattice G = I, so the value matches the isotropic one.
+    // (The per-voxel maximum is not compared: corner/edge particles have < 25
+    // neighbours and use the compact k_n = 0.5 kernel, which peaks 8x higher.)
+    const float vIso   = svIso->getValue(Coord(0, 0, 0));
+    const float vAniso = svAniso->getValue(Coord(0, 0, 0));
+    EXPECT_GT(vIso, 0.0f);
+    EXPECT_NEAR(vAniso, vIso, vIso * 0.1f);
+}
+
+TEST(SPHVolumeConverterTest, AnisotropicIsScaleInvariant)
+{
+    // G must be dimensionless: scaling the whole scene (positions, radius and
+    // voxel size) by the same factor must reproduce the same voxel pattern.
+    // The old G carried a 1/searchRadius factor plus the covariance's
+    // spacing² units, so the kernel shape depended on the scene's scale.
+    constexpr float s = 100.0f;
+    const auto small = makeLattice(8, 0.02f, Vector3df(0.0f, 0.0f, 0.0f));
+    const auto large = makeLattice(8, 0.02f * s, Vector3df(0.0f, 0.0f, 0.0f));
+
+    SPHVolumeConverter convS, convL;
+    auto svS = convS.buildAnisotoropic(small, 0.04f,     0.01f);
+    auto svL = convL.buildAnisotoropic(large, 0.04f * s, 0.01f * s);
+    ASSERT_NE(svS, nullptr);
+    ASSERT_NE(svL, nullptr);
+
+    const auto a = summarize(*svS);
+    const auto b = summarize(*svL);
+    // Voxel counts can differ by a handful of support-boundary voxels from
+    // float rounding. Each voxel value W*m/rho is a dimensionless volume
+    // fraction (W ~ 1/s³, m ~ s³, rho invariant), so values match directly.
+    EXPECT_NEAR(static_cast<float>(b.activeCount), static_cast<float>(a.activeCount), a.activeCount * 0.01f);
+    EXPECT_NEAR(b.sum, a.sum, a.sum * 1.0e-3f);
+    EXPECT_NEAR(b.maxValue, a.maxValue, a.maxValue * 1.0e-3f);
 }
 
 // ============================================================================
