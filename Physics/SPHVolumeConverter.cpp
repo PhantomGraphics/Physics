@@ -331,8 +331,17 @@ void SPHVolumeConverter::calculateAnisotropy(const float searchRadius)
 		spaceHash.add(p->getPosition());
 	}
 
+	// Two passes. Pass 1 reads only the original positions (neighbours'
+	// positions are gathered here, so no particle may move until every
+	// particle has finished): density, the Laplacian-smoothed kernel centre
+	// and the anisotropy matrix (built from the original neighbourhood, as in
+	// Yu & Turk 2013). Pass 2 then moves each particle to its smoothed centre.
+	// Doing the move inside pass 1 was a data race -- other threads read the
+	// moved position as a neighbour -- and made the result change run to run.
+	std::vector<Vector3df> smoothed(particles.size());
+
 #pragma omp parallel for
-	for (int i = 0; i < particles.size(); ++i) {
+	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
 		auto& p = particles[i];
 		const auto indices = spaceHash.findNeighborIndices(p->getPosition());
 		std::vector<Vector3df> neighbors;
@@ -343,8 +352,12 @@ void SPHVolumeConverter::calculateAnisotropy(const float searchRadius)
 		p->calculateDensity(neighbors, searchRadius, kernel);
 		WPCA wpca;
 		wpca.setup(p->getPosition(), neighbors, searchRadius);
-		const auto wm = wpca.calculateWeightedMean(p->getPosition(), neighbors, searchRadius);
-		p->correctedPosition(0.95f, wm);
+		smoothed[i] = wpca.calculateWeightedMean(p->getPosition(), neighbors, searchRadius);
 		p->calculateAnisotoropicMatrix(neighbors, searchRadius);
+	}
+
+#pragma omp parallel for
+	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
+		particles[i]->correctedPosition(0.95f, smoothed[i]);
 	}
 }
