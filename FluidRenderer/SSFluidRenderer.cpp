@@ -100,6 +100,83 @@ void SSFluidRenderer::clearParticleBuffer()
     thicknessPass_.clearExternalBuffer();
 }
 
+void SSFluidRenderer::setParticleEllipsoids(std::vector<glm::vec4> centers,
+                                            std::vector<SSFREllipsoidAxes> axes)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (axes.size() != centers.size()) axes.resize(centers.size());
+    ellipsoidCenters_ = std::move(centers);
+    ellipsoidAxes_ = std::move(axes);
+    ++ellipsoidGeneration_;
+}
+
+void SSFluidRenderer::clearParticleEllipsoids()
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (ellipsoidCenters_.empty()) return;
+    ellipsoidCenters_.clear();
+    ellipsoidAxes_.clear();
+    ++ellipsoidGeneration_;
+}
+
+void SSFluidRenderer::setEllipsoidBuffers(VkBuffer centers, VkBuffer axes, uint32_t count)
+{
+    extEllipsoidCenters_ = centers;
+    extEllipsoidAxes_ = axes;
+    extEllipsoidCount_ = count;
+    useExternalEllipsoids_ = true;
+}
+
+void SSFluidRenderer::clearEllipsoidBuffers()
+{
+    extEllipsoidCenters_ = VK_NULL_HANDLE;
+    extEllipsoidAxes_ = VK_NULL_HANDLE;
+    extEllipsoidCount_ = 0;
+    useExternalEllipsoids_ = false;
+}
+
+void SSFluidRenderer::uploadEllipsoids(uint32_t frameIndex)
+{
+    if (!ctx_ || frameIndex >= ellipsoidSlots_.size()) return;
+    EllipsoidSlot& slot = *ellipsoidSlots_[frameIndex];
+
+    // onUpdate(frameIndex) runs after this frame slot's fence, so its buffers
+    // are no longer read by the GPU and may be rewritten or reallocated.
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (slot.generation == ellipsoidGeneration_) return;
+    const size_t n = ellipsoidCenters_.size();
+    if (n > slot.capacity) {
+        const size_t capacity = n + n / 2;
+        slot.centers.destroy(ctx_->getDevice());
+        slot.axes.destroy(ctx_->getDevice());
+        slot.capacity = 0;
+        slot.count = 0;
+        if (!slot.centers.createMapped(*ctx_, sizeof(glm::vec4) * capacity, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT) ||
+            !slot.axes.createMapped(*ctx_, sizeof(SSFREllipsoidAxes) * capacity, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)) {
+            std::cerr << "[VKSSFR] Failed to allocate ellipsoid buffers (" << n << " particles)" << std::endl;
+            slot.centers.destroy(ctx_->getDevice());
+            slot.axes.destroy(ctx_->getDevice());
+            return;
+        }
+        slot.capacity = capacity;
+    }
+    if (n > 0) {
+        slot.centers.write(ellipsoidCenters_.data(), sizeof(glm::vec4) * n);
+        slot.axes.write(ellipsoidAxes_.data(), sizeof(SSFREllipsoidAxes) * n);
+    }
+    slot.count = static_cast<uint32_t>(n);
+    slot.generation = ellipsoidGeneration_;
+}
+
+void SSFluidRenderer::destroyEllipsoidSlots(VkDevice device)
+{
+    for (auto& slot : ellipsoidSlots_) {
+        slot->centers.destroy(device);
+        slot->axes.destroy(device);
+    }
+    ellipsoidSlots_.clear();
+}
+
 void SSFluidRenderer::setCamera(const glm::mat4& proj, const glm::mat4& view)
 {
     proj_ = proj;
@@ -142,6 +219,14 @@ void SSFluidRenderer::onInit(GlobalVulkanContext& ctx,
     pool_ = &pool;
     framesInFlight_ = framesInFlight;
     mainRenderPass_ = renderPass;
+
+    VkPhysicalDeviceProperties props{};
+    vkGetPhysicalDeviceProperties(ctx.getPhysicalDevice(), &props);
+    maxPointSize_ = std::max(1.0f, props.limits.pointSizeRange[1]);
+
+    ellipsoidSlots_.clear();
+    for (uint32_t i = 0; i < framesInFlight; ++i)
+        ellipsoidSlots_.push_back(std::make_unique<EllipsoidSlot>());
 
     if (!createPassResources(renderPass)) {
         destroyPassResources(ctx.getDevice());
@@ -193,6 +278,19 @@ bool SSFluidRenderer::createPassResources(VkRenderPass mainRenderPass)
         std::cerr << "[VKSSFR] Failed to create thickness pass" << std::endl;
         return false;
     }
+    // Anisotropic kernel pipelines are optional: a missing shader or a failed
+    // pipeline only disables the ellipsoid splats, never SSFR itself.
+    if (!shaders_.anisoVert.empty() && !shaders_.depthAnisoFrag.empty() &&
+        !shaders_.thicknessAnisoFrag.empty()) {
+        const bool ok =
+            depthPass_.createEllipsoid(*ctx_, framesInFlight_, targets_.depth().getRenderPass(),
+                                       shaders_.anisoVert, shaders_.depthAnisoFrag) &&
+            thicknessPass_.createEllipsoid(*ctx_, framesInFlight_, targets_.thickness().getRenderPass(),
+                                           shaders_.anisoVert, shaders_.thicknessAnisoFrag);
+        if (!ok)
+            std::cerr << "[VKSSFR] Failed to create anisotropic kernel pipelines; ellipsoid splats disabled" << std::endl;
+    }
+
     sprayPass_.create(*ctx_, framesInFlight_, targets_.spray().getRenderPass(),
                       shaders_.thicknessVert, shaders_.thicknessFrag);
     if (!sprayPass_.isValid()) {
@@ -377,7 +475,7 @@ void SSFluidRenderer::loadEnvMap(const std::array<std::string, 6>& facePaths)
     hasEnvMap_ = true;
 }
 
-void SSFluidRenderer::onUpdate(uint32_t)
+void SSFluidRenderer::onUpdate(uint32_t frameIndex)
 {
     if (!ctx_) return;
 
@@ -416,6 +514,7 @@ void SSFluidRenderer::onUpdate(uint32_t)
     if (hasNewFoamData) {
         foamPass_.setParticles(*ctx_, *pool_, foamUploadData);
     }
+    uploadEllipsoids(frameIndex);
 }
 
 void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
@@ -431,13 +530,47 @@ void SSFluidRenderer::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
     // The reconstruction kernel must overlap neighbouring particles at their
     // rest spacing (normally 2*r).  1.35*r left a scalloped silhouette and
     // visible vertical particle columns at close camera distances.
-    const float surfaceRadius = particleRadiiInBuffer_ ? -1.5f : particleRadius_ * 1.5f;
+    constexpr float kSurfaceRadiusScale = 1.5f;
+    const float surfaceRadius = particleRadiiInBuffer_ ? -kSurfaceRadiusScale
+                                                       : particleRadius_ * kSurfaceRadiusScale;
     const float viewportHeight = static_cast<float>(extent_.height);
-    depthPass_.render(cmd, frameIndex, targets_, proj_, view_,
-                      surfaceRadius, viewportHeight);
-    gpuMark("ssfr.depth");
-    thicknessPass_.render(cmd, frameIndex, targets_, proj_, view_,
+
+    // Anisotropic kernel: the ellipsoid centres carry their own world radius
+    // (w), scaled by the same surface factor as the sphere sprites.
+    SSFREllipsoidDraw ellipsoids;
+    if (anisotropicKernel_ && supportsAnisotropicKernel()) {
+        if (useExternalEllipsoids_) {
+            ellipsoids.centers = extEllipsoidCenters_;
+            ellipsoids.axes = extEllipsoidAxes_;
+            ellipsoids.count = extEllipsoidCount_;
+        } else if (frameIndex < ellipsoidSlots_.size()) {
+            const EllipsoidSlot& slot = *ellipsoidSlots_[frameIndex];
+            ellipsoids.centers = slot.centers.get();
+            ellipsoids.axes = slot.axes.get();
+            ellipsoids.count = slot.count;
+        }
+        ellipsoids.radiusScale = kSurfaceRadiusScale;
+        ellipsoids.maxPointSize = maxPointSize_;
+        // The ray cast maps gl_FragCoord back to NDC, so it needs the size the
+        // targets were actually created at -- extent_ can run ahead of them
+        // (setExtent() without a resize() that rebuilds, e.g. FluidStudio).
+        ellipsoids.extent = targets_.depth().getExtent();
+    }
+    anisotropicKernelActive_ = ellipsoids.valid();
+
+    if (anisotropicKernelActive_) {
+        depthPass_.renderEllipsoids(cmd, frameIndex, targets_, proj_, view_, ellipsoids);
+    } else {
+        depthPass_.render(cmd, frameIndex, targets_, proj_, view_,
                           surfaceRadius, viewportHeight);
+    }
+    gpuMark("ssfr.depth");
+    if (anisotropicKernelActive_) {
+        thicknessPass_.renderEllipsoids(cmd, frameIndex, targets_.thickness(), proj_, view_, ellipsoids);
+    } else {
+        thicknessPass_.render(cmd, frameIndex, targets_, proj_, view_,
+                              surfaceRadius, viewportHeight);
+    }
     gpuMark("ssfr.thickness");
 
     // A single 5x5 pass truncated sigmaS=2.5 to less than one standard
@@ -677,6 +810,7 @@ void SSFluidRenderer::onRender(VkCommandBuffer cmd, uint32_t frameIndex)
 void SSFluidRenderer::onCleanup(VkDevice device)
 {
     destroyPassResources(device);
+    destroyEllipsoidSlots(device);
     ctx_ = nullptr;
     pool_ = nullptr;
 }

@@ -3,18 +3,10 @@
 #include "SPHSurfaceParticle.h"
 
 #include "WPCA.h"
-
-#include "CGLib/Numerics/Numerics/SVD3d.h"
+#include "AnisotropicKernel.h"
 
 using namespace Phantom::Math;
 using namespace Phantom::Physics;
-
-namespace {
-	// Max ratio between the largest and the other principal stretches.
-	constexpr auto kr = 4.0;
-	// Isotropic stretch used for particles with too few neighbours (Yu & Turk's k_n).
-	constexpr auto kn = 0.5;
-}
 
 SPHSurfaceParticle::SPHSurfaceParticle(const Vector3df& p, const float radius) :
 	position(p),
@@ -30,49 +22,24 @@ void SPHSurfaceParticle::correctedPosition(const float lamda, const Vector3df& w
 
 void SPHSurfaceParticle::calculateAnisotoropicMatrix(const std::vector<Vector3df>& neighbors, const float searchRadius)
 {
-	//const Matrix3dd scaleMatrix;
 	WPCA wpca;
 	wpca.setup(position, neighbors, searchRadius);
-	this->matrix = wpca.calculateCovarianceMatrix(position, neighbors, searchRadius);
+	const Matrix3dd covariance = wpca.calculateCovarianceMatrix(position, neighbors, searchRadius);
 
-	Phantom::Numerics::SVD3d svd;
-	auto result = svd.calculateJacobi(matrix);
-	/*
-	if (!result.isOk) {
-		p->matrix = ::identitiyMatrix();
-		return;
-	}
-	*/
-
-	const auto rotation = result.eigenVectors;
-
-
-	// Sigma~ in Yu & Turk (2013): the per-axis stretch of the kernel. G maps a
-	// world-space offset v to the world-space distance |Gv| fed to the same
-	// SPHKernel the isotropic path uses (support = searchRadius), so G is
-	// dimensionless and a uniform neighbourhood must give G = I.
+	// G maps a world-space offset v to the world-space distance |Gv| fed to the
+	// same SPHKernel the isotropic path uses (support = searchRadius), so G is
+	// dimensionless and a uniform neighbourhood must give G = I. The stretch
+	// itself (Yu & Turk 2013's Sigma~, clamped and normalized to unit product)
+	// is shared with the SSFR ellipsoid splats -- see AnisotropicKernel.h.
 	//
-	// The covariance eigenvalues are squared lengths (~ spacing^2), so they are
-	// normalized to unit product (volume-preserving ellipsoid) instead of being
-	// multiplied by a scene-scale-dependent ks. The previous code used ks = 1
-	// and also folded 1/searchRadius into G, which made |Gv| ~1e4-1e5 times too
-	// large for real particle spacings: the kernel collapsed to about one voxel
-	// and det(G) reached ~1e14.
-	Matrix3dd scaleMatrix = ::identitiyMatrix3d<double>() * kn;
-	auto evs = result.eigenValues;
-	if (neighbors.size() >= 25 && evs[0] > 0.0) {
-		evs[1] = std::max(evs[1], evs[0] / kr);
-		evs[2] = std::max(evs[2], evs[0] / kr);
-		evs /= std::cbrt(evs[0] * evs[1] * evs[2]);
-
-		scaleMatrix = Matrix3dd
-		(
-			evs[0], 0.0, 0.0,
-			0.0, evs[1], 0.0,
-			0.0, 0.0, evs[2]
-		);
-	}
-	this->matrix = rotation * glm::inverse(scaleMatrix) * glm::transpose(rotation);
+	// History: the code before the shared helper used ks = 1 and also folded
+	// 1/searchRadius into G, which made |Gv| ~1e4-1e5 times too large for real
+	// particle spacings: the kernel collapsed to about one voxel and det(G)
+	// reached ~1e14.
+	AnisotropyParams params;
+	params.searchRadius = searchRadius;
+	const auto frame = anisotropyFromCovariance(covariance, neighbors.size(), params);
+	this->matrix = toKernelMatrix(frame);
 }
 
 void SPHSurfaceParticle::calculateDensity(const std::vector<Vector3df>& neighbors, const float searchRadius, const SPHKernel& kernel)

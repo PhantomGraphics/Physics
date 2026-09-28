@@ -146,6 +146,12 @@ namespace Phantom {
         // Screen-space fluid rendering toggle + mode (Phase 5). SetSSFREnabled:
         // {true|false} / SetSSFRMode:<index> / IsSSFREnabled. Unset makes them
         // "Error:SSFR panel not available".
+        // Anisotropic kernel (Yu & Turk ellipsoid splats,
+        // docs/todo/PLAN_ssfr_anisotropic_kernel.md): SetSSFRAnisotropicKernel:
+        // {0|1} / GetSSFRAnisotropicKernel / SetSSFRKernelParam:<key>=<v> /
+        // GetSSFRKernelParam:<key> (searchScale, maxRatio, isolatedScale,
+        // minNeighbors, smoothing) / GetSSFRKernelStat:<computeMs|
+        // meanStretchRatio|particleCount|anisotropicCount|active>.
         void setSsfrPanel(SSFRPanel* p) { ssfrPanel_ = p; }
 
         // Flame page surface (SetFlamePage / FlameReset / FlameStep:N /

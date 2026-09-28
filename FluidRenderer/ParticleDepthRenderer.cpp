@@ -59,6 +59,7 @@ void ParticleDepthRenderer::destroy(VkDevice device)
     vertexBuffer_.destroy(device);
     pipeline_.destroy(device);
     pipelineVec4_.destroy(device);
+    pipelineEllipsoid_.destroy(device);
     particleCount_ = 0;
 }
 
@@ -117,6 +118,38 @@ void ParticleDepthRenderer::render(
         vkCmdDraw(cmd, drawCount, 1, 0, 0);
     }
 
+    offscreen.endRenderPass(cmd);
+}
+
+bool ParticleDepthRenderer::createEllipsoid(
+    const Phantom::VKG::VulkanContext& ctx,
+    uint32_t framesInFlight,
+    VkRenderPass renderPass,
+    std::vector<uint32_t> vertSpv,
+    std::vector<uint32_t> fragSpv)
+{
+    SSFRPassConfig cfg = makeEllipsoidPassConfig(std::move(vertSpv), std::move(fragSpv), framesInFlight);
+    cfg.depthTest     = true;
+    cfg.depthWrite    = true;
+    cfg.additiveBlend = false;
+    return pipelineEllipsoid_.create(ctx, renderPass, cfg);
+}
+
+void ParticleDepthRenderer::renderEllipsoids(
+    VkCommandBuffer cmd,
+    uint32_t frameIndex,
+    SSFROffscreenSet& targets,
+    const glm::mat4& proj,
+    const glm::mat4& modelView,
+    const SSFREllipsoidDraw& draw)
+{
+    const SSFREllipsoidUBO ubo = makeEllipsoidUBO(proj, modelView, draw, 1.0f);
+    pipelineEllipsoid_.updateUBO(frameIndex, &ubo, sizeof(ubo));
+
+    auto& offscreen = targets.depth();
+    offscreen.beginRenderPass(cmd, {0.f, 0.f, 0.f, 0.f}, 1.0f);
+    if (draw.valid())
+        drawEllipsoids(cmd, frameIndex, pipelineEllipsoid_, draw);
     offscreen.endRenderPass(cmd);
 }
 

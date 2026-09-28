@@ -1,0 +1,59 @@
+{
+  "name": "86_render_ssfr_anisotropic_kernel",
+  "_comment": "SSFR anisotropic kernel (Yu & Turk 2013 ellipsoid splats, docs/todo/PLAN_ssfr_anisotropic_kernel.md). Off by default; on, the depth/thickness passes ray cast per-particle ellipsoids computed by Phantom::Physics::computeAnisotropy. Distinct from the bilateral 'Anisotropic Smoothing'.",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "Precondition: the anisotropic kernel is off by default", "command": "GetSSFRAnisotropicKernel", "expect": "0" },
+    { "label": "Precondition: default kernel settings (k_r = 4)", "command": "GetSSFRKernelParam:maxRatio", "expect_range": "3.999,4.001" },
+
+    { "label": "DFSPH at the default (stable) scale", "command": "SetSimulationType:DFSPH", "expect": "OK" },
+    { "label": "A 7x5x7 block (spacing 2.0) so there are interior, surface and edge particles", "command": "SetFluidBounds:-6:2:-6:6:10:6", "expect": "OK" },
+    { "label": "Container walls", "command": "SetFluidBoundary:-12:-2:-12:12:20:12", "expect": "OK" },
+    { "label": "Rebuild fluid", "command": "Reset", "expect": "OK" },
+    { "label": "Precondition: sane, non-zero seed count", "command": "GetParticleCount", "expect_prefix": "Count:", "store_as": "count0", "strip_prefix": "Count:" },
+    { "label": "Let the block slump so the surface is irregular", "command": "Step", "expect": "OK", "repeat": 40 },
+
+    { "label": "Synthetic cube map for SSFR reflections", "command": "SetEnvironment:${repo_root}/Physics/PhysicsView/scenarios/models/env", "expect": "OK" },
+    { "label": "Shared directional light", "command": "SetLight:-0.3,-1,-0.25,1,1,1,3", "expect": "OK" },
+    { "label": "Turn on screen-space fluid rendering", "command": "SetSSFREnabled:true", "expect": "OK" },
+    { "label": "A few frames with sphere sprites", "command": "Step", "expect": "OK", "repeat": 3 },
+    { "label": "Precondition: with the kernel off, SSFR draws sphere sprites", "command": "GetSSFRKernelStat:active", "expect": "0" },
+    { "label": "Screenshot: sphere sprites (baseline)",
+      "command": "SaveScreenshot:testdata/screenshots/86_ssfr_kernel_off.png", "expect": "OK" },
+
+    { "label": "Turn the anisotropic kernel on", "command": "SetSSFRAnisotropicKernel:1", "expect": "OK" },
+    { "label": "Change: the kernel reports on", "command": "GetSSFRAnisotropicKernel", "expect": "1" },
+    { "label": "A few frames with ellipsoid splats", "command": "Step", "expect": "OK", "repeat": 3 },
+    { "label": "Change: SSFR now ray casts ellipsoids", "command": "GetSSFRKernelStat:active", "expect": "1" },
+    { "label": "Change: one ellipsoid per fluid particle", "command": "GetSSFRKernelStat:particleCount", "expect": "${count0}" },
+    { "label": "Change: some neighbourhoods are large enough for the PCA", "command": "GetSSFRKernelStat:anisotropicCount", "expect_not": "0" },
+    { "label": "Change: surface particles are stretched (mean sigma_max/sigma_min > 1)", "command": "GetSSFRKernelStat:meanStretchRatio", "expect_range": "1.001,16", "store_as": "ratio_aniso" },
+    { "label": "Record the CPU cost (not asserted beyond sanity)", "command": "GetSSFRKernelStat:computeMs", "expect_range": "0,100000" },
+    { "label": "Screenshot: ellipsoid splats",
+      "command": "SaveScreenshot:testdata/screenshots/86_ssfr_kernel_on.png", "expect": "OK" },
+    { "label": "Depth-only view of the ellipsoid splats", "command": "SetSSFRMode:0", "expect": "OK" },
+    { "label": "Advance a frame", "command": "Step", "expect": "OK" },
+    { "label": "Screenshot: raw ellipsoid depth",
+      "command": "SaveScreenshot:testdata/screenshots/86_ssfr_kernel_on_depth.png", "expect": "OK" },
+    { "label": "Back to surface mode", "command": "SetSSFRMode:5", "expect": "OK" },
+
+    { "label": "Retune while paused: k_r = 1 forces spheres (no Step -- the paused-recompute path)", "command": "SetSSFRKernelParam:maxRatio=1", "expect": "OK" },
+    { "label": "Let one frame run the recompute", "command": "GetStatus", "expect": "OK" },
+    { "label": "Change: k_r = 1 makes every kernel a sphere", "command": "GetSSFRKernelStat:meanStretchRatio", "expect_range": "0.999,1.001", "store_as": "ratio_iso" },
+    { "label": "Restore k_r", "command": "SetSSFRKernelParam:maxRatio=4", "expect": "OK" },
+
+    { "label": "Turn the kernel off again", "command": "SetSSFRAnisotropicKernel:0", "expect": "OK" },
+    { "label": "Advance a frame", "command": "Step", "expect": "OK" },
+    { "label": "Change: back to sphere sprites", "command": "GetSSFRKernelStat:active", "expect": "0" },
+
+    { "label": "Invariant: particle count conserved through the kernel toggles", "command": "GetParticleCount", "expect": "Count:${count0}" },
+    { "label": "Invariant: the app is still alive", "command": "GetStatus", "expect": "OK" },
+
+    { "label": "Neg: k_r below 1 is rejected", "command": "SetSSFRKernelParam:maxRatio=0.5", "expect_prefix": "Error:" },
+    { "label": "Neg: an unknown kernel param is rejected", "command": "SetSSFRKernelParam:foo=1", "expect_prefix": "Error:" },
+    { "label": "Neg: a malformed kernel param is rejected", "command": "SetSSFRKernelParam:maxRatio", "expect_prefix": "Error:" },
+    { "label": "Neg: a non-boolean kernel toggle is rejected", "command": "SetSSFRAnisotropicKernel:maybe", "expect_prefix": "Error:" },
+    { "label": "Neg: an unknown kernel stat is rejected", "command": "GetSSFRKernelStat:foo", "expect_prefix": "Error:" }
+  ],
+  "post_assert": "ratio_aniso > ratio_iso"
+}

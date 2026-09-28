@@ -73,7 +73,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 | 45–49 | `flame` — 炎 SPH・Flame 描画（Normal/PBVR） | | |
 | 50–59 | `couple` — Rigid↔Fluid / Soft↔Fluid | | |
 
-現在 58 本（`45`〜`49_flame_*`（炎 SPH、`docs/todo/PLAN_flame_sph_pbvr_improvement.md`）、`04_smoke_new_scene`（File > New / `NewScene` コマンド）、`81_render_background` / `82_render_rigid_shaded` / `83_render_soft_shaded` / `84_render_shadows` / `85_render_ssfr_scene`（glTF レンダリング Phase 1–5）を含む）。全シナリオが「事前条件・変化（`store_as`+`post_assert` または初期値を含まない `expect_range`/`expect_not`）・不変条件」の三点契約で構成されている（詳細は
+現在 59 本（`86_render_ssfr_anisotropic_kernel`（SSFR 異方性カーネル）、`45`〜`49_flame_*`（炎 SPH、`docs/todo/PLAN_flame_sph_pbvr_improvement.md`）、`04_smoke_new_scene`（File > New / `NewScene` コマンド）、`81_render_background` / `82_render_rigid_shaded` / `83_render_soft_shaded` / `84_render_shadows` / `85_render_ssfr_scene`（glTF レンダリング Phase 1–5）を含む）。全シナリオが「事前条件・変化（`store_as`+`post_assert` または初期値を含まない `expect_range`/`expect_not`）・不変条件」の三点契約で構成されている（詳細は
 シナリオテストガイドの「アサーション三点契約」節）。
 
 **タグ:** JSON トップレベルの `"tags": [...]` を `run_physics_scenarios.ps1` が読み、`-Tag`/`-ExcludeTag` で絞り込む
@@ -202,6 +202,12 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 ### FluidRenderer（`Physics/FluidRenderer/`）
 
 Screen Space Fluid Rendering（SSFR）パイプライン。`ParticleDepthRenderer`（深度）→ `BilateralFilter`（平滑化）→ `SSThicknessRenderer`（厚み）→ `SSReflectionRenderer`/`SSRefractionRenderer`（反射・屈折）を `SSFluidRenderer` が束ね、`SSFROffscreenSet` でオフスクリーンターゲットを管理する。
+
+**異方性カーネル（楕円体スプラット、`docs/todo/PLAN_ssfr_anisotropic_kernel.md`、既定 OFF）**: Yu & Turk (2013) の異方性カーネルで各粒子を楕円体として深度・厚みパスにレイキャストする（`shaders/ssfr_aniso.vert` + `ssfr_{depth,thickness}_aniso.frag`、共通部は `ssfr_aniso_*.glsl`）。既存の「Anisotropic Smoothing」（`BilateralFilter` の画面空間フィルタ）とは別物で、名前・UI・コマンドを分けてある。
+- 行列の定義は `Physics/Physics/AnisotropicKernel.{h,cpp}` の 1 か所（`anisotropyFromCovariance()`／`computeAnisotropy()`、`Space::CSRNeighborList` + OpenMP、自分自身も近傍に含む）。`SPHSurfaceParticle`（Volume 変換）も同じ関数を呼ぶので、Volume の G と SSFR の楕円体軸 T = R·diag(σ) は常に対応する（G·T が直交行列）。
+- `FluidRendererCore` は PhysicsCore に依存しない。楕円体はホスト側で `SSFRAnisotropy.h`（header-only の `SSFRAnisotropyBuilder`/`SSFRKernelSettings`）が計算し、`SSFluidRenderer::setParticleEllipsoids()`（CPU、frame-in-flight ごとの mapped バッファへ `onUpdate()` でアップロード）か `setEllipsoidBuffers()`（外部 GPU バッファ）で渡す。`Shaders::anisoVert/depthAnisoFrag/thicknessAnisoFrag` が空ならこの機能は無効で、OFF 時の描画は従来と完全に同じ。
+- 探索半径の既定は粒子半径の 6 倍（3 粒子間隔）。4.5 倍だと容器の稜線上の粒子が N_ε=25 に届かず k_n=0.5 に縮んで点々に見えた。
+- PhysicsView: SSFR パネルの「Anisotropic Kernel」、コマンド `SetSSFRAnisotropicKernel:{0|1}` / `GetSSFRAnisotropicKernel` / `SetSSFRKernelParam:<key>=<v>` / `GetSSFRKernelParam:<key>` / `GetSSFRKernelStat:<computeMs|meanStretchRatio|particleCount|anisotropicCount|active>`。GPU_CSPH は CPU に位置が無いため球スプライトのまま（Phase 5 の GPU compute 版で対応予定）。
 
 ### Flame（`Physics/Physics/Flame*` + `Physics/PhysicsView/Flame*`）— 炎 SPH（実験的・独立系統）
 

@@ -5,11 +5,13 @@
 #include "../../CGLib/UIWidgets/BoolView.h"
 #include "../../CGLib/UIWidgets/ComboBox.h"
 #include "../../CGLib/UIWidgets/FloatSlider.h"
+#include "../../CGLib/UIWidgets/IntSlider.h"
 #include "../../CGLib/UIWidgets/Label.h"
 #include "../../CGLib/UIWidgets/Section.h"
 #include "../../CGLib/UIWidgets/Separator.h"
 
 #include "FluidWorld.h"
+#include "../FluidRenderer/SSFRAnisotropy.h"
 #include "IEmbeddedPanel.h"
 
 namespace Phantom {
@@ -42,6 +44,24 @@ public:
     // these same fields, so the GUI stays in sync).
     void setEnabled(bool v) { enabled_ = v; }
     void setModeIndex(int i) { modeIndex_ = i; }
+    // Anisotropic kernel (Yu & Turk ellipsoid splats). The on/off flag lives on
+    // the renderer (SSFluidRenderer::setAnisotropicKernel); the PCA settings
+    // live here and FluidApp feeds them to SSFRAnisotropyBuilder. The kernel
+    // generation bumps on every change so FluidApp can recompute while paused.
+    SSFRKernelSettings& kernelSettings() { return kernelSettings_; }
+    const SSFRKernelSettings& kernelSettings() const { return kernelSettings_; }
+    void markKernelChanged() { ++kernelGeneration_; }
+    // Kernel on/off (forwards to the bound renderer; command-driven).
+    void setAnisotropicKernel(bool v);
+    bool getAnisotropicKernel() const;
+    /// Whether the last SSFR pre-pass actually drew ellipsoids.
+    bool isAnisotropicKernelActive() const;
+    uint64_t kernelGeneration() const { return kernelGeneration_; }
+    void setKernelStats(const SSFRKernelStats& s) { kernelStats_ = s; }
+    const SSFRKernelStats& kernelStats() const { return kernelStats_; }
+    // Set by FluidApp: the kernel is unavailable in the current mode (GPU_CSPH).
+    void setKernelUnavailableReason(std::string r) { kernelUnavailable_ = std::move(r); }
+
     void setVisible(bool visible) { visible_ = visible; }
     bool isVisible() const { return visible_; }
 
@@ -57,7 +77,13 @@ private:
     bool visible_ = true;
     int modeIndex_ = 5;
 
+    SSFRKernelSettings kernelSettings_;
+    SSFRKernelStats    kernelStats_;
+    uint64_t           kernelGeneration_ = 0;
+    std::string        kernelUnavailable_;
+
     bool uiBuilt_ = false;
+    std::string kernelStatsText() const;
     void buildUi();
 
     UI::IView    contents_    {"SSFRControl"};
@@ -81,6 +107,16 @@ private:
     UI::BoolView    anisoCheck_           {"Anisotropic Smoothing"};
     UI::FloatSlider anisotropySlider_     {"Anisotropy", 0.0f, 3.0f};
     UI::FloatSlider anisoGradScaleSlider_ {"Aniso Grad Scale", 0.0f, 20.0f};
+    UI::Separator   sepKernel_;
+    UI::Label       kernelHeader_         {std::string("--- Anisotropic Kernel (Yu & Turk ellipsoids) ---"), UI::Label::Style::Disabled};
+    UI::BoolView    kernelCheck_          {"Anisotropic Kernel"};
+    UI::IView       kernelGroup_          {"SSFRKernel"};
+    UI::FloatSlider kernelSearchSlider_   {"Kernel Search (x radius)", 2.0f, 8.0f};
+    UI::FloatSlider kernelMaxRatioSlider_ {"Kernel Max Ratio", 1.0f, 8.0f};
+    UI::FloatSlider kernelIsolatedSlider_ {"Kernel Isolated Scale", 0.1f, 1.0f};
+    UI::IntSlider   kernelMinNbrSlider_   {"Kernel Min Neighbors", 1, 64};
+    UI::FloatSlider kernelSmoothSlider_   {"Kernel Center Smoothing", 0.0f, 1.0f};
+    UI::Label       kernelStatsLabel_     {std::function<std::string()>([this] { return kernelStatsText(); }), UI::Label::Style::Disabled};
     UI::Separator   sep2_;
     UI::Label       depthHeader_          {std::string("--- Depth Bilateral (Surface Normals) ---"), UI::Label::Style::Disabled};
     UI::BoolView    depthSmoothCheck_     {"Depth Smoothing"};

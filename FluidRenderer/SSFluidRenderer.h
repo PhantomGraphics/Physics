@@ -46,6 +46,9 @@ public:
         std::vector<uint32_t> refractionVert, refractionFrag;
         std::vector<uint32_t> compositeVert, compositeFrag;
         std::vector<uint32_t> skyboxVert, skyboxFrag;
+        // Optional: anisotropic-kernel ellipsoid splats. Empty => the kernel
+        // is unavailable and the sphere-sprite passes are always used.
+        std::vector<uint32_t> anisoVert, depthAnisoFrag, thicknessAnisoFrag;
     };
 
     void setShaders(Shaders shaders) { shaders_ = std::move(shaders); }
@@ -125,6 +128,30 @@ public:
 
     void setAnisotropicGradientScale(float v) { bilateralGradientScale_ = v; }
     float getAnisotropicGradientScale() const { return bilateralGradientScale_; }
+
+    // Anisotropic kernel (Yu & Turk 2013 ellipsoid splats,
+    // docs/todo/PLAN_ssfr_anisotropic_kernel.md). Unrelated to the bilateral
+    // "anisotropic smoothing" above: this changes the particle shape itself.
+    // The caller computes the ellipsoids (Phantom::Physics::computeAnisotropy)
+    // and hands them over each time the positions change; while enabled and
+    // ellipsoid data is present, the depth + thickness passes ray cast the
+    // ellipsoids instead of drawing sphere sprites. Default off.
+    void setAnisotropicKernel(bool v) { anisotropicKernel_ = v; }
+    bool getAnisotropicKernel() const { return anisotropicKernel_; }
+    /// True when the ellipsoid pipelines were created (shaders supplied).
+    bool supportsAnisotropicKernel() const {
+        return depthPass_.hasEllipsoidPipeline() && thicknessPass_.hasEllipsoidPipeline();
+    }
+    /// True when the last onPreRender() actually drew ellipsoids.
+    bool isAnisotropicKernelActive() const { return anisotropicKernelActive_; }
+    /// CPU path: centers[i] = (smoothed centre, world radius), axes[i] = the
+    /// columns of T = R diag(sigma). Uploaded per frame-in-flight in onUpdate().
+    void setParticleEllipsoids(std::vector<glm::vec4> centers, std::vector<SSFREllipsoidAxes> axes);
+    void clearParticleEllipsoids();
+    /// GPU path: caller-owned vertex buffers in the same layout. Takes
+    /// precedence over the CPU path until clearEllipsoidBuffers().
+    void setEllipsoidBuffers(VkBuffer centers, VkBuffer axes, uint32_t count);
+    void clearEllipsoidBuffers();
 
     void setThicknessSmoothingSigmaS(float v) { bilateralSigmaS_ = v; }
     float getThicknessSmoothingSigmaS() const { return bilateralSigmaS_; }
@@ -206,6 +233,28 @@ private:
     std::vector<glm::vec3> pendingPositions_;
     std::vector<glm::vec3> pendingSprayPositions_;
     std::vector<glm::vec3> pendingFoamPositions_;
+    // Anisotropic kernel: latest CPU ellipsoids (guarded by mutex_) and one
+    // host-visible upload slot per frame in flight.
+    struct EllipsoidSlot {
+        Phantom::VKG::VulkanBuffer centers;
+        Phantom::VKG::VulkanBuffer axes;
+        size_t   capacity   = 0;
+        uint32_t count      = 0;
+        uint64_t generation = 0;
+    };
+    std::vector<glm::vec4>         ellipsoidCenters_;
+    std::vector<SSFREllipsoidAxes> ellipsoidAxes_;
+    uint64_t ellipsoidGeneration_ = 0;
+    std::vector<std::unique_ptr<EllipsoidSlot>> ellipsoidSlots_;
+    VkBuffer extEllipsoidCenters_ = VK_NULL_HANDLE;
+    VkBuffer extEllipsoidAxes_    = VK_NULL_HANDLE;
+    uint32_t extEllipsoidCount_   = 0;
+    bool     useExternalEllipsoids_ = false;
+    bool     anisotropicKernel_       = false;
+    bool     anisotropicKernelActive_ = false;
+    float    maxPointSize_ = 64.0f;
+    void uploadEllipsoids(uint32_t frameIndex);
+    void destroyEllipsoidSlots(VkDevice device);
     bool dirty_ = false;
     bool sprayDirty_ = false;
     bool foamDirty_ = false;

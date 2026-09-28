@@ -301,6 +301,9 @@ void FluidApp::onInit()
         s.compositeFrag  = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_composite.frag.spv");
         s.skyboxVert     = ::VKG::loadSPVRepo(std::string(kSS) + "skybox.vert.spv");
         s.skyboxFrag     = ::VKG::loadSPVRepo(std::string(kSS) + "skybox.frag.spv");
+        s.anisoVert          = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_aniso.vert.spv");
+        s.depthAnisoFrag     = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_depth_aniso.frag.spv");
+        s.thicknessAnisoFrag = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_thickness_aniso.frag.spv");
         ssfrRenderer_.setShaders(std::move(s));
     }
 
@@ -510,6 +513,9 @@ void FluidApp::onUpdate(uint32_t frameIndex)
             ssfrRenderer_.setParticles(pts);
             ssfrRenderer_.setSprayParticles({});
             ssfrRenderer_.setFoamParticles({});
+            updateAnisotropicKernel(pts);
+        } else if (ssfrPanel_.kernelGeneration() != appliedKernelGeneration_) {
+            updateAnisotropicKernel(ssfrTestPanel_.getPositions());
         }
     } else {
         if (prevTestActive_)
@@ -539,6 +545,11 @@ void FluidApp::onUpdate(uint32_t frameIndex)
             } else {
                 syncParticlesToRenderer();
             }
+        } else if (ssfrPanel_.kernelGeneration() != appliedKernelGeneration_ &&
+                   world_.getSimulationType() != FluidWorld::SimulationType::GPU_CSPH) {
+            // Kernel toggled / retuned while paused: rebuild the ellipsoids
+            // from the current (unchanged) particle positions.
+            updateAnisotropicKernel(world_.getParticlePositions());
         }
         if (rigidRunning) {
             syncRigidRenderer();
@@ -992,6 +1003,7 @@ void FluidApp::syncParticlesToRenderer()
     ssfrRenderer_.setParticles(fluidPositions);
     ssfrRenderer_.setSprayParticles(spray);
     ssfrRenderer_.setFoamParticles(foam);
+    updateAnisotropicKernel(fluidPositions);
 
     auto merged = fluidPositions;
     merged.insert(merged.end(), spray.begin(), spray.end());
@@ -1006,6 +1018,25 @@ void FluidApp::syncParticlesToRenderer()
     // White-water particles do not carry SPH density; use the neutral value.
     densityDeviations.resize(merged.size(), 0.0f);
     fluidRenderer_.setParticles(merged, densityDeviations);
+}
+
+void FluidApp::updateAnisotropicKernel(const std::vector<glm::vec3>& positions)
+{
+    appliedKernelGeneration_ = ssfrPanel_.kernelGeneration();
+    ssfrPanel_.setKernelUnavailableReason({});
+    // Keyed on the kernel flag alone (not on SSFR being enabled) so turning
+    // SSFR on while paused already finds up-to-date ellipsoids.
+    const bool wanted = ssfrRenderer_.getAnisotropicKernel() &&
+                        ssfrRenderer_.supportsAnisotropicKernel();
+    if (!wanted) {
+        ssfrRenderer_.clearParticleEllipsoids();
+        return;
+    }
+    const float radius = ssfrTestPanel_.isActive() ? ssfrRenderer_.getParticleRadius()
+                                                   : world_.params().radius;
+    ssfrPanel_.setKernelStats(anisotropyBuilder_.build(positions, radius, ssfrPanel_.kernelSettings(),
+                                                       ellipsoidCenters_, ellipsoidAxes_));
+    ssfrRenderer_.setParticleEllipsoids(ellipsoidCenters_, ellipsoidAxes_);
 }
 
 void FluidApp::syncGpuCsphBufferToRenderer()
@@ -1027,6 +1058,12 @@ void FluidApp::syncGpuCsphBufferToRenderer()
     const uint32_t   count  = static_cast<uint32_t>(solver->getNumParticles());
 
     fluidRenderer_.setDirectGpuBuffer(posBuf, count);
+
+    // GPU_CSPH positions never reach the CPU, so the (CPU) anisotropic kernel
+    // cannot run here yet; SSFR falls back to sphere sprites.
+    ssfrRenderer_.clearParticleEllipsoids();
+    ssfrPanel_.setKernelUnavailableReason("Unavailable for GPU_CSPH (sphere sprites)");
+    appliedKernelGeneration_ = ssfrPanel_.kernelGeneration();
 
     if (ssfrPanel_.isEnabled() || ssfrTestPanel_.isActive()) {
         ssfrRenderer_.setParticleBuffer(posBuf, count);

@@ -56,6 +56,7 @@ void SSThicknessRenderer::destroy(VkDevice device)
     vertexBuffer_.destroy(device);
     pipeline_.destroy(device);
     pipelineVec4_.destroy(device);
+    pipelineEllipsoid_.destroy(device);
     particleCount_ = 0;
 }
 
@@ -126,6 +127,38 @@ void SSThicknessRenderer::render(
         vkCmdDraw(cmd, drawCount, 1, 0, 0);
     }
 
+    offscreen.endRenderPass(cmd);
+}
+
+bool SSThicknessRenderer::createEllipsoid(
+    const Phantom::VKG::VulkanContext& ctx,
+    uint32_t framesInFlight,
+    VkRenderPass renderPass,
+    std::vector<uint32_t> vertSpv,
+    std::vector<uint32_t> fragSpv)
+{
+    SSFRPassConfig cfg = makeEllipsoidPassConfig(std::move(vertSpv), std::move(fragSpv), framesInFlight);
+    cfg.depthTest     = false;
+    cfg.depthWrite    = false;
+    cfg.additiveBlend = true;
+    return pipelineEllipsoid_.create(ctx, renderPass, cfg);
+}
+
+void SSThicknessRenderer::renderEllipsoids(
+    VkCommandBuffer cmd,
+    uint32_t frameIndex,
+    Phantom::VKG::VulkanOffscreen& offscreen,
+    const glm::mat4& proj,
+    const glm::mat4& modelView,
+    const SSFREllipsoidDraw& draw,
+    float thicknessScale)
+{
+    const SSFREllipsoidUBO ubo = makeEllipsoidUBO(proj, modelView, draw, thicknessScale);
+    pipelineEllipsoid_.updateUBO(frameIndex, &ubo, sizeof(ubo));
+
+    offscreen.beginRenderPass(cmd, {0.f, 0.f, 0.f, 0.f}, 1.0f);
+    if (draw.valid())
+        drawEllipsoids(cmd, frameIndex, pipelineEllipsoid_, draw);
     offscreen.endRenderPass(cmd);
 }
 

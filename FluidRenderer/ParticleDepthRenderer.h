@@ -6,6 +6,7 @@
 
 #include "SSFRPipeline.h"
 #include "SSFROffscreenSet.h"
+#include "SSFREllipsoid.h"
 #include "../../CGLib/VulkanGraphics/VulkanBuffer.h"
 #include "../../CGLib/VulkanGraphics/VulkanCommandPool.h"
 
@@ -66,7 +67,24 @@ public:
 
     bool isValid() const { return pipeline_.isValid(); }
 
+    // Anisotropic-kernel ellipsoid splats (optional; see SSFREllipsoid.h).
+    bool createEllipsoid(const Phantom::VKG::VulkanContext& ctx,
+                         uint32_t framesInFlight,
+                         VkRenderPass renderPass,
+                         std::vector<uint32_t> vertSpv,
+                         std::vector<uint32_t> fragSpv);
+    bool hasEllipsoidPipeline() const { return pipelineEllipsoid_.isValid(); }
+
+    // Pass 1 with ellipsoid splats instead of sphere sprites.
+    void renderEllipsoids(VkCommandBuffer cmd,
+                          uint32_t frameIndex,
+                          SSFROffscreenSet& targets,
+                          const glm::mat4& proj,
+                          const glm::mat4& modelView,
+                          const SSFREllipsoidDraw& draw);
+
 private:
+    SSFRPipeline    pipelineEllipsoid_;
     SSFRPipeline    pipeline_;       // vec3 stride (CPU upload path)
     SSFRPipeline    pipelineVec4_;   // vec4 stride (GPU_CSPH external buffer)
     Phantom::VKG::VulkanBuffer vertexBuffer_;

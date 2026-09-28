@@ -11,6 +11,35 @@ void SSFRPanel::init()
     buildUi();
 }
 
+void SSFRPanel::setAnisotropicKernel(bool v)
+{
+    if (!renderer_) return;
+    renderer_->setAnisotropicKernel(v);
+    markKernelChanged();
+}
+
+bool SSFRPanel::getAnisotropicKernel() const
+{
+    return renderer_ && renderer_->getAnisotropicKernel();
+}
+
+bool SSFRPanel::isAnisotropicKernelActive() const
+{
+    return renderer_ && renderer_->isAnisotropicKernelActive();
+}
+
+std::string SSFRPanel::kernelStatsText() const
+{
+    if (!kernelUnavailable_.empty()) return kernelUnavailable_;
+    if (renderer_ && !renderer_->supportsAnisotropicKernel())
+        return std::string("Unavailable: ellipsoid shaders not loaded");
+    char buf[160];
+    std::snprintf(buf, sizeof(buf), "%u particles, %u anisotropic, mean stretch %.2f, %.1f ms",
+                  kernelStats_.particleCount, kernelStats_.anisotropicCount,
+                  kernelStats_.meanStretchRatio, kernelStats_.computeMs);
+    return std::string(buf);
+}
+
 void SSFRPanel::buildUi()
 {
     if (uiBuilt_) return;
@@ -50,6 +79,26 @@ void SSFRPanel::buildUi()
                             [this](float v) { renderer_->setDepthSmoothingSigmaS(v); });
     depthSigmaRSlider_.bind([this] { return renderer_->getDepthSmoothingSigmaR(); },
                             [this](float v) { renderer_->setDepthSmoothingSigmaR(v); });
+    kernelCheck_.bind([this] { return renderer_->getAnisotropicKernel(); },
+                      [this](bool v) { renderer_->setAnisotropicKernel(v); markKernelChanged(); });
+    const auto bindKernelFloat = [this](UI::FloatSlider& slider, float SSFRKernelSettings::* field) {
+        slider.bind([this, field] { return kernelSettings_.*field; },
+                    [this, field](float v) { kernelSettings_.*field = v; markKernelChanged(); });
+    };
+    bindKernelFloat(kernelSearchSlider_, &SSFRKernelSettings::searchScale);
+    bindKernelFloat(kernelMaxRatioSlider_, &SSFRKernelSettings::maxRatio);
+    bindKernelFloat(kernelIsolatedSlider_, &SSFRKernelSettings::isolatedScale);
+    bindKernelFloat(kernelSmoothSlider_, &SSFRKernelSettings::smoothing);
+    kernelMinNbrSlider_.bind([this] { return kernelSettings_.minNeighbors; },
+                             [this](int v) { kernelSettings_.minNeighbors = v; markKernelChanged(); });
+    kernelGroup_.add(&kernelSearchSlider_);
+    kernelGroup_.add(&kernelMaxRatioSlider_);
+    kernelGroup_.add(&kernelIsolatedSlider_);
+    kernelGroup_.add(&kernelMinNbrSlider_);
+    kernelGroup_.add(&kernelSmoothSlider_);
+    kernelGroup_.add(&kernelStatsLabel_);
+    kernelGroup_.setVisibleWhen([this] { return renderer_->getAnisotropicKernel(); });
+
     sprayOpacitySlider_.bind([this] { return renderer_->getSprayOpacity(); },
                              [this](float v) { renderer_->setSprayOpacity(v); });
     foamOpacitySlider_.bind([this] { return renderer_->getFoamOpacity(); },
@@ -63,6 +112,10 @@ void SSFRPanel::buildUi()
     rendererGroup_.add(&anisoCheck_);
     rendererGroup_.add(&anisotropySlider_);
     rendererGroup_.add(&anisoGradScaleSlider_);
+    rendererGroup_.add(&sepKernel_);
+    rendererGroup_.add(&kernelHeader_);
+    rendererGroup_.add(&kernelCheck_);
+    rendererGroup_.add(&kernelGroup_);
     rendererGroup_.add(&sep2_);
     rendererGroup_.add(&depthHeader_);
     rendererGroup_.add(&depthSmoothCheck_);
