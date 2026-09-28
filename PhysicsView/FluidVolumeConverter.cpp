@@ -43,23 +43,4 @@ std::vector<glm::vec3> FluidVolumeConverter::getVoxelPositions() const
     return out;
 }
 
-bool FluidVolumeConverter::saveToVdb(const std::string& filePath)
-{
-    if (!volume_) {
-        lastError_ = "no volume to save -- call convert() first";
-        return false;
-    }
-
-    std::error_code ec;
-    std::filesystem::create_directories(
-        std::filesystem::path(filePath).parent_path(), ec);
-
-    Phantom::Volume::SparseVolumeVdbWriter writer;
-    if (!writer.write(filePath, *volume_, params_.gridName)) {
-        lastError_ = "failed to write '" + filePath + "'";
-        return false;
-    }
-    return true;
-}
-
 } // namespace Phantom

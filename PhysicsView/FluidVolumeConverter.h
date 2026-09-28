@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../Physics/SPHVolumeConverter.h"
-#include "../../CGLib/Volume/Volume/SparseVolumeTree/VdbWriter.h"
 
 #include <glm/glm.hpp>
 #include <memory>
@@ -12,13 +11,8 @@ namespace Phantom {
 
 /**
  * @brief Converts the fluid simulation's live particle set into a
- * Volume::SparseVolumef via Physics::SPHVolumeConverter, and optionally
- * writes the result out as a .vdb file.
- *
- * Uses Volume::SparseVolumeVdbWriter (the dependency-free writer that lives
- * alongside SparseVolume itself) rather than a heavier compressed VDB writer:
- * PhysicsView deliberately keeps its dependency footprint minimal and does not
- * pull in a full OpenVDB I/O stack for this live-simulation path.
+ * Volume::SparseVolumef via Physics::SPHVolumeConverter for live rendering
+ * and subsequent mesh conversion.
  */
 class FluidVolumeConverter {
 public:
@@ -28,7 +22,6 @@ public:
         float       particleRadius = 0.025f;
         float       cellLength     = 0.05f;
         KernelType  kernelType     = KernelType::Isotropic;
-        std::string gridName       = "density";
     };
 
     Params&       params()       { return params_; }
@@ -51,13 +44,6 @@ public:
      * Empty if convert() has not yet succeeded.
      */
     std::vector<glm::vec3> getVoxelPositions() const;
-
-    /**
-     * @brief Writes the last converted volume to filePath as a .vdb file.
-     * Returns false (and sets lastError()) if convert() has not yet
-     * succeeded or the write itself fails.
-     */
-    bool saveToVdb(const std::string& filePath);
 
     const std::string& lastError() const { return lastError_; }
 
