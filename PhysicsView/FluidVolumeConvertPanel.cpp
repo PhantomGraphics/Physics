@@ -17,7 +17,6 @@ void FluidVolumeConvertPanel::buildUi()
     kernelCombo_.addItem("Anisotropic");
     kernelCombo_.setSelected(0);
 
-    saveFileView_.addFilter("*.vdb");
     saveMeshFileView_.addFilter("*.obj");
 
     convertButton_.setFunction([this] {
@@ -36,18 +35,6 @@ void FluidVolumeConvertPanel::buildUi()
             : ("Error: " + converter_->lastError());
 
         if (ok && onVolumeChanged_) onVolumeChanged_();
-    });
-
-    saveButton_.setFunction([this] {
-        if (!converter_) return;
-
-        const std::string path = saveFileView_.getFileName();
-        if (path.empty()) {
-            statusMessage_ = "Error: no output file selected";
-            return;
-        }
-        const bool ok = converter_->saveToVdb(path);
-        statusMessage_ = ok ? ("Saved: " + path) : ("Error: " + converter_->lastError());
     });
 
     convertMeshButton_.setFunction([this] {
@@ -115,8 +102,6 @@ void FluidVolumeConvertPanel::buildUi()
     contents_.add(&convertButton_);
     contents_.add(&particlesLabel_);
     contents_.add(&activeVoxelsLabel_);
-    contents_.add(&saveFileView_);
-    contents_.add(&saveButton_);
     contents_.add(&showVolumeCheck_);
     contents_.add(&statusLabel_);
     contents_.add(&meshGroup_);

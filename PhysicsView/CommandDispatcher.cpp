@@ -525,11 +525,6 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
             : Phantom::FluidVolumeConverter::KernelType::Isotropic;
         return std::string("OK");
     }
-    if (sv.rfind("SetVolumeGridName:", 0) == 0) {
-        if (!volumeConverter_) return std::string("Error:volume converter not set");
-        volumeConverter_->params().gridName = std::string(sv.substr(18));
-        return std::string("OK");
-    }
     if (cmd == "ConvertToVolume") {
         if (!volumeConverter_) return std::string("Error:volume converter not set");
         if (!volumeConverter_->convert(world_->getParticlePositions()))
@@ -540,12 +535,6 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
     if (cmd == "GetVolumeVoxelCount") {
         if (!volumeConverter_) return std::string("Error:volume converter not set");
         return "Count:" + std::to_string(volumeConverter_->getVoxelCount());
-    }
-    if (sv.rfind("SaveVolumeToVdb:", 0) == 0) {
-        if (!volumeConverter_) return std::string("Error:volume converter not set");
-        if (!volumeConverter_->saveToVdb(std::string(sv.substr(16))))
-            return std::string("Error:") + volumeConverter_->lastError();
-        return std::string("OK");
     }
     if (cmd == "SetVolumeRenderEnabled:true" || cmd == "SetVolumeRenderEnabled:false") {
         if (!volumeRenderer_) return std::string("Error:volume renderer not set");

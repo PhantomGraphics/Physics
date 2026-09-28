@@ -64,10 +64,9 @@ namespace Phantom {
     // (the deletion counterpart to the emitter commands above), on whichever
     // fluid type is currently active.
     //
-    // "SetVolume*"/"ConvertToVolume"/"GetVolumeVoxelCount"/"SaveVolumeToVdb"
+    // "SetVolume*"/"ConvertToVolume"/"GetVolumeVoxelCount"
     // drive FluidVolumeConverter, which turns the fluid's current particle
-    // set into a Volume::SparseVolumef (Physics::SPHVolumeConverter) and
-    // optionally writes it out as a .vdb file. Set* commands configure the
+    // set into a Volume::SparseVolumef (Physics::SPHVolumeConverter). Set* commands configure the
     // conversion (they take effect on the next ConvertToVolume, mirroring
     // how the SetFluid* setters above only take effect on the next Reset).
     //

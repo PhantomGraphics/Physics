@@ -78,8 +78,6 @@ private:
     UI::Button    convertButton_      {"Convert to Volume"};
     UI::Label     particlesLabel_     {[this] { return particlesText(); }};
     UI::Label     activeVoxelsLabel_  {[this] { return activeVoxelsText(); }};
-    UI::FileSaveView saveFileView_    {"Output VDB File"};
-    UI::Button    saveButton_         {"Save"};
     UI::BoolView  showVolumeCheck_    {"Show Volume Points"};
     UI::Label     statusLabel_        {[this] { return statusMessage_; }, UI::Label::Style::Wrapped};
 
