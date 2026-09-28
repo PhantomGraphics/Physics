@@ -17,6 +17,12 @@ if errorlevel 1 goto :fail
 if errorlevel 1 goto :fail
 "%VULKAN_SDK%\Bin\glslc.exe" ssfr_thickness.frag -o ssfr_thickness.frag.spv
 if errorlevel 1 goto :fail
+"%VULKAN_SDK%\Bin\glslc.exe" ssfr_aniso.vert -o ssfr_aniso.vert.spv
+if errorlevel 1 goto :fail
+"%VULKAN_SDK%\Bin\glslc.exe" ssfr_depth_aniso.frag -o ssfr_depth_aniso.frag.spv
+if errorlevel 1 goto :fail
+"%VULKAN_SDK%\Bin\glslc.exe" ssfr_thickness_aniso.frag -o ssfr_thickness_aniso.frag.spv
+if errorlevel 1 goto :fail
 "%VULKAN_SDK%\Bin\glslc.exe" ssfr_bilateral.vert -o ssfr_bilateral.vert.spv
 if errorlevel 1 goto :fail
 "%VULKAN_SDK%\Bin\glslc.exe" ssfr_bilateral.frag -o ssfr_bilateral.frag.spv

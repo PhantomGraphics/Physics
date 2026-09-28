@@ -35,6 +35,27 @@ bool parseInt(std::string_view sv, int& out) {
     return ec == std::errc{};
 }
 
+// SSFR anisotropic-kernel settings addressable by SetSSFRKernelParam /
+// GetSSFRKernelParam, with their accepted ranges.
+struct KernelParamSpec {
+    const char* name;
+    float lo, hi;
+    float SSFRKernelSettings::* field; // null => minNeighbors (int)
+};
+const KernelParamSpec kKernelParams[] = {
+    { "searchScale",   1.0f,  16.0f, &SSFRKernelSettings::searchScale },
+    { "maxRatio",      1.0f,  16.0f, &SSFRKernelSettings::maxRatio },
+    { "isolatedScale", 0.05f, 1.0f,  &SSFRKernelSettings::isolatedScale },
+    { "smoothing",     0.0f,  1.0f,  &SSFRKernelSettings::smoothing },
+    { "minNeighbors",  1.0f,  256.0f, nullptr },
+};
+
+const KernelParamSpec* findKernelParam(std::string_view name) {
+    for (const auto& p : kKernelParams)
+        if (name == p.name) return &p;
+    return nullptr;
+}
+
 // SoftBodyPreset names (see SoftBodyWorld.h) never overlap with
 // ScenePreset (rigid-body) names, so "SetPreset:<name>" can be routed
 // unambiguously by name alone.
@@ -778,6 +799,57 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
             return std::string("Error:SSFR mode index must be 0..5");
         ssfrPanel_->setModeIndex(idx);
         return std::string("OK");
+    }
+
+    // Anisotropic kernel (Yu & Turk ellipsoid splats).
+    if (sv.rfind("SetSSFRAnisotropicKernel:", 0) == 0) {
+        if (!ssfrPanel_) return std::string("Error:SSFR panel not available");
+        const auto v = sv.substr(25);
+        if (v != "0" && v != "1" && v != "true" && v != "false")
+            return std::string("Error:SetSSFRAnisotropicKernel expects 0|1");
+        ssfrPanel_->setAnisotropicKernel(v == "1" || v == "true");
+        return std::string("OK");
+    }
+    if (cmd == "GetSSFRAnisotropicKernel") {
+        if (!ssfrPanel_) return std::string("Error:SSFR panel not available");
+        return ssfrPanel_->getAnisotropicKernel() ? std::string("1") : std::string("0");
+    }
+    if (sv.rfind("SetSSFRKernelParam:", 0) == 0) {
+        if (!ssfrPanel_) return std::string("Error:SSFR panel not available");
+        const auto kv = sv.substr(19);
+        const auto eq = kv.find('=');
+        if (eq == std::string_view::npos) return std::string("Error:expected <key>=<value>");
+        const auto* spec = findKernelParam(kv.substr(0, eq));
+        if (!spec) return std::string("Error:unknown kernel param '") + std::string(kv.substr(0, eq)) + "'";
+        float value = 0.0f;
+        if (!parseFlt(kv.substr(eq + 1), value)) return std::string("Error:invalid value");
+        if (!(value >= spec->lo && value <= spec->hi))
+            return std::string("Error:") + spec->name + " out of range [" + std::to_string(spec->lo) +
+                   ", " + std::to_string(spec->hi) + "]";
+        auto& settings = ssfrPanel_->kernelSettings();
+        if (spec->field) settings.*(spec->field) = value;
+        else             settings.minNeighbors = static_cast<int>(value);
+        ssfrPanel_->markKernelChanged();
+        return std::string("OK");
+    }
+    if (sv.rfind("GetSSFRKernelParam:", 0) == 0) {
+        if (!ssfrPanel_) return std::string("Error:SSFR panel not available");
+        const auto* spec = findKernelParam(sv.substr(19));
+        if (!spec) return std::string("Error:unknown kernel param '") + std::string(sv.substr(19)) + "'";
+        const auto& settings = ssfrPanel_->kernelSettings();
+        return spec->field ? std::to_string(settings.*(spec->field))
+                           : std::to_string(settings.minNeighbors);
+    }
+    if (sv.rfind("GetSSFRKernelStat:", 0) == 0) {
+        if (!ssfrPanel_) return std::string("Error:SSFR panel not available");
+        const auto key = sv.substr(18);
+        const auto& st = ssfrPanel_->kernelStats();
+        if (key == "computeMs")        return std::to_string(st.computeMs);
+        if (key == "meanStretchRatio") return std::to_string(st.meanStretchRatio);
+        if (key == "particleCount")    return std::to_string(st.particleCount);
+        if (key == "anisotropicCount") return std::to_string(st.anisotropicCount);
+        if (key == "active")           return ssfrPanel_->isAnisotropicKernelActive() ? std::string("1") : std::string("0");
+        return std::string("Error:unknown kernel stat '") + std::string(key) + "'";
     }
 
     if (sv.rfind("SetRigidRenderMode:", 0) == 0) {

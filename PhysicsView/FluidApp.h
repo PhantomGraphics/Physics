@@ -126,6 +126,13 @@ private:
     SSFRPanel ssfrPanel_;
     SSFRTestPanel ssfrTestPanel_;
     bool prevTestActive_ = false;
+    // Anisotropic kernel (SSFR ellipsoid splats): recomputed with every
+    // particle sync while the renderer's kernel flag is on, and once more when
+    // the flag / settings change (kernelGeneration) so a paused scene updates.
+    SSFRAnisotropyBuilder anisotropyBuilder_;
+    std::vector<glm::vec4> ellipsoidCenters_;
+    std::vector<SSFREllipsoidAxes> ellipsoidAxes_;
+    uint64_t appliedKernelGeneration_ = 0;
 
     FluidVolumeConverter volumeConverter_;
     FluidMeshConverter meshConverter_;
@@ -199,6 +206,7 @@ private:
     void newScene();
     void syncParticlesToRenderer();
     void syncGpuCsphBufferToRenderer();
+    void updateAnisotropicKernel(const std::vector<glm::vec3>& positions);
     void syncBackgroundCamera();
     void refreshShadowLightVP();
     bool createHdrTargets();
