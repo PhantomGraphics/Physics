@@ -339,3 +339,12 @@ endif()
 else()
     message(WARNING "Physics: vulkan/vulkan.h not found -- PhysicsView is skipped. Pass -DVULKAN_INCLUDE_DIR=/path/to/include to enable it (on Windows, check $ENV{VULKAN_SDK} is set).")
 endif()
+
+# Precompiled headers (cmake/PhantomPch.cmake). Physics/pch.h and PhysicsTest/pch.h hold
+# only the STL / gtest, so their lists cover every TU; PhysicsView/ and Fluid_GPU_Vk/
+# keep their own pch.h (it sets GLM_FORCE_* macros) for the files that include it.
+include(PhantomPch)
+phantom_use_pch_headers(PhysicsCore ${PHANTOM_PCH_STL})
+phantom_use_pch_headers(PhysicsTest ${PHANTOM_PCH_GTEST})
+phantom_use_pch(FluidGPUVkCore ${PHYSICS_ROOT}/Fluid_GPU_Vk/pch.h)
+phantom_use_pch(PhysicsView    ${PHYSICS_ROOT}/PhysicsView/pch.h)
