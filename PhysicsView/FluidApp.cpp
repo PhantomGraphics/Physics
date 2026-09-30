@@ -694,6 +694,10 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         screenshotPending_ = false;
     }
 
+    // A command-line scenario run (exit-on-complete) hides the Scenario Browser: its default
+    // position overlaps the Control window and ends up in --screenshot captures of every page.
+    if (exitOnComplete_ && runner_.isActive()) scenarioBrowser_.setVisible(false);
+
     if (runner_.isActive()) {
         auto responses = dispatcher_.collectResponses();
         if (runner_.tick(dispatcher_, responses)) {

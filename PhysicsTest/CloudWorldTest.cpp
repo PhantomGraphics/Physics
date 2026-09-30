@@ -160,16 +160,17 @@ TEST(CloudWorldTest, ParticleSpacingSensitivityIsRecorded)
   const auto coarse = run(83.3333333);
   const auto medium = run(62.5);
   const auto fine = run(50.0);
-  // Measured 2026-09-30 (Debug, this scene): formation time 24 / 19 / 16 s and cloud water at 60 s
-  // 0 / 1072 / 2268 kg for spacing 83.3 / 62.5 / 50 m -- formation is resolution dependent (a
-  // known limitation recorded in the plan). Only invariants and the trend direction are asserted.
+  // Root cause of an earlier 0 / 1072 / 2268 kg spread: mixing was a per-pair rate (1/s), so its
+  // effective diffusivity scaled with spacing^2. It is now a physical diffusivity [m^2/s]
+  // (Cleary-Monaghan Laplacian). Measured 2026-09-30: form 18 / 16 / 15 s, cloud water at
+  // 60 s 5170 / 4891 / 5387 kg for spacing 83.3 / 62.5 / 50 m.
   for (const auto* r : { &coarse, &medium, &fine }) {
-    EXPECT_GT(r->first, 0.0);                       // a cloud forms at every resolution
+    EXPECT_GT(r->first, 0.0);
     EXPECT_LT(r->second.balanceError, 1.0e-10);
     EXPECT_EQ(r->second.nonFiniteCount, 0u);
+    EXPECT_NEAR(r->second.totalCloudWater, fine.second.totalCloudWater, 0.20 * fine.second.totalCloudWater);
+    EXPECT_NEAR(r->first, fine.first, 4.0);
   }
-  EXPECT_GE(coarse.first, medium.first);            // finer air forms cloud no later
-  EXPECT_GE(medium.first, fine.first);
 }
 
 TEST(CloudWorldTest, SourceListEditing)

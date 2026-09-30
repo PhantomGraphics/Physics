@@ -118,7 +118,7 @@ void CloudControlPanel::drawContents()
         Im::checkbox("Mixing", cfg.solver.enableMixing);
         sliderD("Sound Speed (m/s)", cfg.solver.soundSpeed, 10.0f, 200.0f);
         sliderD("Viscosity (m2/s)", cfg.solver.viscosity, 0.0f, 50.0f);
-        sliderD("Mix Rate (1/s)", cfg.solver.mixRate, 0.0f, 0.5f);
+        sliderD("Mix Diffusivity (m2/s)", cfg.solver.mixDiffusivity, 0.0f, 200.0f);
         sliderD("Wind Relax (s)", cfg.solver.windRelaxTime, 0.0f, 600.0f);
     }
 

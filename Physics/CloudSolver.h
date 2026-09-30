@@ -25,7 +25,7 @@ struct CloudSolverParams {
 	double soundSpeed = 50.0;           ///< Artificial sound speed c [m/s]; p = c^2 m (n - n0).
 	double viscosity = 5.0;             ///< Kinematic (artificial) viscosity [m^2/s].
 	double windRelaxTime = 60.0;        ///< Relaxation time toward the background wind [s].
-	double mixRate = 0.05;              ///< Pairwise heat/moisture mixing rate [1/s].
+	double mixDiffusivity = 10.0;       ///< Heat/moisture eddy diffusivity kappa [m^2/s] (resolution independent).
 	double wallRestitution = 0.0;       ///< Normal-velocity restitution at closed walls (0..1).
 	double cfl = 0.25;                  ///< Safety factor of stableTimeStep().
 	bool enableBuoyancy = true;
