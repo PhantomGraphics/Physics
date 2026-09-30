@@ -70,7 +70,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 | 10–19 | `fluid` — SPH ソルバー単体 | 70–79 | `pipe` — Volume/Mesh 変換パイプライン |
 | 20–29 | `rigid` — 剛体単体 | 80–89 | `capture` — スクリーンショット |
 | 30–44 | `soft` — 軟体単体・軟体間/自己衝突 | 90–99 | `neg` — 異常系 |
-| 45–49 | `flame` — 炎 SPH・Flame 描画（Normal/PBVR） | 55–58 | `cloud` — 雲 SPH（`tags:["cloud"]`、`docs/todo/PLAN_cloud_sph_pbvr.md`） |
+| 45–49 | `flame` — 炎 SPH・Flame 描画（Normal/PBVR） | 55–59, 65 | `cloud` — 雲 SPH（`tags:["cloud"]`、`docs/todo/PLAN_cloud_sph_pbvr.md`） |
 | 50–54 | `couple` — Rigid↔Fluid / Soft↔Fluid | | |
 
 現在 63 本（`55`〜`58_cloud_*`（雲 SPH の Cloud ページ）、`86_render_ssfr_anisotropic_kernel`（SSFR 異方性カーネル）、`45`〜`49_flame_*`（炎 SPH、`docs/todo/PLAN_flame_sph_pbvr_improvement.md`）、`04_smoke_new_scene`（File > New / `NewScene` コマンド）、`81_render_background` / `82_render_rigid_shaded` / `83_render_soft_shaded` / `84_render_shadows` / `85_render_ssfr_scene`（glTF レンダリング Phase 1–5）を含む）。全シナリオが「事前条件・変化（`store_as`+`post_assert` または初期値を含まない `expect_range`/`expect_not`）・不変条件」の三点契約で構成されている（詳細は

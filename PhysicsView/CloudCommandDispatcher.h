@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <functional>
 #include <optional>
 #include <string>
@@ -32,6 +33,7 @@ class CloudWorld;
  *   GetCloudParticleCount, GetCloudSimTime
  *   GetCloudStats                        One CSV row; GetCloudCsvHeader gives the columns.
  *   GetCloudStat:<name>                  Bare number (names: statDefs() in the .cpp).
+ *   GetCloudPbvrStat:<accumulated|overflowed|generated>  PBVR counters (Error if the renderer is not ready).
  */
 class CloudCommandDispatcher {
 public:
@@ -41,6 +43,8 @@ public:
         setPage_ = std::move(setPage);
         isPage_ = std::move(isPage);
     }
+    /** @brief PBVR counters for GetCloudPbvrStat:<accumulated|overflowed|generated> (-1 if unavailable). */
+    void setPbvrStatsHook(std::function<std::optional<std::array<double, 3>>()> fn) { pbvrStats_ = std::move(fn); }
     /** @brief Called after anything that changes what the cloud display should show. */
     void setOnCloudChanged(std::function<void()> fn) { onChanged_ = std::move(fn); }
 
@@ -51,6 +55,7 @@ private:
     std::function<void(bool)> setPage_;
     std::function<bool()> isPage_;
     std::function<void()> onChanged_;
+    std::function<std::optional<std::array<double, 3>>()> pbvrStats_;
 
     void notifyChanged() { if (onChanged_) onChanged_(); }
 };

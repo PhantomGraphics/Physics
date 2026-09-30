@@ -102,6 +102,12 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
         },
         [this] { return controlHost_.getPage() == ControlPage::Cloud; });
     dispatcher_.cloud().setOnCloudChanged([this]() { cloudDirty_ = true; });
+    dispatcher_.cloud().setPbvrStatsHook([this]() -> std::optional<std::array<double, 3>> {
+        if (!cloudVolumeRenderer_.isReady()) return std::nullopt;
+        const auto s = cloudVolumeRenderer_.queryStats();
+        return std::array<double, 3>{ static_cast<double>(s.accumulated), static_cast<double>(s.overflowed),
+                                      static_cast<double>(s.generated) };
+    });
     renderingPanel_.bind(&renderBackground_);
     renderingPanel_.bindRigidBodyRenderer(&rigidGltfRenderer_);
     renderingPanel_.bindSoftBodyRenderer(&softGltfRenderer_);
@@ -303,6 +309,12 @@ void FluidApp::onInit()
         cs.fullscreenVert = ::VKG::loadSPVRepo("shaders/volume_fullscreen.vert.spv");
         cs.raymarchFrag = ::VKG::loadSPVRepo("shaders/volume_raymarch.frag.spv");
         cs.sunTransmittanceComp = ::VKG::loadSPVRepo("shaders/volume_sun_transmittance.comp.spv");
+        cs.pbvrGenerateComp = ::VKG::loadSPVRepo("shaders/volume_pbvr_generate.comp.spv");
+        cs.pbvrPointVert = ::VKG::loadSPVRepo("shaders/volume_pbvr_point.vert.spv");
+        cs.pbvrPointFrag = ::VKG::loadSPVRepo("shaders/volume_pbvr_point.frag.spv");
+        cs.pbvrAccumulateComp = ::VKG::loadSPVRepo("shaders/volume_pbvr_accumulate.comp.spv");
+        cs.pbvrCompositeFrag = ::VKG::loadSPVRepo("shaders/volume_pbvr_composite.frag.spv");
+        cloudVolumeRenderer_.setDepthFormat(getSwapChain().findDepthFormat().value_or(VK_FORMAT_D32_SFLOAT));
         cloudVolumeRenderer_.setShaders(std::move(cs));
     }
     {
@@ -363,6 +375,7 @@ void FluidApp::onInit()
         for (auto* r : hdrRenderers_)
             r->onInit(getContext(), getCommandPool(), hdrScene_.getRenderPass(), MAX_FRAMES_IN_FLIGHT);
         flameRenderer_.resize(hdrScene_.getExtent().width, hdrScene_.getExtent().height);
+        cloudVolumeRenderer_.resize(hdrScene_.getExtent().width, hdrScene_.getExtent().height);
         ssfrRenderer_.setSceneInput(hdrScene_.getColorImageView(), hdrScene_.getDepthImageView(),
                                     hdrSampler_.get(), 0.1f, 1000.f);
     } else {
@@ -505,6 +518,7 @@ void FluidApp::onSwapChainCreated()
         softGltfRenderer_.setMainRenderPass(hdrScene_.getRenderPass());
         ssfrRenderer_.resize(ext.width, ext.height);
         flameRenderer_.resize(ext.width, ext.height);
+        cloudVolumeRenderer_.resize(ext.width, ext.height);
         ssfrRenderer_.setSceneInput(hdrScene_.getColorImageView(), hdrScene_.getDepthImageView(),
                                     hdrSampler_.get(), 0.1f, 1000.f);
     }
@@ -921,7 +935,15 @@ void FluidApp::syncCloudRenderer()
         // cloud (x, y, z) m -> scene (x, z, y) * k, k = 40 / longest domain axis.
         const float k = 40.0f / static_cast<float>(std::max({ dom.domainMax.x, dom.domainMax.y, dom.domainMax.z }));
         const glm::mat4 cloudToScene(glm::vec4(k, 0, 0, 0), glm::vec4(0, 0, k, 0), glm::vec4(0, k, 0, 0), glm::vec4(0, 0, 0, 1));
-        cloudVolumeRenderer_.setCamera(fluidRenderer_.getProjMatrix(), fluidRenderer_.getViewMatrix(), cloudToScene);
+        cloudVolumeRenderer_.setMode(rp.renderer == 1 ? CloudVolumeRenderer::Mode::Pbvr : CloudVolumeRenderer::Mode::Raymarch);
+        {
+            auto ps = cloudVolumeRenderer_.pbvrSettings();
+            ps.ensemblesPerFrame = static_cast<uint32_t>(std::max(1, rp.pbvrEnsemblesPerFrame));
+            ps.targetEnsembles = static_cast<uint32_t>(std::max(1, rp.pbvrTargetEnsembles));
+            cloudVolumeRenderer_.setPbvrSettings(ps);
+        }
+        cloudVolumeRenderer_.setCamera(fluidRenderer_.getProjMatrix(), fluidRenderer_.getViewMatrix(), cloudToScene,
+                                       hdrScene_.getExtent().height);
         return;
     }
     if (!cloudDirty_ && cloudSyncedStep_ == cloudWorld_.stepCount()) return;
