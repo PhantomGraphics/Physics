@@ -122,6 +122,30 @@ void CloudControlPanel::drawContents()
         sliderD("Wind Relax (s)", cfg.solver.windRelaxTime, 0.0f, 600.0f);
     }
 
+    if (Im::collapsingHeader("Rendering", true)) {
+        auto& rp = w.render();
+        if (Im::checkbox("Volume (raymarched)", rp.volumeMode)) notifyWorldChanged();
+        if (rp.volumeMode) {
+            int res = static_cast<int>(rp.gridResolution);
+            if (Im::sliderInt("Density Grid", res, 16, 128)) {
+                rp.gridResolution = static_cast<uint32_t>(res);
+                notifyWorldChanged();
+            }
+            if (sliderD("Kernel Support (x spacing)", rp.supportScale, 0.5f, 4.0f)) notifyWorldChanged();
+            sliderD("Extinction (m2/kg)", rp.extinction, 0.0f, 600.0f);
+            sliderD("Albedo", rp.albedo, 0.0f, 1.0f);
+            sliderD("Phase g", rp.phaseG, -0.9f, 0.95f);
+            sliderD("Sun Azimuth", rp.sunAzimuthDeg, -180.0f, 180.0f);
+            sliderD("Sun Elevation", rp.sunElevationDeg, 1.0f, 90.0f);
+            sliderD("Sun Irradiance", rp.sunIrradiance, 0.0f, 10.0f);
+            sliderD("Ambient", rp.ambient, 0.0f, 2.0f);
+            sliderD("Step (x cell)", rp.stepScale, 0.2f, 2.0f);
+            Im::textDisabled("Opaque scene depth is not sampled yet.");
+        } else {
+            Im::textDisabled("Air particles coloured by cloud water (diagnostic).");
+        }
+    }
+
     if (Im::collapsingHeader("Statistics", true)) {
         Im::text("Total water   %.4g kg", s.totalWater);
         Im::text("Cloud water   %.4g kg  (%zu cloudy)", s.totalCloudWater, s.cloudyParticles);

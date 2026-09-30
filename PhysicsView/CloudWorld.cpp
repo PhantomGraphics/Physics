@@ -13,6 +13,15 @@ using Physics::CloudSourceParams;
 using Math::Vector3dd;
 namespace CT = Physics::CloudThermodynamics;
 
+Math::Vector3df CloudWorld::RenderParams::sunDirection() const
+{
+    const double az = sunAzimuthDeg * 3.14159265358979 / 180.0;
+    const double el = sunElevationDeg * 3.14159265358979 / 180.0;
+    return Math::Vector3df(static_cast<float>(std::cos(el) * std::cos(az)),
+                           static_cast<float>(std::cos(el) * std::sin(az)),
+                           static_cast<float>(std::sin(el)));
+}
+
 CloudWorld::CloudWorld() = default;
 
 void CloudWorld::syncSolver()

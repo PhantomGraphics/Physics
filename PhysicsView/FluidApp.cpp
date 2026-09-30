@@ -2,6 +2,7 @@
 #include "FluidApp.h"
 
 #include <chrono>
+#include "../Physics/CloudDensity.h"
 
 #include "../../CGLib/VulkanGraphics/VulkanSPVResolver.h"
 
@@ -135,7 +136,8 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     hdrRenderers_ = { &bgGltfRenderer_, &fluidRenderer_,
                       &rigidGltfRenderer_, &rigidRenderer_,
                       &softGltfRenderer_, &softRenderer_,
-                      &volumeRenderer_, &meshRenderer_, &flameRenderer_ };
+                      &volumeRenderer_, &meshRenderer_, &flameRenderer_,
+                      &cloudVolumeRenderer_ };
     add(&ssfrRenderer_);
 
     // The per-domain control panels are no longer registered as standalone
@@ -296,6 +298,12 @@ void FluidApp::onInit()
         fs.pbvr.generateComp   = ::VKG::loadSPVRepo("shaders/flame_pbvr_generate.comp.spv");
         fs.pbvr.finalizeComp   = ::VKG::loadSPVRepo("shaders/flame_pbvr_finalize.comp.spv");
         flameRenderer_.setShaders(std::move(fs));
+
+        CloudVolumeRenderer::Shaders cs;
+        cs.fullscreenVert = ::VKG::loadSPVRepo("shaders/volume_fullscreen.vert.spv");
+        cs.raymarchFrag = ::VKG::loadSPVRepo("shaders/volume_raymarch.frag.spv");
+        cs.sunTransmittanceComp = ::VKG::loadSPVRepo("shaders/volume_sun_transmittance.comp.spv");
+        cloudVolumeRenderer_.setShaders(std::move(cs));
     }
     {
         static constexpr auto kSS = "shaders/";
@@ -626,7 +634,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         syncCloudRenderer();
         ssfrRenderer_.setEnabled(false);
         fluidRenderer_.clearDirectGpuBuffer();
-        fluidRenderer_.setEnabled(true);
+        fluidRenderer_.setEnabled(!cloudWorld_.render().volumeMode);
     } else {
         cloudLastTime_ = -1.0;
         if (prevCloudActive_) {
@@ -640,6 +648,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         }
     }
     prevCloudActive_ = cloudActive;
+    cloudVolumeRenderer_.setEnabled(cloudActive && cloudWorld_.render().volumeMode);
     const bool ownsViewport = flameActive || cloudActive;
     // Rigid / soft body: wire (RigidBodyWireRenderer / SoftBodyWireRenderer) vs
     // shaded (GltfBodyRenderer / GltfSoftRenderer) vs both, per SetRigidRenderMode
@@ -758,6 +767,7 @@ void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
     if (flameActive) {
         flameRenderer_.recordPreRender(cmd, frameIndex);
     }
+    cloudVolumeRenderer_.recordPreRender(cmd, frameIndex);   // no-op unless the Cloud volume view is enabled
 
     if (hdrValid_) {
         const std::array<float, 4> clear{ 0.02f, 0.02f, 0.03f, 1.0f };
@@ -886,11 +896,37 @@ void FluidApp::syncCloudRenderer()
     // Maps the cloud's z-up metres onto the shared FluidRenderer camera space
     // (y-up, ~40 units across): (x, y, z) m -> (x, z, y) * 0.04. Colour value =
     // cloud water in g/kg (0 = clear air stays neutral).
+    const auto& soa = cloudWorld_.particles();
+    const auto& dom = cloudWorld_.config().solver;
+    const auto& rp = cloudWorld_.render();
+    if (rp.volumeMode) {
+        // Density grid (rebuilt when the sim advanced or a command changed the scene) + per-frame camera.
+        if (cloudDirty_ || cloudSyncedStep_ != cloudWorld_.stepCount()) {
+            cloudDirty_ = false;
+            cloudSyncedStep_ = cloudWorld_.stepCount();
+            const auto desc = Physics::CloudDensity::makeGridDesc(dom.domainMin, dom.domainMax, rp.gridResolution);
+            Physics::CloudDensity::reconstruct(soa, desc, rp.supportScale * dom.spacing, cloudDensity_);
+            cloudVolumeRenderer_.setDensity(cloudDensity_);
+        }
+        Volume::ScatteringParams sp;
+        sp.extinction = static_cast<float>(rp.extinction);
+        sp.albedo = static_cast<float>(rp.albedo);
+        sp.phaseG = static_cast<float>(rp.phaseG);
+        sp.sunDirection = rp.sunDirection();
+        sp.sunIrradiance = static_cast<float>(rp.sunIrradiance);
+        sp.ambient = static_cast<float>(rp.ambient);
+        sp.stepLength = static_cast<float>(rp.stepScale) * cloudDensity_.desc().cellSize;
+        sp.maxSteps = rp.maxSteps;
+        cloudVolumeRenderer_.setScattering(sp);
+        // cloud (x, y, z) m -> scene (x, z, y) * k, k = 40 / longest domain axis.
+        const float k = 40.0f / static_cast<float>(std::max({ dom.domainMax.x, dom.domainMax.y, dom.domainMax.z }));
+        const glm::mat4 cloudToScene(glm::vec4(k, 0, 0, 0), glm::vec4(0, 0, k, 0), glm::vec4(0, k, 0, 0), glm::vec4(0, 0, 0, 1));
+        cloudVolumeRenderer_.setCamera(fluidRenderer_.getProjMatrix(), fluidRenderer_.getViewMatrix(), cloudToScene);
+        return;
+    }
     if (!cloudDirty_ && cloudSyncedStep_ == cloudWorld_.stepCount()) return;
     cloudDirty_ = false;
     cloudSyncedStep_ = cloudWorld_.stepCount();
-    const auto& soa = cloudWorld_.particles();
-    const auto& dom = cloudWorld_.config().solver;
     const float scale = 40.0f / static_cast<float>(std::max({ dom.domainMax.x, dom.domainMax.y, dom.domainMax.z }));
     std::vector<glm::vec3> pts(soa.size());
     std::vector<float> qc(soa.size());
