@@ -1,0 +1,36 @@
+{
+  "name": "59_cloud_volume_render",
+  "tags": ["cloud"],
+  "_comment": "Cloud page Phase 3: raymarched cloud (VolumeRaymarch) render parameters and view switching. Numbers are asserted through the command surface; the captured image is for inspection.",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "Show the Cloud page", "command": "SetCloudPage:true", "expect": "OK" },
+    { "label": "Paused", "command": "SetCloudRunning:false", "expect": "OK" },
+    { "label": "Domain X", "command": "SetCloudParam:domainX,500", "expect": "OK" },
+    { "label": "Domain Y", "command": "SetCloudParam:domainY,500", "expect": "OK" },
+    { "label": "Domain Z", "command": "SetCloudParam:domainZ,500", "expect": "OK" },
+    { "label": "Spacing", "command": "SetCloudParam:spacing,31.25", "expect": "OK" },
+    { "label": "Rebuild", "command": "CloudReset:1", "expect": "OK" },
+    { "label": "Precondition: volume view is the default", "command": "GetCloudParam:volumeMode", "expect_range": "1,1" },
+    { "label": "Precondition: default grid resolution", "command": "GetCloudParam:gridResolution", "expect_range": "64,64" },
+    { "label": "Moist heated source", "command": "AddCloudSource:250,250,150,100,0.1,3000,0,40", "expect": "Index:0" },
+    { "label": "Run 40 s", "command": "CloudAdvance:40", "expect": "OK" },
+    { "label": "Change: cloud formed", "command": "GetCloudStat:cloudyParticles", "expect_range": "1,100000" },
+
+    { "label": "Sun elevation round trip", "command": "SetCloudParam:sunElevation,40", "expect": "OK" },
+    { "label": "Sun elevation read back", "command": "GetCloudParam:sunElevation", "expect_range": "40,40" },
+    { "label": "Reject sun below the horizon", "command": "SetCloudParam:sunElevation,0", "expect_prefix": "Error:" },
+    { "label": "Reject bad grid resolution", "command": "SetCloudParam:gridResolution,4", "expect_prefix": "Error:" },
+    { "label": "Reject albedo above 1", "command": "SetCloudParam:albedo,1.5", "expect_prefix": "Error:" },
+    { "label": "Finer density grid", "command": "SetCloudParam:gridResolution,96", "expect": "OK" },
+    { "label": "Let the volume view update", "command": "GetCloudSimTime", "repeat": 10 },
+    { "label": "Switch to the particle view", "command": "SetCloudParam:volumeMode,0", "expect": "OK" },
+    { "label": "Let the particle view update", "command": "GetCloudSimTime", "repeat": 10 },
+    { "label": "Back to the volume view", "command": "SetCloudParam:volumeMode,1", "expect": "OK" },
+    { "label": "Let the volume view update", "command": "GetCloudSimTime", "repeat": 10 },
+    { "label": "Sun back to the default", "command": "SetCloudParam:sunElevation,65", "expect": "OK" },
+    { "label": "Capture", "command": "SaveScreenshot:testdata/screenshots/59_cloud_volume_render.png", "expect": "OK" },
+    { "label": "Invariant: simulation untouched by rendering changes", "command": "GetCloudStat:balanceError", "expect_range": "0,1e-10" },
+    { "label": "Back to the Fluid page", "command": "SetCloudPage:false", "expect": "OK" }
+  ]
+}

@@ -35,6 +35,24 @@ public:
         double qcThreshold = 1.0e-5;      ///< Cloud base/top definition.
     };
 
+    /** @brief Display-only parameters (never affect the simulation), shared by UI, commands and renderers. */
+    struct RenderParams {
+        bool volumeMode = true;            ///< Raymarched cloud (true) or coloured air particles (false).
+        uint32_t gridResolution = 64;      ///< Density grid cells along the longest domain axis.
+        double supportScale = 1.5;         ///< Density kernel support = supportScale * particle spacing.
+        double extinction = 30.0;          ///< kExt [m^2/kg] (CG value; physical 3/(2 r_e rho_w) is ~150 for r_e = 10 um and renders too opaque).
+        double albedo = 1.0;
+        double phaseG = 0.2;
+        double sunAzimuthDeg = 35.0;       ///< Sun direction in cloud space (z up).
+        double sunElevationDeg = 65.0;
+        double sunIrradiance = 15.0;
+        double ambient = 0.15;             ///< Constant sky term (an artistic fill, not multiple scattering).
+        double stepScale = 0.5;            ///< Ray step = stepScale * cell size.
+        int maxSteps = 512;
+
+        Math::Vector3df sunDirection() const;
+    };
+
     CloudWorld();
 
     /**
@@ -46,6 +64,9 @@ public:
 
     /** @brief Rebuilds the air lattice from the config; keeps the source list. seed < 0 keeps the config seed. */
     void reset(int64_t seed = -1);
+
+    RenderParams& render() { return render_; }
+    const RenderParams& render() const { return render_; }
 
     Config& config() { return config_; }
     const Config& config() const { return config_; }
@@ -97,6 +118,7 @@ private:
     double run(double simSeconds, int maxSubsteps);
 
     Config config_;
+    RenderParams render_;
     Physics::CloudSolver solver_;
     Physics::CloudParticleSoA soa_;
     Physics::CloudWaterLedger ledger_;

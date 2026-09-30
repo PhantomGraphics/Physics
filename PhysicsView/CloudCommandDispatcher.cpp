@@ -61,6 +61,10 @@ struct ParamDef {
 	  [](CloudWorld& w, double v) { auto& c = w.config(); if (!(VALID)) return false;               \
 	                                EXPR = static_cast<std::remove_reference_t<decltype(EXPR)>>(v); return true; } }
 
+#define CLOUD_RENDER(NAME, MEMBER, VALID)                                                   \
+	{ NAME, [](CloudWorld& w) { return static_cast<double>(w.render().MEMBER); },          \
+	  [](CloudWorld& w, double v) { if (!(VALID)) return false; w.render().MEMBER = v; return true; } }
+
 #define CLOUD_TOGGLE(NAME, MEMBER)                                                          \
 	{ NAME, [](CloudWorld& w) { return w.config().solver.MEMBER ? 1.0 : 0.0; },            \
 	  [](CloudWorld& w, double v) { w.config().solver.MEMBER = v != 0.0; return true; } }
@@ -86,6 +90,20 @@ const std::vector<ParamDef>& params()
 		CLOUD_PARAM("fixedTimeStep", c.fixedTimeStep, v >= 0.0),
 		CLOUD_PARAM("maxSubstepsPerFrame", c.maxSubstepsPerFrame, v >= 1.0 && v <= 1000.0),
 		CLOUD_PARAM("qcThreshold", c.qcThreshold, v >= 0.0),
+		// Display-only:
+		{ "volumeMode", [](CloudWorld& w) { return w.render().volumeMode ? 1.0 : 0.0; },
+		  [](CloudWorld& w, double v) { w.render().volumeMode = v != 0.0; return true; } },
+		{ "gridResolution", [](CloudWorld& w) { return static_cast<double>(w.render().gridResolution); },
+		  [](CloudWorld& w, double v) { if (v < 8.0 || v > 256.0) return false; w.render().gridResolution = static_cast<uint32_t>(v); return true; } },
+		CLOUD_RENDER("supportScale", supportScale, v >= 0.5 && v <= 6.0),
+		CLOUD_RENDER("extinction", extinction, v >= 0.0),
+		CLOUD_RENDER("albedo", albedo, v >= 0.0 && v <= 1.0),
+		CLOUD_RENDER("phaseG", phaseG, v > -0.99 && v < 0.99),
+		CLOUD_RENDER("sunAzimuth", sunAzimuthDeg, v >= -360.0 && v <= 360.0),
+		CLOUD_RENDER("sunElevation", sunElevationDeg, v >= 1.0 && v <= 90.0),
+		CLOUD_RENDER("sunIrradiance", sunIrradiance, v >= 0.0),
+		CLOUD_RENDER("ambient", ambient, v >= 0.0),
+		CLOUD_RENDER("stepScale", stepScale, v >= 0.1 && v <= 4.0),
 		CLOUD_TOGGLE("enablePressure", enablePressure),
 		CLOUD_TOGGLE("enableBuoyancy", enableBuoyancy),
 		CLOUD_TOGGLE("enableAdiabatic", enableAdiabatic),

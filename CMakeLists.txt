@@ -176,6 +176,7 @@ phantom_add_vkrenderer_core()
 # FileCore / VulkanGraphicsCore / GraphicsCore transitively; listed explicitly
 # in target_link_libraries below to match the plan's wiring section.
 phantom_add_gltfrenderer_core()
+phantom_add_volumeraymarch_core()
 
 # --- FluidRenderer (Screen Space Fluid Rendering) -- PhysicsView only ---
 
@@ -261,6 +262,7 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/CloudWorld.cpp
     ${PHYSICS_ROOT}/PhysicsView/CloudCommandDispatcher.cpp
     ${PHYSICS_ROOT}/PhysicsView/CloudControlPanel.cpp
+    ${PHYSICS_ROOT}/PhysicsView/CloudVolumeRenderer.cpp
 )
 target_include_directories(PhysicsView PRIVATE
     ${CGLIB_ROOT}/ThirdParty/VulkanMemoryAllocator
@@ -278,6 +280,7 @@ target_link_libraries(PhysicsView PRIVATE
     VkRendererCore
     GltfRendererCore
     AnimationCore
+    VolumeRaymarch
     # VulkanGraphicsCore must precede GraphicsCore on the link line: GltfReader.cpp
     # (GltfRendererCore) pulls stbi_load_from_memory, and both VulkanCubeMap.cpp
     # (VulkanGraphicsCore, already linked for SSFluidRenderer's cube maps) and
@@ -317,7 +320,8 @@ target_compile_features(PhysicsView PRIVATE cxx_std_20)
 phantom_add_runtime_shaders(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/shaders
     ${PHYSICS_ROOT}/Fluid_GPU_Vk/Shader
-    ${PHYSICS_ROOT}/FluidRenderer/shaders)
+    ${PHYSICS_ROOT}/FluidRenderer/shaders
+    ${CGLIB_ROOT}/Volume/VolumeRaymarch/shaders)
 
 # Default cubemap used by SSFR when the viewer starts. Generate it beside the
 # executable so binary images do not need to be stored in source control.

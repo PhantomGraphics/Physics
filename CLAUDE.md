@@ -197,7 +197,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 
 - `CloudWorld`/`CloudControlPanel`/`CloudCommandDispatcher` — 雲（湿潤空気 SPH）。Flame と同じ「結合しない独立ドメイン」で
   `ControlPage::Cloud`。コアは `Physics/Physics/Cloud{Params,Thermodynamics,Particle,Stats,Solver}`（double、Vulkan/ImGui 非依存、
-  PhysicsTest で検証）。Phase 2 の表示は FluidRenderer に空気粒子を雲水量で着色して流し込む診断表示のみ（PBVR は Phase 3）。
+  PhysicsTest で検証）。表示は既定でレイマーチング（`CloudVolumeRenderer` → 独立モジュール `CGLib/Volume/VolumeRaymarch`。密度は `Physics/CloudDensity` が粒子から再構成）、`volumeMode=0` で FluidRenderer による粒子診断表示。PBVR は未実装。シナリオ `55`〜`59_cloud_*`。
   コマンド名はすべて "Cloud" を含む（`CloudCommandDispatcher.h` 参照）。`CloudWorld` は構築時に格子を作らず（`ensureBuilt()`）、
   初回使用時に 32³ を作る。**格子・環境系パラメータは `CloudReset` で反映**される。
 

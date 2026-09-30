@@ -52,6 +52,7 @@
 #include "FlameRenderer.h"
 #include "FlameControlPanel.h"
 #include "CloudWorld.h"
+#include "CloudVolumeRenderer.h"
 #include "CloudControlPanel.h"
 
 #include <filesystem>
@@ -175,6 +176,8 @@ private:
     // FluidRenderer (coloured by cloud water); the PBVR cloud renderer is Phase 3.
     CloudWorld        cloudWorld_;
     CloudControlPanel cloudControlPanel_;
+    CloudVolumeRenderer cloudVolumeRenderer_;
+    Volume::ScalarGrid3D cloudDensity_;            // last reconstructed density (cloud space)
     bool              cloudDirty_ = true;          // display needs re-uploading
     bool              prevCloudActive_ = false;
     uint64_t          cloudSyncedStep_ = ~0ull;
