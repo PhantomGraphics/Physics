@@ -119,7 +119,8 @@ if(PHANTOM_GTEST_FOUND)
     add_executable(PhysicsTest ${PHYSICSTEST_SOURCES}
         ${PHYSICS_ROOT}/PhysicsView/PrimitiveGltf.cpp
         ${PHYSICS_ROOT}/PhysicsView/SoftMeshGltf.cpp
-        ${PHYSICS_ROOT}/PhysicsView/FlameBlackbody.cpp)
+        ${PHYSICS_ROOT}/PhysicsView/FlameBlackbody.cpp
+        ${PHYSICS_ROOT}/PhysicsView/CloudWorld.cpp)
     set_target_properties(PhysicsTest PROPERTIES
         CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON
@@ -257,6 +258,7 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/FlameFullscreenPass.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlamePBVRPass.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameStreamBuffer.cpp
+    ${PHYSICS_ROOT}/PhysicsView/CloudWorld.cpp
 )
 target_include_directories(PhysicsView PRIVATE
     ${CGLIB_ROOT}/ThirdParty/VulkanMemoryAllocator
