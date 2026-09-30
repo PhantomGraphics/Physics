@@ -73,10 +73,19 @@ void FlameControlPanel::drawContents()
         }
     }
 
+    if (Im::collapsingHeader("Heat Haze", true)) {
+        Im::textDisabled("Refracts the scene behind the flame (screen space).");
+        Im::checkbox("Enabled", render.hazeEnabled);
+        Im::sliderFloat("Strength (px)", render.hazeStrength, 0.0f, 24.0f);
+        Im::sliderFloat("Extent", render.hazeExtent, 1.0f, 6.0f);
+        Im::sliderFloat("Frequency", render.hazeFrequency, 2.0f, 40.0f);
+        Im::sliderFloat("Rise Speed", render.hazeRiseSpeed, 0.0f, 2.0f);
+    }
+
     if (Im::collapsingHeader("Display Transform", true)) {
         Im::textDisabled(
-            "The flame sim runs at its native ~3-unit scale; these map it onto\n"
-            "PhysicsView's shared camera (centred on 20,20,20).");
+            "The flame sim runs at its native ~3-unit scale; these place it in the\n"
+            "shared scene (origin = rigid / soft floor, 1 unit = 1 m at scale 1).");
         Im::sliderFloat("Render Scale", render.renderScale, 1.0f, 40.0f);
         float offset[3] = { render.renderOffset.x, render.renderOffset.y, render.renderOffset.z };
         if (Im::dragFloat3("Render Offset", offset, 0.5f, -200.0f, 200.0f)) {

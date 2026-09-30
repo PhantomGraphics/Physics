@@ -257,6 +257,7 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/FlamePointPipeline.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameBlackbody.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameFullscreenPass.cpp
+    ${PHYSICS_ROOT}/PhysicsView/FlameHazePass.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlamePBVRPass.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameStreamBuffer.cpp
     ${PHYSICS_ROOT}/PhysicsView/CloudWorld.cpp

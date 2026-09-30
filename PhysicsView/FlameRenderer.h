@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CGLib/VkAppBase/IVkSubRenderer.h"
+#include "FlameHazePass.h"
 #include "FlamePBVRPass.h"
 #include "FlamePointPipeline.h"
 
@@ -45,7 +46,24 @@ public:
 		std::vector<uint32_t> flameVert, flameFrag; // flame_point
 		std::vector<uint32_t> smokeVert, smokeFrag; // flame_smoke
 		FlamePBVRPass::Shaders pbvr;
+		FlameHazePass::Shaders haze;
 	};
+
+	/** @brief Must match the HDR scene's depth attachment (render-pass compatibility); set before onInit(). */
+	void setDepthFormat(VkFormat f) { depthFormat_ = f; }
+	/** @brief Heat-haze parameters and animation time (simulated seconds). */
+	void setHaze(const FlameHazePass::Settings& s, float timeSeconds) { hazeSettings_ = s; hazeTime_ = timeSeconds; }
+	/**
+	 * @brief True when this frame's opaque scene must be routed through the
+	 * haze pass (flame visible, haze on, hot particles present). Valid after onUpdate().
+	 */
+	bool hazeActive() const { return hazeActive_; }
+	/** @brief Haze field render; outside any render pass, before the background pass. */
+	void recordHazeField(VkCommandBuffer cmd, uint32_t frameIndex);
+	void beginHazeBackground(VkCommandBuffer cmd, const std::array<float, 4>& clear) const { haze_.beginBackground(cmd, clear); }
+	void endHazeBackground(VkCommandBuffer cmd) const { haze_.endBackground(cmd); }
+	/** @brief First draw inside the HDR scene pass: displaced copy of the background. */
+	void applyHaze(VkCommandBuffer cmd) const { haze_.apply(cmd); }
 
 	/** @brief Shading parameters (FlamePointUBO::thermal/smoke/view/smokeAlbedo). */
 	struct Shading {
@@ -131,6 +149,12 @@ private:
 	std::optional<FlamePointPipeline> smokePipeline_;
 	FlamePBVRPass pbvr_;
 	bool pbvrRecordedThisFrame_ = false;
+
+	FlameHazePass haze_;
+	FlameHazePass::Settings hazeSettings_;
+	float hazeTime_ = 0.0f;
+	bool hazeActive_ = false;
+	VkFormat depthFormat_ = VK_FORMAT_D32_SFLOAT;
 
 	FlamePointUBO makeUBO();
 

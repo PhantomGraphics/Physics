@@ -303,7 +303,12 @@ void FluidApp::onInit()
         fs.pbvr.compositeFrag  = ::VKG::loadSPVRepo("shaders/flame_pbvr_composite.frag.spv");
         fs.pbvr.generateComp   = ::VKG::loadSPVRepo("shaders/flame_pbvr_generate.comp.spv");
         fs.pbvr.finalizeComp   = ::VKG::loadSPVRepo("shaders/flame_pbvr_finalize.comp.spv");
+        fs.haze.fieldVert      = ::VKG::loadSPVRepo("shaders/flame_haze_field.vert.spv");
+        fs.haze.fieldFrag      = ::VKG::loadSPVRepo("shaders/flame_haze_field.frag.spv");
+        fs.haze.fullscreenVert = fs.pbvr.fullscreenVert;
+        fs.haze.applyFrag      = ::VKG::loadSPVRepo("shaders/flame_haze_apply.frag.spv");
         flameRenderer_.setShaders(std::move(fs));
+        flameRenderer_.setDepthFormat(getSwapChain().findDepthFormat().value_or(VK_FORMAT_D32_SFLOAT));
 
         CloudVolumeRenderer::Shaders cs;
         cs.fullscreenVert = ::VKG::loadSPVRepo("shaders/volume_fullscreen.vert.spv");
@@ -446,6 +451,8 @@ void FluidApp::newScene()
                                 // emitters / outflow / sources / boundaries / coupling
     world_.rigid().clear();     // 0 rigid bodies (no preset, not even a floor)
     softWorld_.clear();         // 0 soft bodies
+    flameWorld_.clear();        // fresh flame scene, stopped and out of the shared scene
+    syncFlameRenderer();
     renderBackground_.clearBackground();  // release the glTF background document
 
     syncParticlesToRenderer();
@@ -533,10 +540,12 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     scenarioBrowser_.pumpQueue();
     ssfrRenderer_.setParticleRadius(world_.params().radius);
 
-    // The Flame page takes over the viewport: its own point-sprite renderer is
-    // the only one drawn, and the fluid/rigid/soft domains keep simulating in
-    // the background exactly as they do while any other page is shown.
+    // Flame is a normal scene domain: it is drawn together with the fluid /
+    // rigid / soft domains and the glTF background, whichever page is shown.
+    // Opening its page (or Play / Step / Reset) puts it into the scene; File >
+    // New takes it out again.
     const bool flameActive = (controlHost_.getPage() == ControlPage::Flame);
+    if (flameActive) flameWorld_.setPopulated(true);
     const bool cloudActive = (controlHost_.getPage() == ControlPage::Cloud);
 
     const bool testActive = ssfrTestPanel_.isActive();
@@ -626,16 +635,15 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         ssfrRenderer_.setShowSpray(gpu ? false : ww.enableSpray);
         ssfrRenderer_.setShowFoam(gpu ? false : ww.enableFoam);
     }
-    if (flameActive) {
+    // Flame steps and renders on every page (its own Play/Pause); the fluid
+    // renderers above keep whatever mode they chose -- the flame is composited
+    // into the same linear-HDR scene the SSFR composite tonemaps.
+    const bool flameInScene = flameWorld_.isPopulated();
+    if (flameInScene) {
         if (flameWorld_.isRunning()) flameWorld_.step();
         syncFlameRenderer();
-        fluidRenderer_.setEnabled(false);
-        // Flame owns the viewport. SSFR's fluid-surface work stays off; when the
-        // HDR path is active its composite still runs (hasScene) and passes the
-        // HDR scene (= flame) through with the shared ACES tonemap.
-        ssfrRenderer_.setEnabled(false);
     }
-    flameRenderer_.setEnabled(flameActive);
+    flameRenderer_.setEnabled(flameInScene && !cloudActive);
     // Cloud page: the air particles replace the fluid display in the shared
     // FluidRenderer (Phase 2 diagnostic view); every other scene renderer is off.
     if (cloudActive) {
@@ -663,7 +671,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     }
     prevCloudActive_ = cloudActive;
     cloudVolumeRenderer_.setEnabled(cloudActive && cloudWorld_.render().volumeMode);
-    const bool ownsViewport = flameActive || cloudActive;
+    const bool ownsViewport = cloudActive;
     // Rigid / soft body: wire (RigidBodyWireRenderer / SoftBodyWireRenderer) vs
     // shaded (GltfBodyRenderer / GltfSoftRenderer) vs both, per SetRigidRenderMode
     // / SetSoftRenderMode / the "glTF Rendering" panel. Flame still takes the
@@ -676,8 +684,8 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         softRenderer_.setEnabled(!ownsViewport && bodyRenderModeWantsWire(sm));
         softGltfRenderer_.setEnabled(!ownsViewport && bodyRenderModeWantsShaded(sm));
     }
-    // The Flame page owns the viewport (see the flameActive comment above);
-    // hide the glTF background there too, matching rigid/soft/fluid.
+    // Only the Cloud page owns the viewport; hide the glTF background there too,
+    // matching rigid/soft/fluid.
     bgGltfRenderer_.setVisible(!ownsViewport);
 
     ssfrRenderer_.setCamera(fluidRenderer_.getProjMatrix(), fluidRenderer_.getViewMatrix());
@@ -760,12 +768,11 @@ void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
     // Shadow-caster pass (Phase 4): depth-only, before the main render pass. The
     // pass always runs so the depth target is defined; when shadows are toggled
     // off the casters are simply not drawn (cleared depth = far = nothing
-    // occluded). Flame owns the viewport, so skip casters there too.
-    const bool flameActive = (controlHost_.getPage() == ControlPage::Flame);
+    // occluded). Cloud owns the viewport, so skip casters there.
     if (shadowPass_.isValid()) {
         const glm::mat4 vp = shadowPass_.getLightVP();
         shadowPass_.begin(cmd);
-        if (renderBackground_.castShadows() && !flameActive && controlHost_.getPage() != ControlPage::Cloud) {
+        if (renderBackground_.castShadows() && controlHost_.getPage() != ControlPage::Cloud) {
             bgGltfRenderer_.renderShadowCasters(cmd, vp);
             rigidGltfRenderer_.renderShadowCasters(cmd, vp);
             softGltfRenderer_.renderShadowCasters(cmd, vp);
@@ -778,15 +785,29 @@ void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
     // and its composite (in the swapchain pass) tonemaps it once.
     // Flame PBVR (plan Phase 4): GPU particle generation + ensemble passes
     // run in their own offscreen targets before the HDR pass composites them.
-    if (flameActive) {
-        flameRenderer_.recordPreRender(cmd, frameIndex);
-    }
+    flameRenderer_.recordPreRender(cmd, frameIndex);   // no-op unless the flame is enabled in PBVR mode
     cloudVolumeRenderer_.recordPreRender(cmd, frameIndex);   // no-op unless the Cloud volume view is enabled
 
     if (hdrValid_) {
         const std::array<float, 4> clear{ 0.02f, 0.02f, 0.03f, 1.0f };
+        // Heat haze: the opaque scene (everything but the flame) is drawn into the
+        // haze pass's background target first; the HDR scene pass then starts with
+        // a displaced copy of it and the flame is drawn on top.
+        const bool haze = flameRenderer_.hazeActive();
+        auto* const flameSub = static_cast<::VKG::IVkSubRenderer*>(&flameRenderer_);
+        if (haze) {
+            flameRenderer_.recordHazeField(cmd, frameIndex);
+            flameRenderer_.beginHazeBackground(cmd, clear);
+            for (auto* r : hdrRenderers_) if (r != flameSub) r->onRender(cmd, frameIndex);
+            flameRenderer_.endHazeBackground(cmd);
+        }
         hdrScene_.beginRenderPass(cmd, clear, 1.0f);
-        for (auto* r : hdrRenderers_) r->onRender(cmd, frameIndex);
+        if (haze) {
+            flameRenderer_.applyHaze(cmd);
+            flameSub->onRender(cmd, frameIndex);
+        } else {
+            for (auto* r : hdrRenderers_) r->onRender(cmd, frameIndex);
+        }
         hdrScene_.endRenderPass(cmd);
     }
 
@@ -1076,6 +1097,13 @@ void FluidApp::syncFlameRenderer()
     const auto ext = getExtent();
     flameRenderer_.setViewportHeight(ext.height > 0 ? static_cast<float>(ext.height) : 720.0f);
     flameRenderer_.setShading(shading);
+    FlameHazePass::Settings haze;
+    haze.enabled   = render.hazeEnabled;
+    haze.strength  = render.hazeStrength;
+    haze.extent    = render.hazeExtent;
+    haze.frequency = render.hazeFrequency;
+    haze.riseSpeed = render.hazeRiseSpeed;
+    flameRenderer_.setHaze(haze, simTime);
     if (animating) flameRenderer_.notifySimulationAdvanced(jumped);
     flameRenderer_.setRenderMode(render.pbvrMode ? FlameRenderer::RenderMode::PBVR
                                                  : FlameRenderer::RenderMode::Normal);

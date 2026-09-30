@@ -10,8 +10,10 @@
 namespace Phantom {
 
 /**
- * @brief Standalone Flame (reacting hot-gas SPH) scene for FluidApp, folded in
- * from the former standalone FlameView/FlameApp.
+ * @brief Flame (reacting hot-gas SPH) domain for FluidApp, folded in from the
+ * former standalone FlameView/FlameApp. It is drawn in the shared scene next to
+ * the fluid / rigid / soft domains and the glTF background (it no longer owns
+ * the viewport while its control page is open).
  *
  * Owns a FlameFluid + FlameSolver and drives them exactly as FlameView did:
  * the same initial scene (buildScene()), the same fixed 1/60 s step, the same
@@ -37,7 +39,19 @@ public:
     /** @brief Rebuilds the fluid/solver and re-seeds the initial scene. */
     void reset();
 
-    void setRunning(bool r) { running_ = r; }
+    /**
+     * @brief Whether the flame is part of the shared scene (drawn together with
+     * the fluid / rigid / soft / glTF background). False at startup and after
+     * clear() so the app still opens on an empty scene; becomes true when the
+     * user opens the Flame page, presses Play / Step, or calls reset().
+     */
+    bool isPopulated() const { return populated_; }
+    void setPopulated(bool p) { populated_ = p; }
+
+    /** @brief Empty-scene reset (File > New): fresh initial scene, stopped, not drawn. */
+    void clear();
+
+    void setRunning(bool r) { running_ = r; if (r) populated_ = true; }
     bool isRunning() const { return running_; }
 
     /** @brief Advances the flame sim by one fixed step (getTimeStep()) if running. */
@@ -104,9 +118,19 @@ public:
         float pbvrMinSubPixels   = 1.5f;  ///< never smaller than this on screen
         float pbvrDensityScale   = 1.0f;
 
+        // Heat haze (FlameHazePass): screen-space refraction shimmer of whatever
+        // is behind the flame. Display only, driven by the emitters' temperature.
+        bool  hazeEnabled   = true;
+        float hazeStrength  = 10.0f;  ///< peak displacement (px at full heat); 0 = off
+        float hazeExtent    = 3.5f;   ///< haze sprite size relative to a flame sprite
+        float hazeFrequency = 24.0f;  ///< noise cells per screen height
+        float hazeRiseSpeed = 0.35f;  ///< screen heights / s the pattern climbs
+
         // Display transform onto FluidApp's shared FluidRenderer camera space.
         float     renderScale  = 12.0f;
-        glm::vec3 renderOffset { 20.0f, 4.0f, 20.0f };
+        // Default: the flame's base sits at the world origin on the floor plane
+        // (y = 0), where the rigid / soft presets and the glTF background live.
+        glm::vec3 renderOffset { 0.0f, 0.0f, 0.0f };
     };
 
     RenderParams&       render()       { return render_; }
@@ -116,6 +140,7 @@ private:
     std::unique_ptr<Phantom::Physics::FlameFluid>  fluid_;
     std::unique_ptr<Phantom::Physics::FlameSolver> solver_;
     bool         running_ = false;
+    bool         populated_ = false;
     float        timeStep_ = 1.0f / 60.0f;
     float        simTime_  = 0.0f;
     RenderParams render_;

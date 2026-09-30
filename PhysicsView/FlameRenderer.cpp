@@ -64,12 +64,25 @@ void FlameRenderer::onInit(VulkanContext& ctx, const VulkanCommandPool& pool,
 	if (!pbvr_.create(ctx, pool, renderPass, framesInFlight, shaders_.pbvr, 1280, 720)) {
 		std::fprintf(stderr, "[FlameRenderer] PBVR pass creation failed; PBVR mode will draw nothing\n");
 	}
+	if (!haze_.create(ctx, renderPass, depthFormat_, framesInFlight, shaders_.haze, 1280, 720)) {
+		std::fprintf(stderr, "[FlameRenderer] heat-haze pass creation failed; haze disabled\n");
+	}
 }
 
 void FlameRenderer::resize(uint32_t width, uint32_t height)
 {
 	if (ctx_ && pbvr_.isValid()) {
 		pbvr_.resize(*ctx_, width, height);
+	}
+	if (ctx_ && haze_.isValid()) {
+		haze_.resize(*ctx_, width, height);
+	}
+}
+
+void FlameRenderer::recordHazeField(VkCommandBuffer cmd, uint32_t frameIndex)
+{
+	if (hazeActive_) {
+		haze_.recordField(cmd, frameIndex);
 	}
 }
 
@@ -97,12 +110,20 @@ FlamePointUBO FlameRenderer::makeUBO()
 void FlameRenderer::onUpdate(uint32_t frameIndex)
 {
 	pbvrRecordedThisFrame_ = false;
+	hazeActive_ = false;
 	if (!enabled_ || !ctx_ || !flamePipeline_ || !smokePipeline_) {
 		pbvrWasActive_ = false;
 		return;
 	}
 	const FlamePointUBO ubo = makeUBO();
 	const auto nEmit = static_cast<uint32_t>(emitPositions_.size() / 3);
+
+	// Heat haze refracts what is behind the flame, in both render modes.
+	if (hazeSettings_.enabled && haze_.isValid() && nEmit > 0 && hazeSettings_.strength > 0.0f) {
+		haze_.update(*ctx_, frameIndex, ubo, hazeSettings_, nEmit, emitPositions_.data(),
+			emitTemperatures_.data(), emitSizes_.data(), hazeTime_);
+		hazeActive_ = true;
+	}
 
 	if (renderMode_ == RenderMode::PBVR) {
 		const auto nAbs = absPositions_.size() / 3;
@@ -204,6 +225,7 @@ void FlameRenderer::onCleanup(VkDevice device)
 		}
 	}
 	if (ctx_) {
+		haze_.destroy(*ctx_);
 		pbvr_.destroy(*ctx_);
 	}
 }

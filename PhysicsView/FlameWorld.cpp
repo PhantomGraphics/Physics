@@ -10,7 +10,7 @@ namespace Phantom {
 
 FlameWorld::FlameWorld()
 {
-    reset();
+    clear();
 }
 
 void FlameWorld::reset()
@@ -19,6 +19,14 @@ void FlameWorld::reset()
     solver_ = std::make_unique<FlameSolver>();
     simTime_ = 0.0f;
     buildScene();
+    populated_ = true;
+}
+
+void FlameWorld::clear()
+{
+    reset();
+    running_ = false;
+    populated_ = false;
 }
 
 void FlameWorld::buildScene()
@@ -80,6 +88,7 @@ void FlameWorld::step()
 
 void FlameWorld::stepOnce()
 {
+    populated_ = true;
     solver_->simulate(timeStep_);
     simTime_ += timeStep_;
 }

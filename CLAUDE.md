@@ -257,8 +257,23 @@ Screen Space Fluid Rendering（SSFR）パイプライン。`ParticleDepthRendere
     `CGLib/Graphics/EnsembleLodController`（GSView と共有、header-only）による Adaptive。ノイズの 1/√R 減衰は
     `run_flame_pbvr_evaluation.ps1` で確認（tail 傾き ≈ −0.5）。
   - 共有シェーダヘッダ `shaders/flame_common.glsl`（`FlamePointUBO` と同期）。`#include` は Ninja の depfile で追跡される。
-  - Flame ページを開いている間は `FlameRenderer` のみ描画し、fluid/SSFR/rigid/soft の各レンダラーは
-    `setEnabled(false)`。fluid/rigid/soft のシミュレーション自体は他ページと同様バックグラウンドで進む。
+  - **共通シーンへ統合済み**（2026-09-30）: Flame はページ専有ではなく、fluid/SSFR/rigid/soft/glTF 背景と同じ linear-HDR
+    シーンへ一緒に描く（雲ページだけがビューポートを専有する）。`FlameWorld::isPopulated()` が真の間だけ描画・ステップする
+    （起動時と File > New/`NewScene` 後は偽＝空シーン。Flame ページを開く／Play／Step／`FlameReset` で真）。
+    表示位置は `renderOffset` の既定を原点（剛体・軟体・背景の床 y=0）に合わせた（2026-09-30）。`renderScale` の既定は 12 のまま
+    （1 で「1 unit = 1 m」）。`renderOffsetX/Y/Z` は `SetFlameRenderParam` で負値も設定できる。
+  - **陽炎（`FlameHazePass`、2026-09-30）**: 炎の背後のシーンを画面空間で屈折させる。放射体の (T−T_amb)/(T_ref−T_amb) を
+    1/4 解像度の場（`flame_haze_field.*`、加算。r=熱、g=熱で重み付けした深度）へスプラットし、視線方向の積分に見立てる。
+    有効時は `FluidApp::onPreRender` が炎以外の不透明シーンを `FlameHazePass` の背景ターゲット（HDR シーンと同じ
+    フォーマット＝レンダーパス互換）へ描き、HDR シーンパスの最初に `flame_haze_apply.frag` が「ノイズで変位した背景のコピー」
+    を描いてから炎を重ねる。**変位させるのは色だけで、深度は元のまま書き戻す**（深度も動かすと炎スプライトと床の前後判定が
+    乱れて横縞が出た）。炎より手前の物体は屈折させない（g/r の深度比較、シルエットの引きずりも防止）。
+    ノイズ時間は炎のシミュレーション時刻（一時停止で固定＝スクリーンショットが決定的）。パラメータは
+    `RenderParams::haze*`（`SetFlameRenderParam:hazeEnabled|hazeStrength|hazeExtent|hazeFrequency|hazeRiseSpeed`、
+    Flame パネルの "Heat Haze"）。背景が単色だと変化は見えない。
+    **注意:** 深度ディスクリプタのレイアウトは `DEPTH_STENCIL_READ_ONLY_OPTIMAL`（`FlameFullscreenPass::setImages` の
+    `layouts` 引数）。`FlameRenderer` のサイズが変わるヘッダ変更後は Ninja が依存 .obj を再ビルドせず起動時にクラッシュする
+    ことがある（`build/.../PhysicsView.dir/PhysicsView` を消して再ビルド）。
 - **非スコープ（意図的）**: `RigidBoundary`/`addRigidBoundary()` 等の Rigid/SoftBody 境界結合、シミュレーションの GPU 化
   （`Fluid_GPU_Vk` 相当）、煙レイヤー分離。将来の拡張候補として 内部設計メモ の Phase 4 に記載。
 
