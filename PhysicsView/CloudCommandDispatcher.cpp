@@ -80,7 +80,7 @@ const std::vector<ParamDef>& params()
 		CLOUD_PARAM("soundSpeed", c.solver.soundSpeed, v > 0.0),
 		CLOUD_PARAM("viscosity", c.solver.viscosity, v >= 0.0),
 		CLOUD_PARAM("windRelaxTime", c.solver.windRelaxTime, v >= 0.0),
-		CLOUD_PARAM("mixRate", c.solver.mixRate, v >= 0.0),
+		CLOUD_PARAM("mixDiffusivity", c.solver.mixDiffusivity, v >= 0.0),
 		CLOUD_PARAM("wallRestitution", c.solver.wallRestitution, v >= 0.0 && v <= 1.0),
 		CLOUD_PARAM("timeScale", c.timeScale, v > 0.0),
 		CLOUD_PARAM("fixedTimeStep", c.fixedTimeStep, v >= 0.0),

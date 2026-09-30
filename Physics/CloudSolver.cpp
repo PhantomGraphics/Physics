@@ -73,7 +73,9 @@ double CloudSolver::stableTimeStep(const CloudParticleSoA& soa) const
 	for (const Vector3dd& v : soa.velocities) vmax = std::max(vmax, std::sqrt(dot3(v, v)));
 	if (vmax > 0.0) dt = std::min(dt, params.cfl * h / vmax);
 	if (params.viscosity > 0.0) dt = std::min(dt, 0.125 * h * h / params.viscosity);
-	if (params.enableMixing && params.mixRate > 0.0) dt = std::min(dt, 0.5 / params.mixRate);
+	if (params.enableMixing && params.mixDiffusivity > 0.0) {
+		dt = std::min(dt, params.spacing * params.spacing / (6.0 * params.mixDiffusivity));
+	}
 	if (diag_.maxAcceleration > 0.0) dt = std::min(dt, 0.4 * std::sqrt(h / diag_.maxAcceleration));
 	return dt;
 }
@@ -173,13 +175,19 @@ bool CloudSolver::step(CloudParticleSoA& soa, const std::vector<CloudSourceParam
 
 	// 5. Sources and conservative pairwise mixing (each unordered pair once, fixed order).
 	CloudOps::applySources(soa, sources, time, dt, ledger);
-	if (params.enableMixing && params.mixRate > 0.0) {
+	if (params.enableMixing && params.mixDiffusivity > 0.0) {
 		for (size_t i = 0; i < n; ++i) {
 			for (int jj : neighbors_[i]) {
 				const size_t j = static_cast<size_t>(jj);
 				if (j <= i) continue;
 				const Vector3dd d = soa.positions[i] - soa.positions[j];
-				const double a = std::min(0.5, params.mixRate * dt * kernel(std::sqrt(dot3(d, d)), h) / w0);
+				// Cleary-Monaghan SPH Laplacian: dphi_i/dt = sum_j 2 kappa V_j |W'|/r (phi_j - phi_i). The pair
+				// update moves i by a*wi (wi ~ 1/2 for equal masses), hence a = 4 kappa dt V |W'| / r. Being
+				// per-volume, the diffusivity does not depend on the particle spacing.
+				const double r = std::sqrt(dot3(d, d));
+				if (r < 1.0e-12) continue;
+				const double volume = 2.0 / (number_[i] + number_[j]);
+				const double a = std::min(0.5, 4.0 * params.mixDiffusivity * dt * volume * std::abs(kernelGradMag(r, h)) / r);
 				CloudOps::mixPairRelative(soa, i, j, a, thermo, environment);
 			}
 		}
