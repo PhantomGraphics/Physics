@@ -34,8 +34,9 @@ bool FlameFullscreenPass::create(const VulkanContext& ctx, VkRenderPass renderPa
 	p.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	p.descriptorSetLayout = setLayout_.get();
 	p.cullMode = VK_CULL_MODE_NONE;
-	p.depthTest = false;
-	p.depthWrite = false;
+	p.depthTest = config.writeDepth;
+	p.depthWrite = config.writeDepth;
+	p.depthCompareOp = VK_COMPARE_OP_ALWAYS;
 	p.blendEnable = config.premultipliedBlend;
 	p.premultipliedAlphaBlend = config.premultipliedBlend;
 	if (config.pushConstantSize > 0) {
@@ -52,7 +53,8 @@ void FlameFullscreenPass::destroy(VkDevice device)
 	sets_.clear();
 }
 
-void FlameFullscreenPass::setImages(VkDevice device, uint32_t set, const std::vector<VkImageView>& views, VkSampler sampler)
+void FlameFullscreenPass::setImages(VkDevice device, uint32_t set, const std::vector<VkImageView>& views, VkSampler sampler,
+	const std::vector<VkImageLayout>& layouts)
 {
 	if (set >= sets_.size() || views.size() != config_.imageCount) {
 		return;
@@ -60,7 +62,8 @@ void FlameFullscreenPass::setImages(VkDevice device, uint32_t set, const std::ve
 	std::vector<VkDescriptorImageInfo> infos(views.size());
 	std::vector<VkWriteDescriptorSet> writes(views.size());
 	for (size_t i = 0; i < views.size(); ++i) {
-		infos[i] = { sampler, views[i], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+		infos[i] = { sampler, views[i],
+			i < layouts.size() ? layouts[i] : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
 		writes[i] = {};
 		writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		writes[i].dstSet = sets_[set];

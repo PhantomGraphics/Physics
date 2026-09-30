@@ -32,13 +32,19 @@ public:
 		uint32_t setCount = 1;
 		uint32_t pushConstantSize = 0;
 		bool premultipliedBlend = false; ///< false = overwrite (no blending)
+		bool writeDepth = false;         ///< shader writes gl_FragDepth; depth test ALWAYS + write
 	};
 
 	bool create(const Phantom::VKG::VulkanContext& ctx, VkRenderPass renderPass, const Config& config);
 	void destroy(VkDevice device);
 
-	/** @brief Points descriptor set `set` at `views` (bindings 0..imageCount-1). */
-	void setImages(VkDevice device, uint32_t set, const std::vector<VkImageView>& views, VkSampler sampler);
+	/**
+	 * @brief Points descriptor set `set` at `views` (bindings 0..imageCount-1).
+	 * `layouts` (optional, one per view) overrides SHADER_READ_ONLY_OPTIMAL --
+	 * needed for depth images, which end in DEPTH_STENCIL_READ_ONLY_OPTIMAL.
+	 */
+	void setImages(VkDevice device, uint32_t set, const std::vector<VkImageView>& views, VkSampler sampler,
+		const std::vector<VkImageLayout>& layouts = {});
 
 	/** @brief Records the draw. Caller has begun a render pass compatible with create()'s. */
 	void draw(VkCommandBuffer cmd, uint32_t set, const void* pushData = nullptr) const;
