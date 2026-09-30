@@ -1,0 +1,38 @@
+{
+  "name": "65_cloud_pbvr_render",
+  "tags": ["cloud"],
+  "_comment": "Cloud page Phase 3: PBVR (ensemble-averaged opaque discs) of the same density / sun-transmittance grids the raymarch reads. Accumulates while the image is still, restarts when it changes, and reports capacity overflow instead of hiding it.",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "Show the Cloud page", "command": "SetCloudPage:true", "expect": "OK" },
+    { "label": "Paused", "command": "SetCloudRunning:false", "expect": "OK" },
+    { "label": "Domain X", "command": "SetCloudParam:domainX,500", "expect": "OK" },
+    { "label": "Domain Y", "command": "SetCloudParam:domainY,500", "expect": "OK" },
+    { "label": "Domain Z", "command": "SetCloudParam:domainZ,500", "expect": "OK" },
+    { "label": "Spacing", "command": "SetCloudParam:spacing,31.25", "expect": "OK" },
+    { "label": "Rebuild", "command": "CloudReset:1", "expect": "OK" },
+    { "label": "Moist heated source", "command": "AddCloudSource:250,250,150,100,0.1,3000,0,40", "expect": "Index:0" },
+    { "label": "Run 40 s", "command": "CloudAdvance:40", "expect": "OK" },
+    { "label": "Change: cloud formed", "command": "GetCloudStat:cloudyParticles", "expect_range": "1,100000" },
+
+    { "label": "Reject bad renderer", "command": "SetCloudParam:renderer,2", "expect_prefix": "Error:" },
+    { "label": "Reject zero ensembles", "command": "SetCloudParam:pbvrTargetEnsembles,0", "expect_prefix": "Error:" },
+    { "label": "Small ensemble target for the test", "command": "SetCloudParam:pbvrTargetEnsembles,16", "expect": "OK" },
+    { "label": "Ensembles per frame", "command": "SetCloudParam:pbvrEnsemblesPerFrame,4", "expect": "OK" },
+    { "label": "Switch to PBVR", "command": "SetCloudParam:renderer,1", "expect": "OK" },
+    { "label": "Let it accumulate (still image)", "command": "GetCloudSimTime", "repeat": 40 },
+    { "label": "Change: the average reached its target", "command": "GetCloudPbvrStat:accumulated", "expect_range": "16,16" },
+    { "label": "Invariant: no capacity overflow at the default budget", "command": "GetCloudPbvrStat:overflowed", "expect_range": "0,0" },
+    { "label": "Change: sub-particles were generated", "command": "GetCloudPbvrStat:generated", "expect_range": "1,1e9" },
+    { "label": "Capture", "command": "SaveScreenshot:testdata/screenshots/65_cloud_pbvr_render.png", "expect": "OK" },
+
+    { "label": "Sun change restarts the average", "command": "SetCloudParam:sunAzimuth,-90", "expect": "OK" },
+    { "label": "Let it accumulate again", "command": "GetCloudSimTime", "repeat": 40 },
+    { "label": "Change: accumulated to the target again", "command": "GetCloudPbvrStat:accumulated", "expect_range": "16,16" },
+    { "label": "Reject unknown PBVR stat", "command": "GetCloudPbvrStat:bogus", "expect_prefix": "Error:" },
+    { "label": "Back to the raymarch", "command": "SetCloudParam:renderer,0", "expect": "OK" },
+    { "label": "Let the raymarch draw", "command": "GetCloudSimTime", "repeat": 10 },
+    { "label": "Invariant: simulation untouched by rendering changes", "command": "GetCloudStat:balanceError", "expect_range": "0,1e-10" },
+    { "label": "Back to the Fluid page", "command": "SetCloudPage:false", "expect": "OK" }
+  ]
+}

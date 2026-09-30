@@ -49,6 +49,9 @@ public:
         double ambient = 0.15;             ///< Constant sky term (an artistic fill, not multiple scattering).
         double stepScale = 0.5;            ///< Ray step = stepScale * cell size.
         int maxSteps = 512;
+        int renderer = 0;                  ///< 0 = reference raymarch, 1 = ensemble PBVR of the same grids.
+        int pbvrEnsemblesPerFrame = 2;     ///< Ensembles added per frame while the image changes (1..4 interactive).
+        int pbvrTargetEnsembles = 64;      ///< Accumulation stops here while the image is still.
 
         Math::Vector3df sunDirection() const;
     };

@@ -126,6 +126,12 @@ void CloudControlPanel::drawContents()
         auto& rp = w.render();
         if (Im::checkbox("Volume (raymarched)", rp.volumeMode)) notifyWorldChanged();
         if (rp.volumeMode) {
+            const char* renderers[] = { "Raymarch (reference)", "PBVR (ensemble)" };
+            if (Im::combo("Renderer", rp.renderer, renderers, 2)) notifyWorldChanged();
+            if (rp.renderer == 1) {
+                Im::sliderInt("Ensembles / frame", rp.pbvrEnsemblesPerFrame, 1, 8);
+                Im::sliderInt("Target ensembles", rp.pbvrTargetEnsembles, 1, 256);
+            }
             int res = static_cast<int>(rp.gridResolution);
             if (Im::sliderInt("Density Grid", res, 16, 128)) {
                 rp.gridResolution = static_cast<uint32_t>(res);

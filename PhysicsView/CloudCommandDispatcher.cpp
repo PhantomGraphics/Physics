@@ -95,6 +95,12 @@ const std::vector<ParamDef>& params()
 		  [](CloudWorld& w, double v) { w.render().volumeMode = v != 0.0; return true; } },
 		{ "gridResolution", [](CloudWorld& w) { return static_cast<double>(w.render().gridResolution); },
 		  [](CloudWorld& w, double v) { if (v < 8.0 || v > 256.0) return false; w.render().gridResolution = static_cast<uint32_t>(v); return true; } },
+		{ "renderer", [](CloudWorld& w) { return static_cast<double>(w.render().renderer); },
+		  [](CloudWorld& w, double v) { if (v != 0.0 && v != 1.0) return false; w.render().renderer = static_cast<int>(v); return true; } },
+		{ "pbvrEnsemblesPerFrame", [](CloudWorld& w) { return static_cast<double>(w.render().pbvrEnsemblesPerFrame); },
+		  [](CloudWorld& w, double v) { if (v < 1.0 || v > 16.0) return false; w.render().pbvrEnsemblesPerFrame = static_cast<int>(v); return true; } },
+		{ "pbvrTargetEnsembles", [](CloudWorld& w) { return static_cast<double>(w.render().pbvrTargetEnsembles); },
+		  [](CloudWorld& w, double v) { if (v < 1.0 || v > 1024.0) return false; w.render().pbvrTargetEnsembles = static_cast<int>(v); return true; } },
 		CLOUD_RENDER("supportScale", supportScale, v >= 0.5 && v <= 6.0),
 		CLOUD_RENDER("extinction", extinction, v >= 0.0),
 		CLOUD_RENDER("albedo", albedo, v >= 0.0 && v <= 1.0),
@@ -282,6 +288,15 @@ std::optional<std::string> CloudCommandDispatcher::route(const std::string& cmd)
 	if (cmd == "GetCloudSimTime") return fmt(w.simTime());
 	if (cmd == "GetCloudCsvHeader") return CloudWorld::csvHeader();
 	if (cmd == "GetCloudStats") return w.csvRow();
+	if (startsWith(sv, "GetCloudPbvrStat:")) {
+		const auto name = sv.substr(17);
+		const auto s = pbvrStats_ ? pbvrStats_() : std::nullopt;
+		if (!s) return std::string("Error:PBVR renderer not available");
+		if (name == "accumulated") return fmt((*s)[0]);
+		if (name == "overflowed") return fmt((*s)[1]);
+		if (name == "generated") return fmt((*s)[2]);
+		return "Error:unknown PBVR stat '" + std::string(name) + "'";
+	}
 	if (startsWith(sv, "GetCloudStat:")) {
 		const auto name = sv.substr(13);
 		const CloudStats s = w.stats();
