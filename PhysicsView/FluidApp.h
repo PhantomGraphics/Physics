@@ -51,6 +51,8 @@
 #include "FlameWorld.h"
 #include "FlameRenderer.h"
 #include "FlameControlPanel.h"
+#include "CloudWorld.h"
+#include "CloudControlPanel.h"
 
 #include <filesystem>
 #include <optional>
@@ -168,6 +170,15 @@ private:
     FlameWorld        flameWorld_;
     FlameRenderer     flameRenderer_;
     FlameControlPanel flameControlPanel_;
+    // Cloud (moist-air SPH, docs/todo/PLAN_cloud_sph_pbvr.md). Same peer-domain
+    // pattern as Flame. Phase 2 shows the air particles through the shared
+    // FluidRenderer (coloured by cloud water); the PBVR cloud renderer is Phase 3.
+    CloudWorld        cloudWorld_;
+    CloudControlPanel cloudControlPanel_;
+    bool              cloudDirty_ = true;          // display needs re-uploading
+    bool              prevCloudActive_ = false;
+    uint64_t          cloudSyncedStep_ = ~0ull;
+    double            cloudLastTime_ = -1.0;       // steady-clock seconds of the previous frame
     bool              uiVisible_ = true; // SetUIVisible scenario command
     float             flameAutoRefT_ = 2000.0f;  // smoothed hottest temperature (auto radiance reference)
     float             flameLastSimTime_ = -1.0f; // sim time at the previous syncFlameRenderer()
@@ -214,6 +225,7 @@ private:
     void syncRigidRenderer();
     void syncSoftRenderer();
     void syncFlameRenderer();
+    void syncCloudRenderer();
     void syncVolumeRenderer();
     void syncMeshRenderer();
 };

@@ -17,6 +17,7 @@ enum class ControlPage {
     RigidBody,
     SoftBody,
     Flame,
+    Cloud,
     FluidRendering,
     SSFR,
     Rendering,
@@ -34,6 +35,7 @@ inline const char* toString(ControlPage page)
     case ControlPage::RigidBody:        return "Rigid Body";
     case ControlPage::SoftBody:         return "Soft Body";
     case ControlPage::Flame:            return "Flame";
+    case ControlPage::Cloud:            return "Cloud";
     case ControlPage::FluidRendering:   return "Fluid Rendering";
     case ControlPage::SSFR:             return "SSFR";
     case ControlPage::Rendering:        return "glTF Rendering";

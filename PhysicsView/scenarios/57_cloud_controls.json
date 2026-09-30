@@ -1,0 +1,53 @@
+{
+  "name": "57_cloud_controls",
+  "tags": ["cloud"],
+  "_comment": "Cloud page command surface: Play/Pause/Step, parameter get/set with rejection, source editing, wind, and error handling. Also exercises the free-running (Running) path with the real frame loop.",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "Show the Cloud page", "command": "SetCloudPage:true", "expect": "OK" },
+    { "label": "Paused", "command": "SetCloudRunning:false", "expect": "OK" },
+    { "label": "Small domain X", "command": "SetCloudParam:domainX,500", "expect": "OK" },
+    { "label": "Small domain Y", "command": "SetCloudParam:domainY,500", "expect": "OK" },
+    { "label": "Domain Z", "command": "SetCloudParam:domainZ,1000", "expect": "OK" },
+    { "label": "Coarse spacing", "command": "SetCloudParam:spacing,62.5", "expect": "OK" },
+    { "label": "Rebuild", "command": "CloudReset:3", "expect": "OK" },
+    { "label": "Precondition: not running", "command": "IsCloudRunning", "expect": "false" },
+
+    { "label": "Single step", "command": "CloudStep", "expect": "OK" },
+    { "label": "Change: exactly one step", "command": "GetCloudStat:stepCount", "expect_range": "1,1" },
+    { "label": "Ten steps", "command": "CloudStep:10", "expect": "OK" },
+    { "label": "Change: eleven steps", "command": "GetCloudStat:stepCount", "expect_range": "11,11" },
+
+    { "label": "Parameter round trip", "command": "SetCloudParam:viscosity,7", "expect": "OK" },
+    { "label": "Parameter read back", "command": "GetCloudParam:viscosity", "expect_range": "7,7" },
+    { "label": "Toggle a physics term", "command": "SetCloudParam:enableMixing,0", "expect": "OK" },
+    { "label": "Toggle read back", "command": "GetCloudParam:enableMixing", "expect_range": "0,0" },
+    { "label": "Restore the toggle", "command": "SetCloudParam:enableMixing,1", "expect": "OK" },
+    { "label": "Parameter names are listable", "command": "GetCloudParam:list", "expect_prefix": "spacing," },
+
+    { "label": "Reject out-of-range value", "command": "SetCloudParam:soundSpeed,-5", "expect_prefix": "Error:" },
+    { "label": "Reject unknown parameter", "command": "SetCloudParam:bogus,1", "expect_prefix": "Error:" },
+    { "label": "Reject non-numeric value", "command": "SetCloudParam:viscosity,abc", "expect_prefix": "Error:" },
+    { "label": "Reject unknown stat", "command": "GetCloudStat:bogus", "expect_prefix": "Error:" },
+    { "label": "Reject bad humidity", "command": "SetCloudHumidity:1.5", "expect_prefix": "Error:" },
+    { "label": "Reject bad source", "command": "AddCloudSource:1,2,3", "expect_prefix": "Error:" },
+    { "label": "Reject zero-radius source", "command": "AddCloudSource:1,2,3,0,0,0,0,1", "expect_prefix": "Error:" },
+    { "label": "Reject removal of a missing source", "command": "RemoveCloudSource:4", "expect_prefix": "Error:" },
+    { "label": "Wind accepted", "command": "SetCloudWind:2,0,0", "expect": "OK" },
+
+    { "label": "Add a source", "command": "AddCloudSource:250,250,200,100,0.5,100,0,10", "expect": "Index:0" },
+    { "label": "Edit it", "command": "SetCloudSource:0,250,250,200,100,1.0,200,0,10", "expect": "OK" },
+    { "label": "Change: one source", "command": "GetCloudSourceCount", "expect": "Count:1" },
+    { "label": "Sources survive a reset", "command": "CloudReset", "expect": "OK" },
+    { "label": "Invariant: still one source", "command": "GetCloudSourceCount", "expect": "Count:1" },
+    { "label": "Remove it", "command": "RemoveCloudSource:0", "expect": "OK" },
+    { "label": "Change: no sources", "command": "GetCloudSourceCount", "expect": "Count:0" },
+
+    { "label": "Free-run", "command": "SetCloudRunning:true", "expect": "OK" },
+    { "label": "Let frames pass (one command per frame)", "command": "GetCloudSimTime", "repeat": 150 },
+    { "label": "Change: real-time updates advanced the clock", "command": "GetCloudStat:simTime", "expect_range": "0.05,100000" },
+    { "label": "Pause again", "command": "SetCloudRunning:false", "expect": "OK" },
+    { "label": "Invariant: still valid after free-running", "command": "GetCloudStat:nonFinite", "expect_range": "0,0" },
+    { "label": "Back to the Fluid page", "command": "SetCloudPage:false", "expect": "OK" }
+  ]
+}

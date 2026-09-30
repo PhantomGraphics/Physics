@@ -70,10 +70,10 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 | 10–19 | `fluid` — SPH ソルバー単体 | 70–79 | `pipe` — Volume/Mesh 変換パイプライン |
 | 20–29 | `rigid` — 剛体単体 | 80–89 | `capture` — スクリーンショット |
 | 30–44 | `soft` — 軟体単体・軟体間/自己衝突 | 90–99 | `neg` — 異常系 |
-| 45–49 | `flame` — 炎 SPH・Flame 描画（Normal/PBVR） | | |
-| 50–59 | `couple` — Rigid↔Fluid / Soft↔Fluid | | |
+| 45–49 | `flame` — 炎 SPH・Flame 描画（Normal/PBVR） | 55–58 | `cloud` — 雲 SPH（`tags:["cloud"]`、`docs/todo/PLAN_cloud_sph_pbvr.md`） |
+| 50–54 | `couple` — Rigid↔Fluid / Soft↔Fluid | | |
 
-現在 59 本（`86_render_ssfr_anisotropic_kernel`（SSFR 異方性カーネル）、`45`〜`49_flame_*`（炎 SPH、`docs/todo/PLAN_flame_sph_pbvr_improvement.md`）、`04_smoke_new_scene`（File > New / `NewScene` コマンド）、`81_render_background` / `82_render_rigid_shaded` / `83_render_soft_shaded` / `84_render_shadows` / `85_render_ssfr_scene`（glTF レンダリング Phase 1–5）を含む）。全シナリオが「事前条件・変化（`store_as`+`post_assert` または初期値を含まない `expect_range`/`expect_not`）・不変条件」の三点契約で構成されている（詳細は
+現在 63 本（`55`〜`58_cloud_*`（雲 SPH の Cloud ページ）、`86_render_ssfr_anisotropic_kernel`（SSFR 異方性カーネル）、`45`〜`49_flame_*`（炎 SPH、`docs/todo/PLAN_flame_sph_pbvr_improvement.md`）、`04_smoke_new_scene`（File > New / `NewScene` コマンド）、`81_render_background` / `82_render_rigid_shaded` / `83_render_soft_shaded` / `84_render_shadows` / `85_render_ssfr_scene`（glTF レンダリング Phase 1–5）を含む）。全シナリオが「事前条件・変化（`store_as`+`post_assert` または初期値を含まない `expect_range`/`expect_not`）・不変条件」の三点契約で構成されている（詳細は
 シナリオテストガイドの「アサーション三点契約」節）。
 
 **タグ:** JSON トップレベルの `"tags": [...]` を `run_physics_scenarios.ps1` が読み、`-Tag`/`-ExcludeTag` で絞り込む
@@ -194,6 +194,12 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 - 描画: `FluidRenderer`（パーティクル直接描画）と `SSFluidRenderer`（`Physics/FluidRenderer/` の SSFR、下記）を切替可能。`RigidBodyWireRenderer`/`SoftBodyWireRenderer` はワイヤーフレーム表示。
 - glTF レンダリング（`docs/todo/PLAN_physicsview_gltf_rendering.md`、Phase 0–5 実装済み 2026-09-08、Phase 6 は任意）: `bgGltfRenderer_`（`Phantom::Gltf::GltfSceneRenderer` 1 個）が不透明背景セットを流体と同一カメラ（`FluidRenderer` が唯一のソース、`syncBackgroundCamera()` が `inverse(view)[3]` を eye に）で PBR 描画する。ドキュメント・環境・共有 directional light は `RenderBackground.{h,cpp}` が所有し、`CommandDispatcher` の `LoadRenderBackground`/`SetEnvironment`/`SetLight`/… と `ControlPage::Rendering`（`RenderingPanel`、"glTF Rendering" ページ）が駆動する。gltf.{vert,frag} は `CGLib/GltfViewer/shaders` から `PhysicsView/shaders/` へコピー（SDR シェーダ内トーンマップ版、Universe と同一）。Flame ページ中は `setVisible(false)`。Phase 2–3（2026-09-08）で剛体・軟体の PBR 描画を追加: `GltfBodyRenderer`（`PrimitiveGltf.{h,cpp}` の単位 Sphere/Box、`SetRigidRenderMode`）と `GltfSoftRenderer`（`SoftMeshGltf.{h,cpp}` で `SoftMesh` から合成、毎フレーム `GltfSceneRenderer::updateMorphedGeometry()` で position+法線ストリーム、cull-none、`SetSoftRenderMode`、Rope は対象外）。どちらも Vulkan 非依存の合成部を PhysicsTest で単体テスト。CGLib 側は `GltfGpuMesh::setKeepCpuVertices()`/`updatePositionsAndNormals()`・`GltfSceneRenderer::setDynamic()`/`setCullMode()`/`updateMorphedGeometry()` を純追加（既定不変）。Phase 4（2026-09-08、CGLib 変更なし）で共有 directional light の shadow map（`FluidApp` が `Phantom::Gltf::ShadowMapPass` を 1 個所有、`onPreRender()` で depth-only pass、背景/剛体/軟体が影を落とす/受ける、`SetShadowEnabled`）を追加。Phase 5（2026-09-08、CGLib 変更なし）で linear-HDR オフスクリーン合成: 9 個のシーンサブレンダラーを `add()` せず `hdrRenderers_` に集め `onPreRender()` で `hdrScene_`（`VulkanOffscreen` RGBA16F+depth）へ手動描画、`ssfrRenderer_` だけが VkAppBase サブレンダラーとして残りそのコンポジットがスワップチェーンへの唯一の最終 pass（HDR scene サンプル → 流体合成 → ACES+exposure 1 回）。`gltf.frag` は linear 出力へ（PhysicsView ローカル差分は Phase 3 の法線反転 + これの 2 点）。`SetSSFREnabled`/`SetSSFRMode`。共有 `Physics/FluidRenderer` の `BilateralFilter` 多重呼び出しバグ（frame あたり 1 descriptor set / UBO しか無く bind 中更新でコマンドバッファ無効化）も `SSFRPassConfig::setsPerFrame` 追加で修正（FluidStudio にも効く、既定 1 で挙動不変）。
 - `FlameWorld`/`FlameControlPanel`/`FlameRenderer` — 炎 SPH（旧 FlameView を統合、下記 Flame 節）。`ControlPage::Flame` を開いている間だけ描画する独立ドメイン。
+
+- `CloudWorld`/`CloudControlPanel`/`CloudCommandDispatcher` — 雲（湿潤空気 SPH）。Flame と同じ「結合しない独立ドメイン」で
+  `ControlPage::Cloud`。コアは `Physics/Physics/Cloud{Params,Thermodynamics,Particle,Stats,Solver}`（double、Vulkan/ImGui 非依存、
+  PhysicsTest で検証）。Phase 2 の表示は FluidRenderer に空気粒子を雲水量で着色して流し込む診断表示のみ（PBVR は Phase 3）。
+  コマンド名はすべて "Cloud" を含む（`CloudCommandDispatcher.h` 参照）。`CloudWorld` は構築時に格子を作らず（`ensureBuilt()`）、
+  初回使用時に 32³ を作る。**格子・環境系パラメータは `CloudReset` で反映**される。
 
 ### Fluid_GPU_Vk（`Physics/Fluid_GPU_Vk/`）
 
