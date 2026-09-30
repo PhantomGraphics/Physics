@@ -66,6 +66,16 @@ void applySources(CloudParticleSoA& soa, const std::vector<CloudSourceParams>& s
 void mixPair(CloudParticleSoA& soa, size_t i, size_t j, double a);
 
 /**
+ * @brief mixPair() for a stratified atmosphere: T and qv are exchanged as deviations from the
+ * environment profile at each particle's height (mixing must not diffuse the background
+ * lapse rate / humidity gradient); qc is exchanged directly. Mass-weighted, so
+ * sum(mDry*qv), sum(mDry*qc) are conserved exactly (positions are fixed during mixing).
+ * If the vapour exchange would make either qv negative, the vapour part is skipped.
+ */
+void mixPairRelative(CloudParticleSoA& soa, size_t i, size_t j, double a, const CloudThermoParams& th,
+                     const CloudEnvironmentParams& env);
+
+/**
  * @brief Runs the saturation adjustment for every particle using the hydrostatic
  * environment pressure at its height. Returns the number of particles whose
  * adjustment failed to converge or had invalid input (state left unchanged).

@@ -106,6 +106,37 @@ void mixPair(CloudParticleSoA& soa, size_t i, size_t j, double a)
 	exchange(soa.qc);
 }
 
+void mixPairRelative(CloudParticleSoA& soa, size_t i, size_t j, double a, const CloudThermoParams& th,
+                     const CloudEnvironmentParams& env)
+{
+	if (i == j || !(a > 0.0)) return;
+	a = std::min(a, 1.0);
+	const double mi = soa.mDry[i];
+	const double mj = soa.mDry[j];
+	const double wi = mj / (mi + mj);
+	const double wj = mi / (mi + mj);
+
+	const double zi = soa.positions[i].z, zj = soa.positions[j].z;
+	const double tEi = CloudThermodynamics::environmentTemperature(env, zi);
+	const double tEj = CloudThermodynamics::environmentTemperature(env, zj);
+	const double qEi = CloudThermodynamics::environmentVaporMixingRatio(th, env, zi);
+	const double qEj = CloudThermodynamics::environmentVaporMixingRatio(th, env, zj);
+
+	const double dT = a * ((soa.temperatures[j] - tEj) - (soa.temperatures[i] - tEi));
+	soa.temperatures[i] += dT * wi;
+	soa.temperatures[j] -= dT * wj;
+
+	const double dQ = a * ((soa.qv[j] - qEj) - (soa.qv[i] - qEi));
+	if (soa.qv[i] + dQ * wi >= 0.0 && soa.qv[j] - dQ * wj >= 0.0) {
+		soa.qv[i] += dQ * wi;
+		soa.qv[j] -= dQ * wj;
+	}
+
+	const double dC = a * (soa.qc[j] - soa.qc[i]);
+	soa.qc[i] += dC * wi;
+	soa.qc[j] -= dC * wj;
+}
+
 size_t saturationAdjustAll(CloudParticleSoA& soa, const CloudThermoParams& th,
                            const CloudEnvironmentParams& env, CloudStats* stats)
 {
