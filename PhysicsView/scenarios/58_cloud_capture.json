@@ -1,0 +1,21 @@
+{
+  "name": "58_cloud_capture",
+  "tags": ["cloud"],
+  "_comment": "Cloud page Phase 2 diagnostic view: air particles coloured by cloud water in the shared FluidRenderer, captured after a cloud forms.",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "Show the Cloud page", "command": "SetCloudPage:true", "expect": "OK" },
+    { "label": "Paused", "command": "SetCloudRunning:false", "expect": "OK" },
+    { "label": "Domain X", "command": "SetCloudParam:domainX,500", "expect": "OK" },
+    { "label": "Domain Y", "command": "SetCloudParam:domainY,500", "expect": "OK" },
+    { "label": "Domain Z", "command": "SetCloudParam:domainZ,500", "expect": "OK" },
+    { "label": "Spacing", "command": "SetCloudParam:spacing,31.25", "expect": "OK" },
+    { "label": "Rebuild", "command": "CloudReset:1", "expect": "OK" },
+    { "label": "Moist heated source", "command": "AddCloudSource:250,250,150,100,0.1,3000,0,40", "expect": "Index:0" },
+    { "label": "Run 40 s", "command": "CloudAdvance:40", "expect": "OK" },
+    { "label": "Change: cloud formed", "command": "GetCloudStat:cloudyParticles", "expect_range": "1,100000" },
+    { "label": "Let the display update", "command": "GetCloudSimTime", "repeat": 10 },
+    { "label": "Capture", "command": "SaveScreenshot:testdata/screenshots/58_cloud_capture.png", "expect": "OK" },
+    { "label": "Back to the Fluid page", "command": "SetCloudPage:false", "expect": "OK" }
+  ]
+}

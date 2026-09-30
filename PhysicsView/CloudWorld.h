@@ -37,6 +37,13 @@ public:
 
     CloudWorld();
 
+    /**
+     * @brief Builds the initial lattice if reset() has not run yet. Construction is deliberately
+     * cheap (a default 32^3 lattice costs seconds in Debug) so the world can live in FluidApp
+     * without being paid for until the Cloud page/commands are first used.
+     */
+    void ensureBuilt() { if (!built_) reset(); }
+
     /** @brief Rebuilds the air lattice from the config; keeps the source list. seed < 0 keeps the config seed. */
     void reset(int64_t seed = -1);
 
@@ -94,6 +101,7 @@ private:
     Physics::CloudParticleSoA soa_;
     Physics::CloudWaterLedger ledger_;
     std::vector<Physics::CloudSourceParams> sources_;
+    bool built_ = false;
     bool running_ = false;
     double simTime_ = 0.0;
     uint64_t stepCount_ = 0;

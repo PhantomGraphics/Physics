@@ -1,6 +1,8 @@
 ﻿#include "pch.h"
 #include "FluidApp.h"
 
+#include <chrono>
+
 #include "../../CGLib/VulkanGraphics/VulkanSPVResolver.h"
 
 #include <algorithm>
@@ -15,6 +17,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     , softWorld_(world_.physicsSolver())
     , softControlPanel_(&softWorld_)
     , flameControlPanel_(&flameWorld_)
+    , cloudControlPanel_(&cloudWorld_)
 {
     // Every scene object registers itself into the shared registry: the fluid
     // + mesh boundary + emitters/outflow via FluidWorld, its rigid bodies via
@@ -89,6 +92,15 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
         [this] { return controlHost_.getPage() == ControlPage::Flame; });
     dispatcher_.flame().setPBVRStatsHook([this] { return flameRenderer_.pbvrStats(); });
     dispatcher_.flame().setOnFlameChanged([this]() { syncFlameRenderer(); });
+    cloudControlPanel_.setOnWorldChanged([this]() { cloudDirty_ = true; });
+    dispatcher_.cloud().setWorld(&cloudWorld_);
+    dispatcher_.cloud().setPageHooks(
+        [this](bool on) {
+            controlHost_.setPage(on ? ControlPage::Cloud : ControlPage::Fluid);
+            controlHost_.setVisible(true);
+        },
+        [this] { return controlHost_.getPage() == ControlPage::Cloud; });
+    dispatcher_.cloud().setOnCloudChanged([this]() { cloudDirty_ = true; });
     renderingPanel_.bind(&renderBackground_);
     renderingPanel_.bindRigidBodyRenderer(&rigidGltfRenderer_);
     renderingPanel_.bindSoftBodyRenderer(&softGltfRenderer_);
@@ -215,6 +227,7 @@ void FluidApp::registerControlPages()
     controlHost_.registerPage(ControlPage::RigidBody,        &rigidControlPanel_);
     controlHost_.registerPage(ControlPage::SoftBody,         &softControlPanel_);
     controlHost_.registerPage(ControlPage::Flame,            &flameControlPanel_);
+    controlHost_.registerPage(ControlPage::Cloud,            &cloudControlPanel_);
     controlHost_.registerPage(ControlPage::FluidRendering,   &fluidRenderer_);
     controlHost_.registerPage(ControlPage::SSFR,             &ssfrPanel_);
     controlHost_.registerPage(ControlPage::Rendering,        &renderingPanel_);
@@ -502,6 +515,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     // the only one drawn, and the fluid/rigid/soft domains keep simulating in
     // the background exactly as they do while any other page is shown.
     const bool flameActive = (controlHost_.getPage() == ControlPage::Flame);
+    const bool cloudActive = (controlHost_.getPage() == ControlPage::Cloud);
 
     const bool testActive = ssfrTestPanel_.isActive();
 
@@ -600,21 +614,48 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         ssfrRenderer_.setEnabled(false);
     }
     flameRenderer_.setEnabled(flameActive);
+    // Cloud page: the air particles replace the fluid display in the shared
+    // FluidRenderer (Phase 2 diagnostic view); every other scene renderer is off.
+    if (cloudActive) {
+        const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        const double realDt = cloudLastTime_ < 0.0 ? 0.0 : std::min(now - cloudLastTime_, 0.1);
+        cloudLastTime_ = now;
+        cloudWorld_.ensureBuilt();
+        cloudWorld_.update(realDt);
+        if (world_.isRunning()) cloudDirty_ = true;   // the fluid sync above may have overwritten the particles
+        syncCloudRenderer();
+        ssfrRenderer_.setEnabled(false);
+        fluidRenderer_.clearDirectGpuBuffer();
+        fluidRenderer_.setEnabled(true);
+    } else {
+        cloudLastTime_ = -1.0;
+        if (prevCloudActive_) {
+            // Leaving the page: put the fluid domain's own particles back.
+            if (world_.getSimulationType() != FluidWorld::SimulationType::GPU_CSPH) {
+                syncParticlesToRenderer();
+            } else {
+                syncGpuCsphBufferToRenderer();
+            }
+            cloudDirty_ = true;
+        }
+    }
+    prevCloudActive_ = cloudActive;
+    const bool ownsViewport = flameActive || cloudActive;
     // Rigid / soft body: wire (RigidBodyWireRenderer / SoftBodyWireRenderer) vs
     // shaded (GltfBodyRenderer / GltfSoftRenderer) vs both, per SetRigidRenderMode
     // / SetSoftRenderMode / the "glTF Rendering" panel. Flame still takes the
     // whole viewport.
     {
         const auto rm = rigidGltfRenderer_.mode();
-        rigidRenderer_.setEnabled(!flameActive && bodyRenderModeWantsWire(rm));
-        rigidGltfRenderer_.setEnabled(!flameActive && bodyRenderModeWantsShaded(rm));
+        rigidRenderer_.setEnabled(!ownsViewport && bodyRenderModeWantsWire(rm));
+        rigidGltfRenderer_.setEnabled(!ownsViewport && bodyRenderModeWantsShaded(rm));
         const auto sm = softGltfRenderer_.mode();
-        softRenderer_.setEnabled(!flameActive && bodyRenderModeWantsWire(sm));
-        softGltfRenderer_.setEnabled(!flameActive && bodyRenderModeWantsShaded(sm));
+        softRenderer_.setEnabled(!ownsViewport && bodyRenderModeWantsWire(sm));
+        softGltfRenderer_.setEnabled(!ownsViewport && bodyRenderModeWantsShaded(sm));
     }
     // The Flame page owns the viewport (see the flameActive comment above);
     // hide the glTF background there too, matching rigid/soft/fluid.
-    bgGltfRenderer_.setVisible(!flameActive);
+    bgGltfRenderer_.setVisible(!ownsViewport);
 
     ssfrRenderer_.setCamera(fluidRenderer_.getProjMatrix(), fluidRenderer_.getViewMatrix());
     rigidRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
@@ -697,7 +738,7 @@ void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
     if (shadowPass_.isValid()) {
         const glm::mat4 vp = shadowPass_.getLightVP();
         shadowPass_.begin(cmd);
-        if (renderBackground_.castShadows() && !flameActive) {
+        if (renderBackground_.castShadows() && !flameActive && controlHost_.getPage() != ControlPage::Cloud) {
             bgGltfRenderer_.renderShadowCasters(cmd, vp);
             rigidGltfRenderer_.renderShadowCasters(cmd, vp);
             softGltfRenderer_.renderShadowCasters(cmd, vp);
@@ -834,6 +875,27 @@ void FluidApp::syncSoftRenderer()
     softRenderer_.update(wd.positions, wd.colors, wd.indices,
                           fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
     softGltfRenderer_.syncFromWorld();
+}
+
+void FluidApp::syncCloudRenderer()
+{
+    // Maps the cloud's z-up metres onto the shared FluidRenderer camera space
+    // (y-up, ~40 units across): (x, y, z) m -> (x, z, y) * 0.04. Colour value =
+    // cloud water in g/kg (0 = clear air stays neutral).
+    if (!cloudDirty_ && cloudSyncedStep_ == cloudWorld_.stepCount()) return;
+    cloudDirty_ = false;
+    cloudSyncedStep_ = cloudWorld_.stepCount();
+    const auto& soa = cloudWorld_.particles();
+    const auto& dom = cloudWorld_.config().solver;
+    const float scale = 40.0f / static_cast<float>(std::max({ dom.domainMax.x, dom.domainMax.y, dom.domainMax.z }));
+    std::vector<glm::vec3> pts(soa.size());
+    std::vector<float> qc(soa.size());
+    for (size_t i = 0; i < soa.size(); ++i) {
+        const auto& p = soa.positions[i];
+        pts[i] = glm::vec3(static_cast<float>(p.x), static_cast<float>(p.z), static_cast<float>(p.y)) * scale;
+        qc[i] = static_cast<float>(soa.qc[i] * 1000.0);
+    }
+    fluidRenderer_.setParticles(pts, qc);
 }
 
 void FluidApp::syncFlameRenderer()

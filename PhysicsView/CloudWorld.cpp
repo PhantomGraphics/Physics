@@ -13,10 +13,7 @@ using Physics::CloudSourceParams;
 using Math::Vector3dd;
 namespace CT = Physics::CloudThermodynamics;
 
-CloudWorld::CloudWorld()
-{
-    reset();
-}
+CloudWorld::CloudWorld() = default;
 
 void CloudWorld::syncSolver()
 {
@@ -27,6 +24,7 @@ void CloudWorld::syncSolver()
 
 void CloudWorld::reset(int64_t seed)
 {
+    built_ = true;
     if (seed >= 0) config_.seed = static_cast<uint32_t>(seed);
     syncSolver();
     soa_.clear();
@@ -79,6 +77,7 @@ double CloudWorld::run(double simSeconds, int maxSubsteps)
 
 void CloudWorld::update(double realDt)
 {
+    ensureBuilt();
     if (!running_ || !(realDt > 0.0)) return;
     const double left = run(realDt * config_.timeScale, std::max(1, config_.maxSubstepsPerFrame));
     if (left > 0.0) {
@@ -89,12 +88,14 @@ void CloudWorld::update(double realDt)
 
 void CloudWorld::advance(double simSeconds)
 {
+    ensureBuilt();
     if (!(simSeconds > 0.0)) return;
     run(simSeconds, 1 << 30);
 }
 
 void CloudWorld::stepOnce()
 {
+    ensureBuilt();
     run(chooseDt(1.0e30), 1);
 }
 
@@ -120,6 +121,7 @@ bool CloudWorld::removeSource(size_t index)
 
 void CloudWorld::setRelativeHumidity(double rh)
 {
+    ensureBuilt();
     rh = std::clamp(rh, 0.0, 1.0);
     const double old = config_.environment.relativeHumidity;
     config_.environment.relativeHumidity = rh;

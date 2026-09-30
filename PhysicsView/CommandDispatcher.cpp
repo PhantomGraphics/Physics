@@ -142,6 +142,7 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
     const std::string_view sv(cmd);
 
     if (auto flameResp = flameDispatcher_.route(cmd)) return flameResp;
+    if (auto cloudResp = cloudDispatcher_.route(cmd)) return cloudResp;
 
     if (sv.rfind("SetCameraOrbit:", 0) == 0) {
         if (!fluidRenderer_) return std::string("Error:camera not available");

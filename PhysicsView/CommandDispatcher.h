@@ -4,6 +4,7 @@
 #include "RigidBodyCommandDispatcher.h"
 #include "SoftBodyCommandDispatcher.h"
 #include "FlameCommandDispatcher.h"
+#include "CloudCommandDispatcher.h"
 
 #include <optional>
 
@@ -160,6 +161,10 @@ namespace Phantom {
         // command names contains "Flame" so nothing else is shadowed.
         FlameCommandDispatcher& flame() { return flameDispatcher_; }
 
+        // Cloud page surface (SetCloudPage / CloudReset / CloudAdvance:s / AddCloudSource:... /
+        // GetCloudStat:name / ...), see CloudCommandDispatcher.h. Every command name contains "Cloud".
+        CloudCommandDispatcher& cloud() { return cloudDispatcher_; }
+
         // Tears the whole 3D scene down to nothing (the "NewScene" command /
         // File > New). Unset makes "NewScene" an "Error:".
         void setOnNewScene(std::function<void()> cb) { onNewScene_ = std::move(cb); }
@@ -221,6 +226,7 @@ namespace Phantom {
         SoftBodyWorld* softWorld_ = nullptr;
         SoftBodyCommandDispatcher softDispatcher_;
         FlameCommandDispatcher flameDispatcher_;
+        CloudCommandDispatcher cloudDispatcher_;
         FluidVolumeConverter* volumeConverter_ = nullptr;
         FluidMeshConverter* meshConverter_ = nullptr;
         VolumeRenderer* volumeRenderer_ = nullptr;

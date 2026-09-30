@@ -138,6 +138,40 @@ TEST(CloudWorldTest, TimeStepHalvingKeepsResultsClose)
   EXPECT_NEAR(a.cloudTop, b.cloudTop, 0.10 * std::max(b.cloudTop, 1.0) + 62.5);
 }
 
+TEST(CloudWorldTest, ParticleSpacingSensitivityIsRecorded)
+{
+  // Plan Phase 2: record how formation changes with particle spacing (values are logged, not tuned to).
+  auto run = [](double spacing) {
+    CloudWorld w;
+    w.config().solver.domainMax = Vector3dd(500.0, 500.0, 1000.0);
+    w.config().solver.spacing = spacing;
+    w.reset();
+    w.addSource(moistSource(Vector3dd(250.0, 250.0, 300.0), 40.0));
+    double formTime = -1.0;
+    for (int i = 0; i < 60; ++i) {
+      w.advance(1.0);
+      if (formTime < 0.0 && w.stats().totalCloudWater > 0.0) formTime = w.simTime();
+    }
+    const Physics::CloudStats s = w.stats();
+    std::printf("[spacing %.2f] particles=%zu formTime=%.1f s cloudWater=%.4g kg top=%.0f m\n",
+                spacing, s.particleCount, formTime, s.totalCloudWater, s.cloudTop);
+    return std::make_pair(formTime, s);
+  };
+  const auto coarse = run(83.3333333);
+  const auto medium = run(62.5);
+  const auto fine = run(50.0);
+  // Measured 2026-09-30 (Debug, this scene): formation time 24 / 19 / 16 s and cloud water at 60 s
+  // 0 / 1072 / 2268 kg for spacing 83.3 / 62.5 / 50 m -- formation is resolution dependent (a
+  // known limitation recorded in the plan). Only invariants and the trend direction are asserted.
+  for (const auto* r : { &coarse, &medium, &fine }) {
+    EXPECT_GT(r->first, 0.0);                       // a cloud forms at every resolution
+    EXPECT_LT(r->second.balanceError, 1.0e-10);
+    EXPECT_EQ(r->second.nonFiniteCount, 0u);
+  }
+  EXPECT_GE(coarse.first, medium.first);            // finer air forms cloud no later
+  EXPECT_GE(medium.first, fine.first);
+}
+
 TEST(CloudWorldTest, SourceListEditing)
 {
   CloudWorld w;

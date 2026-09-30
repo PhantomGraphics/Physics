@@ -259,6 +259,8 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/FlamePBVRPass.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameStreamBuffer.cpp
     ${PHYSICS_ROOT}/PhysicsView/CloudWorld.cpp
+    ${PHYSICS_ROOT}/PhysicsView/CloudCommandDispatcher.cpp
+    ${PHYSICS_ROOT}/PhysicsView/CloudControlPanel.cpp
 )
 target_include_directories(PhysicsView PRIVATE
     ${CGLIB_ROOT}/ThirdParty/VulkanMemoryAllocator

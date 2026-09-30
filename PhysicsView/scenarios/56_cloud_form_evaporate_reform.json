@@ -1,0 +1,37 @@
+{
+  "name": "56_cloud_form_evaporate_reform",
+  "tags": ["cloud"],
+  "_comment": "Cloud page Phase 2 cycle: a moist heated source forms cloud from qc=0, drying the air evaporates it back into vapour, a second source at another place re-forms it. Every change is checked against the water ledger (drying is a recorded external removal, evaporation is not a loss).",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "Show the Cloud page", "command": "SetCloudPage:true", "expect": "OK" },
+    { "label": "Paused", "command": "SetCloudRunning:false", "expect": "OK" },
+    { "label": "Small domain X", "command": "SetCloudParam:domainX,500", "expect": "OK" },
+    { "label": "Small domain Y", "command": "SetCloudParam:domainY,500", "expect": "OK" },
+    { "label": "Domain Z", "command": "SetCloudParam:domainZ,1000", "expect": "OK" },
+    { "label": "Coarse spacing", "command": "SetCloudParam:spacing,62.5", "expect": "OK" },
+    { "label": "Rebuild the air with a fixed seed", "command": "CloudReset:1", "expect": "OK" },
+    { "label": "Drop any earlier sources", "command": "ClearCloudSources", "expect": "OK" },
+    { "label": "Source A: heat + vapour for 30 s", "command": "AddCloudSource:150,250,300,150,0.1,3000,0,30", "expect": "Index:0" },
+    { "label": "Precondition: clear air", "command": "GetCloudStat:totalCloudWater", "expect_range": "0,0" },
+
+    { "label": "Run 30 s", "command": "CloudAdvance:30", "expect": "OK" },
+    { "label": "Change: cloud water formed from zero", "command": "GetCloudStat:totalCloudWater", "expect_range": "1,1e9" },
+    { "label": "Change: cloudy particles exist", "command": "GetCloudStat:cloudyParticles", "expect_range": "1,1024" },
+    { "label": "Invariant: ledger closed after formation", "command": "GetCloudStat:balanceError", "expect_range": "0,1e-10" },
+
+    { "label": "Dry the air", "command": "SetCloudHumidity:0.15", "expect": "OK" },
+    { "label": "Run 60 s", "command": "CloudAdvance:60", "expect": "OK" },
+    { "label": "Change: cloud evaporated (below the formed amount)", "command": "GetCloudStat:cloudyParticles", "expect_range": "0,5" },
+    { "label": "Invariant: ledger closed after drying/evaporation", "command": "GetCloudStat:balanceError", "expect_range": "0,1e-10" },
+
+    { "label": "Source B elsewhere, starting now", "command": "AddCloudSource:350,250,300,150,0.1,6000,90,120", "expect": "Index:1" },
+    { "label": "Run 30 s", "command": "CloudAdvance:30", "expect": "OK" },
+    { "label": "Change: cloud re-formed", "command": "GetCloudStat:cloudyParticles", "expect_range": "1,1024" },
+    { "label": "Invariant: ledger closed after re-formation", "command": "GetCloudStat:balanceError", "expect_range": "0,1e-10" },
+    { "label": "Invariant: no non-finite particle", "command": "GetCloudStat:nonFinite", "expect_range": "0,0" },
+    { "label": "Invariant: no negative water", "command": "GetCloudStat:negative", "expect_range": "0,0" },
+    { "label": "Invariant: weakly compressible (no collapse)", "command": "GetCloudStat:maxDensityRatio", "expect_range": "0.5,3" },
+    { "label": "Back to the Fluid page", "command": "SetCloudPage:false", "expect": "OK" }
+  ]
+}

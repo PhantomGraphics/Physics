@@ -1,0 +1,33 @@
+{
+  "name": "55_cloud_rest_state",
+  "tags": ["cloud"],
+  "_comment": "Cloud page (docs/todo/PLAN_cloud_sph_pbvr.md Phase 2). A small closed domain of environment-balanced air with no sources must stay clear and at rest, with the water ledger closed. 8x8x16 lattice of 62.5 m cells.",
+  "steps": [
+    { "label": "Liveness check", "command": "GetStatus", "expect": "OK" },
+    { "label": "Show the Cloud page", "command": "SetCloudPage:true", "expect": "OK" },
+    { "label": "Precondition: page switched", "command": "IsCloudPage", "expect": "true" },
+    { "label": "Keep the sim paused (CloudAdvance drives it)", "command": "SetCloudRunning:false", "expect": "OK" },
+    { "label": "Small domain X", "command": "SetCloudParam:domainX,500", "expect": "OK" },
+    { "label": "Small domain Y", "command": "SetCloudParam:domainY,500", "expect": "OK" },
+    { "label": "Domain Z", "command": "SetCloudParam:domainZ,1000", "expect": "OK" },
+    { "label": "Coarse spacing", "command": "SetCloudParam:spacing,62.5", "expect": "OK" },
+    { "label": "Rebuild the air with a fixed seed", "command": "CloudReset:7", "expect": "OK" },
+    { "label": "Precondition: 8x8x16 air particles", "command": "GetCloudParticleCount", "expect": "Count:1024" },
+    { "label": "Precondition: sim clock reset", "command": "GetCloudSimTime", "expect_range": "0,0" },
+    { "label": "Precondition: no sources", "command": "GetCloudSourceCount", "expect": "Count:0" },
+
+    { "label": "Run 60 simulated seconds", "command": "CloudAdvance:60", "expect": "OK" },
+    { "label": "Change: the clock advanced", "command": "GetCloudStat:simTime", "expect_range": "59.9,60.1" },
+    { "label": "Change: solver took steps", "command": "GetCloudStat:stepCount", "expect_range": "10,100000" },
+    { "label": "Invariant: air stays clear", "command": "GetCloudStat:totalCloudWater", "expect_range": "0,0" },
+    { "label": "Invariant: at rest", "command": "GetCloudStat:maxSpeed", "expect_range": "0,0.05" },
+    { "label": "Invariant: water ledger closed", "command": "GetCloudStat:balanceError", "expect_range": "0,1e-10" },
+    { "label": "Invariant: no non-finite particle", "command": "GetCloudStat:nonFinite", "expect_range": "0,0" },
+    { "label": "Invariant: no negative water", "command": "GetCloudStat:negative", "expect_range": "0,0" },
+    { "label": "Invariant: no failed saturation adjustment", "command": "GetCloudStat:adjustFailures", "expect_range": "0,0" },
+    { "label": "Stats row is CSV", "command": "GetCloudStats", "expect_prefix": "60." },
+    { "label": "CSV header is available", "command": "GetCloudCsvHeader", "expect_prefix": "simTime," },
+    { "label": "Back to the Fluid page", "command": "SetCloudPage:false", "expect": "OK" },
+    { "label": "Invariant: left the Cloud page", "command": "IsCloudPage", "expect": "false" }
+  ]
+}
