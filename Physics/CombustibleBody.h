@@ -1,0 +1,94 @@
+﻿#pragma once
+
+#include "CGLib/Math/Vector3d.h"
+#include <cstdint>
+#include <vector>
+
+namespace Phantom::Physics {
+
+// Visual simulation units, not measured material data. Mass uses the same
+// density * (2 radius)^3 convention as FlameParticle. Energy = mass * cp * K.
+struct CombustibleMaterial {
+    float density = 1.0f;
+    float specificHeat = 1.0f;
+    float conductivity = 0.02f;
+    float pyrolysisTemperature = 650.0f;
+    float pyrolysisRate = 0.8f; // multiplier of 0.05 mass/(area*s), independent of fuel stock
+    float latentHeat = 100.0f;
+    float residueFraction = 0.15f;
+    bool combustible = true;
+    bool valid() const;
+    static CombustibleMaterial preset(int index);
+};
+
+enum class CombustionState { Unburned, Heating, Burning, Extinguished, Exhausted };
+const char* combustionStateName(CombustionState state);
+
+struct CombustibleSample {
+    Math::Vector3df position{0.0f}, normal{0.0f}; // local simulation coordinates
+    float area = 0.0f, volume = 0.0f;
+    float temperature = 300.0f;
+    double initialFuel = 0.0, fuel = 0.0, residue = 0.0, pending = 0.0;
+    double pendingHeat = 0.0; // sensible energy above ambient held by pending vapor
+    std::vector<size_t> neighbors;
+};
+
+struct CombustibleBodyStats {
+    double initialFuel = 0.0, fuel = 0.0, residue = 0.0, pending = 0.0;
+    double pyrolyzed = 0.0, emitted = 0.0, heatExchange = 0.0;
+    float temperature = 300.0f, reactionRate = 0.0f;
+    double firstIgnitionTime = -1.0;
+    CombustionState state = CombustionState::Unburned;
+    bool get(const char* name, double& value) const;
+};
+
+class CombustibleBody {
+public:
+    enum class Shape { Box, Sphere };
+    bool initialize(uint64_t id, Shape shape, const Math::Vector3df& center,
+                    const Math::Vector3df& halfExtent, int resolution,
+                    double fuelMass, const CombustibleMaterial& material);
+    uint64_t id() const { return id_; }
+    Shape shape() const { return shape_; }
+    const Math::Vector3df& center() const { return center_; }
+    const Math::Vector3df& halfExtent() const { return halfExtent_; }
+    bool setCenter(const Math::Vector3df& center);
+    bool setMaterial(const CombustibleMaterial& material);
+    const CombustibleMaterial& material() const { return material_; }
+    std::vector<CombustibleSample>& samples() { return samples_; }
+    const std::vector<CombustibleSample>& samples() const { return samples_; }
+    Math::Vector3df surfacePosition(const CombustibleSample& sample) const { return center_ + sample.position; }
+    float signedDistance(const Math::Vector3df& point, Math::Vector3df* normal = nullptr) const;
+    bool blocksSegment(const Math::Vector3df& a, const Math::Vector3df& b) const;
+    CombustibleBodyStats stats() const;
+    double heatCapacity(const CombustibleSample& sample) const;
+
+    double pyrolyzed = 0.0, emitted = 0.0, heatExchange = 0.0;
+    float reactionRate = 0.0f;
+    double firstIgnitionTime = -1.0;
+    bool wasBurning = false;
+private:
+    uint64_t id_ = 0;
+    Shape shape_ = Shape::Box;
+    Math::Vector3df center_{0.0f}, halfExtent_{1.0f};
+    CombustibleMaterial material_;
+    std::vector<CombustibleSample> samples_;
+};
+
+// Independent of RenderParams. Bodies are stored in simulation space; commands
+// accepting scene coordinates pass through this transform once at creation.
+struct FlamePhysicalTransform {
+    float scale = 12.0f;
+    Math::Vector3df offset{0.0f};
+    Math::Vector3df toScene(const Math::Vector3df& p) const { return p * scale + offset; }
+    Math::Vector3df toSimulation(const Math::Vector3df& p) const { return (p - offset) / scale; }
+    Math::Vector3df velocityToScene(const Math::Vector3df& v) const { return v * scale; }
+    Math::Vector3df velocityToSimulation(const Math::Vector3df& v) const { return v / scale; }
+    float lengthToSimulation(float v) const { return v / scale; }
+    float areaToScene(float v) const { return v * scale * scale; }
+    float areaToSimulation(float v) const { return v / (scale * scale); }
+    float volumeToScene(float v) const { return v * scale * scale * scale; }
+    float volumeToSimulation(float v) const { return v / (scale * scale * scale); }
+    Math::Vector3df normalToScene(const Math::Vector3df& v) const { return v; }
+};
+}

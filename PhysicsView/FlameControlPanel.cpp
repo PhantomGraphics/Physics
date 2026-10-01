@@ -29,6 +29,43 @@ void FlameControlPanel::drawContents()
 
     Im::sliderFloat("Particle Size", render.particleSize, 0.01f, 0.6f);
 
+    if (Im::collapsingHeader("Object Combustion", true)) {
+        if (Im::button("Spread / Burnout Preset")) { world_->combustionPreset(); selectedBody_=0; notifyWorldChanged(); }
+        Im::sameLine();
+        if (Im::button("Stop Ignition Source")) { world_->stopSource(); notifyWorldChanged(); }
+        Im::textDisabled("Visual material presets; positions / sizes in simulation units.");
+        const char* shapes[]={"Box","Sphere"}; const char* materials[]={"Easy","Standard","Difficult","Inert"};
+        Im::combo("New Shape",bodyShape_,shapes,2);
+        Im::combo("New Material",materialPreset_,materials,4);
+        Im::dragFloat3("New Center",bodyCenter_,0.01f,-1.0f,2.0f);
+        Im::dragFloat3("Half Extent / Radius",bodyExtent_,0.005f,0.01f,0.4f);
+        Im::sliderFloat("Initial Fuel Mass",bodyFuel_,0.0001f,0.03f,"%.4f");
+        if (Im::button("Add Combustible Object")) {
+            if(world_->addBody(bodyShape_==0?Physics::CombustibleBody::Shape::Box:Physics::CombustibleBody::Shape::Sphere,
+                {bodyCenter_[0],bodyCenter_[1],bodyCenter_[2]}, {bodyExtent_[0],bodyExtent_[1],bodyExtent_[2]},bodyFuel_,materialPreset_))
+                selectedBody_=static_cast<int>(world_->bodies().size())-1;
+            notifyWorldChanged();
+        }
+        const int count=static_cast<int>(world_->bodies().size());
+        if(count) {
+            selectedBody_=std::clamp(selectedBody_,0,count-1);
+            Im::sliderInt("Selected Object",selectedBody_,0,count-1);
+            auto& b=*world_->bodies()[selectedBody_]; const auto s=b.stats();
+            Im::text("ID %llu: %s, %.1f K",static_cast<unsigned long long>(b.id()),Physics::combustionStateName(s.state),s.temperature);
+            Im::text("Fuel %.1f%% / pending %.5f / residue %.5f",100*s.fuel/s.initialFuel,s.pending,s.residue);
+            auto m=b.material(); bool changed=Im::checkbox("Combustible",m.combustible);
+            if(Im::button("Apply New Material Preset to Selected")) { m=Physics::CombustibleMaterial::preset(materialPreset_); changed=true; }
+            changed|=Im::sliderFloat("Pyrolysis Temperature",m.pyrolysisTemperature,350,1200);
+            changed|=Im::sliderFloat("Pyrolysis Rate",m.pyrolysisRate,0,2);
+            if(changed) b.setMaterial(m);
+            auto p=b.center(); float position[]={p.x,p.y,p.z};
+            if(Im::dragFloat3("Object Position",position,0.01f,-1.0f,2.0f)) b.setCenter({position[0],position[1],position[2]});
+            if(Im::button("Remove Selected Object")) { world_->removeBody(b.id()); notifyWorldChanged(); }
+        }
+        const char* colors[]={"Char / Residue","Temperature","Remaining Fuel"};
+        Im::combo("Solid Color",world_->solidDebugColor,colors,3);
+    }
+
     if (Im::collapsingHeader("Render Mode", true)) {
         int mode = render.pbvrMode ? 1 : 0;
         const char* modes[] = { "Normal (splat)", "PBVR (GPU, ensemble-averaged)" };
@@ -134,7 +171,9 @@ void FlameControlPanel::drawContents()
         using RateModel = Phantom::Physics::FlameFluid::ReactionRateModel;
         int model = fluid.getCombustionModel() == Model::Physical ? 1 : 0;
         const char* models[] = { "Legacy (first-order, T-independent)", "Physical (k(T) * fuel * O2)" };
-        if (Im::combo("Model", model, models, 2)) fluid.setCombustionModel(model == 1 ? Model::Physical : Model::Legacy);
+        if(world_->bodies().empty()) {
+            if (Im::combo("Model", model, models, 2)) fluid.setCombustionModel(model == 1 ? Model::Physical : Model::Legacy);
+        } else Im::textDisabled("Object combustion uses Physical chemistry.");
 
         if (fluid.getCombustionModel() == Model::Physical) {
             int rate = fluid.getReactionRateModel() == RateModel::Arrhenius ? 1 : 0;

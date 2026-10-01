@@ -1,5 +1,6 @@
-#include "pch.h"
 #include "FlameWorld.h"
+#include <algorithm>
+#include <cmath>
 
 #include "../../CGLib/Math/Box3d.h"
 
@@ -15,6 +16,10 @@ FlameWorld::FlameWorld()
 
 void FlameWorld::reset()
 {
+    if (solver_) solver_->setSolidCoupler(nullptr);
+    coupler_.clear();
+    bodies_.clear();
+    coupler_ = FlameSolidCoupler{};
     fluid_  = std::make_unique<FlameFluid>();
     solver_ = std::make_unique<FlameSolver>();
     simTime_ = 0.0f;
@@ -89,8 +94,85 @@ void FlameWorld::step()
 void FlameWorld::stepOnce()
 {
     populated_ = true;
-    solver_->simulate(timeStep_);
+    const int count = bodies_.empty() ? 1 : std::max(1,static_cast<int>(std::ceil(timeStep_/0.004f)));
+    for (int i=0;i<count;++i) solver_->simulate(timeStep_/count);
     simTime_ += timeStep_;
+}
+
+uint64_t FlameWorld::addBody(CombustibleBody::Shape shape, const glm::vec3& center,
+    const glm::vec3& extent, double fuel, int material, int resolution)
+{
+    if (material < 0 || material > 3 || bodies_.size() >= 32) return 0;
+    auto body=std::make_unique<CombustibleBody>();
+    if (!body->initialize(nextBodyId_,shape,center,extent,resolution,fuel,CombustibleMaterial::preset(material))) return 0;
+    if (!coupler_.add(body.get())) return 0;
+    const auto id=nextBodyId_++; bodies_.push_back(std::move(body));
+    solver_->setSolidCoupler(&coupler_); populated_=true;
+    // Physical chemistry is mandatory while coupled; legacy temperature-only
+    // burning cannot represent oxygen starvation.
+    fluid_->setCombustionModel(FlameFluid::CombustionModel::Physical);
+    return id;
+}
+
+CombustibleBody* FlameWorld::findBody(uint64_t id)
+{
+    for (auto& b:bodies_) if (b->id()==id) return b.get();
+    return nullptr;
+}
+bool FlameWorld::removeBody(uint64_t id)
+{
+    const auto it=std::find_if(bodies_.begin(),bodies_.end(),[id](const auto& b){return b->id()==id;});
+    if (it==bodies_.end()) return false;
+    coupler_.remove(id); bodies_.erase(it);
+    if (bodies_.empty()) solver_->setSolidCoupler(nullptr);
+    return true;
+}
+void FlameWorld::stopSource()
+{
+    for (auto& e:fluid_->getEmittersMutable()) { e.rate=0; e.accumulator=0; e.pilotTemperature=0; }
+}
+double FlameWorld::gasFuelMass() const
+{
+    auto& gas=fluid_->getParticles(); double mass=0;
+    for (size_t i=0;i<gas.size();++i) mass+=gas.fuels[i]*FlameParticle(gas,i,fluid_.get()).getMass();
+    return mass;
+}
+bool FlameWorld::combustionPreset(int resolution, double fuelMass)
+{
+    if(resolution<1 || resolution>16 || !std::isfinite(fuelMass) || fuelMass<=0) return false;
+    reset();
+    fluid_->setIgnitionTemperature(350);
+    render_.particleSize=0.045f;
+    render_.smokeParticleSize=0.07f;
+    render_.autoReferenceTemperature=false;
+    render_.referenceTemperature=2000;
+    render_.exposure=1;
+    fluid_->setIgnitionWidth(30);
+    fluid_->setBurnRate(30);
+    fluid_->setHeatRelease(5000);
+    fluid_->setCoolRate(0.1f);
+    fluid_->setCurlNoiseStrength(0);
+    fluid_->setSparkCountPerPrimary(0);
+    fluid_->setSmokeCountPerPrimary(2);
+    fluid_->setMaxParticles(1800);
+    fluid_->setLifeMax(2);
+    auto& source=fluid_->getEmittersMutable().front();
+    source.center=Vector3df(-0.15f,0.15f,0);
+    source.radius=0.05f; source.rate=100; source.airRate=300;
+    source.pilotTemperature=1500; source.pilotHeight=0.14f;
+    // Explicit scene air supply, retained when the ignition source is stopped.
+    FlameFluid::Emitter air;
+    air.center=Vector3df(0,0.35f,0); air.radius=0.3f; air.rate=0;
+    air.airRate=400; air.pilotTemperature=0;
+    fluid_->addEmitter(air);
+    const uint64_t a=addBody(CombustibleBody::Shape::Box,{0,0.22f,0},{0.08f,0.06f,0.08f},fuelMass,0,resolution);
+    const uint64_t b=addBody(CombustibleBody::Shape::Box,{0.14f,0.36f,0},{0.06f,0.06f,0.08f},fuelMass,0,resolution);
+    addBody(CombustibleBody::Shape::Sphere,{0.3f,0.3f,0},{0.07f,0.07f,0.07f},fuelMass,3,resolution);
+    for (uint64_t id:{a,b}) {
+        auto m=findBody(id)->material(); m.density=0.03f; m.pyrolysisTemperature=420;
+        m.pyrolysisRate=0.3f; m.latentHeat=30; findBody(id)->setMaterial(m);
+    }
+    return true;
 }
 
 } // namespace Phantom

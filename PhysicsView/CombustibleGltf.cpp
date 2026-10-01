@@ -1,0 +1,63 @@
+﻿#include "CombustibleGltf.h"
+#include "../../CGLib/GltfRenderer/Gltf/GltfAccessorBuilder.h"
+#include <algorithm>
+#include <cmath>
+
+int Phantom::combustibleColorLevel(const Physics::CombustibleSample& s,int mode)
+{
+    const double value=mode==1?(s.temperature-300)/1200.0:s.fuel/s.initialFuel;
+    return std::clamp(static_cast<int>(value*15),0,15);
+}
+
+Phantom::Gltf::GltfDocument Phantom::makeCombustibleGltf(const Physics::CombustibleBody& body,int mode)
+{
+    using namespace Gltf;
+    GltfDocument doc; GltfMesh mesh;
+    struct Geometry { std::vector<glm::vec3> p,n; std::vector<uint32_t> indices; };
+    Geometry geometry[16];
+    for(int i=0;i<16;++i) {
+        const float t=i/15.0f; glm::vec3 color=glm::mix(glm::vec3(0.015f),glm::vec3(0.45f,0.22f,0.08f),t);
+        if(mode==1) color=glm::mix(glm::vec3(0.02f,0.1f,0.6f),glm::vec3(1,0.12f,0.01f),t);
+        if(mode==2) color=glm::mix(glm::vec3(0.1f,0.01f,0.01f),glm::vec3(0.1f,0.7f,0.1f),t);
+        GltfMaterial material; material.pbrMetallicRoughness.baseColorFactor=glm::vec4(color,1);
+        material.pbrMetallicRoughness.metallicFactor=0; material.pbrMetallicRoughness.roughnessFactor=0.8f;
+        doc.materials.push_back(material);
+    }
+    const bool box=body.shape()==Physics::CombustibleBody::Shape::Box;
+    const int n=static_cast<int>(std::lround(std::sqrt(body.samples().size()/(box?6.0:8.0))));
+    for(size_t index=0;index<body.samples().size();++index) {
+        const auto& s=body.samples()[index]; auto& g=geometry[combustibleColorLevel(s,mode)];
+        glm::vec3 p[4],normals[4];
+        if(box) {
+            int axis=0; if(std::abs(s.normal.y)>0.5f) axis=1; if(std::abs(s.normal.z)>0.5f) axis=2;
+            const int u=(axis+1)%3,v=(axis+2)%3;
+            const float du=body.halfExtent()[u]/n,dv=body.halfExtent()[v]/n;
+            for(int k=0;k<4;++k) { p[k]=s.position; normals[k]=s.normal; }
+            p[0][u]-=du; p[0][v]-=dv; p[1][u]+=du; p[1][v]-=dv;
+            p[2][u]+=du; p[2][v]+=dv; p[3][u]-=du; p[3][v]+=dv;
+            if(s.normal[axis]<0) std::swap(p[1],p[3]);
+        } else {
+            constexpr float pi=3.14159265359f;
+            const int lat=static_cast<int>(index)/(4*n),lon=static_cast<int>(index)%(4*n);
+            const int band[]={lat,lat,lat+1,lat+1},slice[]={lon,lon+1,lon+1,lon};
+            for(int k=0;k<4;++k) {
+                const float y=1-static_cast<float>(band[k])/n,phi=2*pi*slice[k]/(4*n);
+                const float r=std::sqrt(std::max(0.0f,1-y*y)); normals[k]={r*std::cos(phi),y,r*std::sin(phi)};
+                p[k]=normals[k]*body.halfExtent().x;
+            }
+        }
+        const auto base=static_cast<uint32_t>(g.p.size());
+        for(int k=0;k<4;++k) { g.p.push_back(p[k]); g.n.push_back(normals[k]); }
+        g.indices.insert(g.indices.end(),{base,base+1,base+2,base,base+2,base+3});
+    }
+    for(int i=0;i<16;++i) if(!geometry[i].p.empty()) {
+        GltfPrimitive primitive; auto& g=geometry[i];
+        primitive.positionAccessor=appendAccessor(doc,g.p,GltfComponentType::Float,GltfAccessorType::Vec3);
+        primitive.normalAccessor=appendAccessor(doc,g.n,GltfComponentType::Float,GltfAccessorType::Vec3);
+        primitive.indicesAccessor=appendAccessor(doc,g.indices,GltfComponentType::UnsignedInt,GltfAccessorType::Scalar);
+        primitive.materialIndex=i; mesh.primitives.push_back(primitive);
+    }
+    doc.meshes.push_back(std::move(mesh)); GltfNode node; node.meshIndex=0; doc.nodes.push_back(node);
+    GltfScene scene; scene.nodes.push_back(0); doc.scenes.push_back(scene); doc.defaultScene=0;
+    return doc;
+}

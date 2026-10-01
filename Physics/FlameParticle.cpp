@@ -115,6 +115,7 @@ void FlameParticle::move(const Vector3df& v)
 
 void FlameParticle::react(const float dt, const FlameScalarRates* diffusion)
 {
+	soa_->lastBurnedMass[index_] = 0.0f;
 	const float ambient = fluid_->getAmbientTemperature();
 
 	if (diffusion) {
@@ -134,6 +135,7 @@ void FlameParticle::react(const float dt, const FlameScalarRates* diffusion)
 		const float dSoot = kBurn * fuel * fluid_->getSootYield();
 
 		setFuel(std::max(0.0f, fuel + dFuel * dt));
+		soa_->lastBurnedMass[index_] = (fuel-getFuel())*getMass();
 		setTemperature(temperature + dTemp * dt);
 		setSoot(std::max(0.0f, getSoot() + dSoot * dt));
 		setAge(getAge() + dt);
@@ -153,6 +155,7 @@ void FlameParticle::react(const float dt, const FlameScalarRates* diffusion)
 	}
 
 	setFuel(std::max(0.0f, fuel - w * dt));
+	soa_->lastBurnedMass[index_] = w*dt*getMass();
 	setOxygen(std::max(0.0f, oxygen - nu * w * dt));
 	const float dTemp = w * fluid_->getHeatRelease() - fluid_->getCoolRate() * (temperature - ambient);
 	setTemperature(std::clamp(temperature + dTemp * dt, 0.0f, fluid_->getMaxTemperature()));

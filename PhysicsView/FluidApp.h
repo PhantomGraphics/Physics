@@ -50,6 +50,7 @@
 
 #include "FlameWorld.h"
 #include "FlameRenderer.h"
+#include "CombustibleRenderer.h"
 #include "FlameControlPanel.h"
 #include "CloudWorld.h"
 #include "CloudVolumeRenderer.h"
@@ -169,6 +170,7 @@ private:
     // Play/Pause/Step and control page, deliberately uncoupled from all three
     // (FlameSolver does not implement ISPHSolver -- see Physics/CLAUDE.md).
     FlameWorld        flameWorld_;
+    CombustibleRenderer combustibleRenderer_;
     FlameRenderer     flameRenderer_;
     FlameControlPanel flameControlPanel_;
     // Cloud (moist-air SPH, docs/todo/PLAN_cloud_sph_pbvr.md). Same peer-domain
@@ -185,6 +187,7 @@ private:
     bool              uiVisible_ = true; // SetUIVisible scenario command
     float             flameAutoRefT_ = 2000.0f;  // smoothed hottest temperature (auto radiance reference)
     float             flameLastSimTime_ = -1.0f; // sim time at the previous syncFlameRenderer()
+    bool              flameWasCoupled_ = false;
 
     CommandDispatcher dispatcher_;
     ScenarioRunner           runner_;

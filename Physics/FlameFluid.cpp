@@ -106,6 +106,7 @@ void FlameFluid::updateEmitters(const float dt)
 			particles.push_back(e.center + offset, kEmittedParticleRadius, density, fuelT);
 			const size_t idx = particles.size() - 1;
 			particles.fuels[idx] = 1.0f;
+			sourceFuelMass += FlameParticle(particles,idx,this).getMass();
 			// Pure fuel vapor: it has to mix with air carriers (via the
 			// solver's diffusion pass) before the Physical model lets it burn.
 			particles.oxygens[idx] = 0.0f;
@@ -153,6 +154,7 @@ void FlameFluid::removeDead()
 	for (size_t i = 0; i < particles.size();) {
 		FlameParticle p(particles, i, this);
 		if (p.isDead()) {
+			outflowFuelMass += p.getFuel()*p.getMass();
 			particles.swapAndPop(i);
 			continue;
 		}

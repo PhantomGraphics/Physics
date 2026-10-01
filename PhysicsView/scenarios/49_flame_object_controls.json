@@ -1,0 +1,31 @@
+{
+  "name": "49_flame_object_controls",
+  "tags": ["flame-object"],
+  "steps": [
+    { "command": "FlameReset", "expect": "OK" },
+    { "command": "GetFlameBodyCount", "expect_range": "0,0" },
+    { "command": "AddFlameBody:box,0,0.5,0,0.08,0.06,0.08,0.006,1", "expect_prefix": "Id:" },
+    { "command": "AddFlameBody:sphere,0.5,0.5,0,0.08,0.08,0.08,0.006,3", "expect_prefix": "Id:" },
+    { "command": "GetFlameBodyCount", "expect_range": "2,2" },
+    { "command": "SetFlameBodyParam:0,pyrolysisTemperature,700", "expect": "OK" },
+    { "command": "SetFlameBodyParam:0,pyrolysisRate,0.2", "expect": "OK" },
+    { "command": "SetFlameBodyParam:0,x,0.2", "expect": "OK" },
+    { "command": "SetFlameBodyParam:0,combustible,0", "expect": "OK" },
+    { "command": "StopFlameSource", "expect": "OK" },
+    { "command": "FlameStep:60", "expect": "OK" },
+    { "command": "GetFlameBodyStat:0,fuel", "expect_range": "0.00599,0.00601" },
+    { "command": "GetFlameBodyStat:1,pyrolyzed", "expect_range": "0,0" },
+    { "command": "SetFlameBodyParam:0,specificHeat,0", "expect_prefix": "Error:" },
+    { "command": "SetFlameBodyParam:0,residueFraction,2", "expect_prefix": "Error:" },
+    { "command": "AddFlameBody:box,0,0,0,-1,1,1,1,1", "expect_prefix": "Error:" },
+    { "command": "RemoveFlameBody:999999", "expect_prefix": "Error:" },
+    { "command": "SetFlameParam:combustionModel,0.0", "expect_prefix": "Error:" },
+    { "command": "RemoveFlameBody:1", "expect": "OK" },
+    { "command": "GetFlameBodyCount", "expect_range": "1,1" },
+    { "command": "GetFlameStat:fuelBalanceError", "expect_range": "-0.0000002,0.0000002" },
+    { "command": "FlameReset", "expect": "OK" },
+    { "command": "GetFlameBodyCount", "expect_range": "0,0" },
+    { "command": "GetFlameStat:burnedFuel", "expect_range": "0,0" },
+    { "command": "GetFlameStat:initialSolidFuel", "expect_range": "0,0" }
+  ]
+}

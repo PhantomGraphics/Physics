@@ -31,6 +31,11 @@ public:
 
 private:
     FlameWorld*           world_ = nullptr;
+    int selectedBody_ = 0;
+    int bodyShape_ = 0, materialPreset_ = 1;
+    float bodyFuel_ = 0.006f;
+    float bodyCenter_[3] = {0.0f,0.3f,0.0f};
+    float bodyExtent_[3] = {0.08f,0.08f,0.08f};
     std::function<void()> onWorldChanged_;
     std::function<FlamePBVRPass::Stats()> pbvrStats_;
 

@@ -15,6 +15,7 @@ public:
     void setYaw(float value) { yaw_ = value; }
     void setPitch(float value) { pitch_ = value; }
     void setDistance(float value) { distance_ = std::max(5.0f, value); }
+    void setCenter(const glm::vec3& center) { center_=center; }
 
     void viewXY();
     void viewYZ();

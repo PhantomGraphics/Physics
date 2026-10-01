@@ -30,8 +30,8 @@
 # FlameRenderer/FlamePipeline/FlameSmokePipeline/FlamePBVRPipeline (folded in
 # from the former standalone FlameView) are self-contained point-sprite
 # pipelines, not built atop VkRenderer or SSFR -- they compile straight into
-# PhysicsView now, and Flame stays an intentionally uncoupled subsystem (matches
-# Physics/CLAUDE.md's Flame section).
+# PhysicsView now. Flame optionally couples to static finite-fuel solids while
+# remaining independent of ISPHSolver and rigid/soft-body dynamics.
 
 cmake_minimum_required(VERSION 3.20)
 
@@ -121,6 +121,8 @@ if(PHANTOM_GTEST_FOUND)
         ${PHYSICS_ROOT}/PhysicsView/SoftMeshGltf.cpp
         ${PHYSICS_ROOT}/PhysicsView/FlameBlackbody.cpp
         ${PHYSICS_ROOT}/PhysicsView/CloudWorld.cpp)
+    target_sources(PhysicsTest PRIVATE ${PHYSICS_ROOT}/PhysicsView/FlameWorld.cpp)
+    target_sources(PhysicsTest PRIVATE ${PHYSICS_ROOT}/PhysicsView/CombustibleGltf.cpp)
     set_target_properties(PhysicsTest PROPERTIES
         CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON
@@ -251,6 +253,8 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/SoftBodyControlPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/SoftBodyCommandDispatcher.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameWorld.cpp
+    ${PHYSICS_ROOT}/PhysicsView/CombustibleRenderer.cpp
+    ${PHYSICS_ROOT}/PhysicsView/CombustibleGltf.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameCommandDispatcher.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameControlPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameRenderer.cpp
@@ -338,8 +342,8 @@ add_custom_command(TARGET PhysicsView POST_BUILD
 # on 2026-09-08: FlameRenderer/FlamePipeline/FlameSmokePipeline/FlamePBVRPipeline
 # and the flame_*.{vert,frag} shaders moved under PhysicsView/, and FlameApp's
 # scene/UI became PhysicsView's FlameWorld + FlameControlPanel (ControlPage::Flame).
-# Flame is still an intentionally uncoupled subsystem (FlameSolver does not
-# implement ISPHSolver) -- see Physics/CLAUDE.md's Flame section.
+# FlameSolidCoupler supports static object combustion; FlameSolver deliberately
+# does not implement ISPHSolver.
 
 else()
     message(WARNING "Physics: Vulkan and/or GLFW loader not found -- PhysicsView is skipped (Physics/PhysicsTest still build). Pass -DVULKAN_LIBRARY=... -DGLFW_LIBRARY=... to enable it.")

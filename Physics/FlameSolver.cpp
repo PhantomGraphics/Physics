@@ -3,6 +3,7 @@
 #include "FlameSolver.h"
 #include "FlameParticle.h"
 #include "FlameFluid.h"
+#include "FlameSolidCoupler.h"
 
 #include "CGLib/Space/Space/NeighborList.h"
 #include "CGLib/ThirdParty/glm-0.9.9.8/glm/gtc/noise.hpp"
@@ -55,6 +56,11 @@ Vector3df curlNoise(const Vector3df& p, const float frequency, const float w)
 
 void FlameSolver::simulate(const float dt)
 {
+	if (!std::isfinite(dt) || dt <= 0) return;
+	if (solidCoupler_) for (auto* fluid : fluids) {
+		fluid->setCombustionModel(FlameFluid::CombustionModel::Physical);
+		solidCoupler_->update(*fluid,dt,simTime_);
+	}
 	std::vector<FlameParticle> particles;
 	for (auto fluid : fluids) {
 		auto& soa = fluid->getParticles();
@@ -130,6 +136,7 @@ void FlameSolver::simulate(const float dt)
 		const auto posI = pi.getPosition();
 		for (const int j : neighbors[i]) {
 			const auto& pj = particles[j];
+			if (solidCoupler_ && solidCoupler_->occluded(posI,pj.getPosition())) continue;
 			const float dist = Math::getDistance(posI, pj.getPosition());
 			const float d2 = dist * dist;
 			const float F = d2 * kernel.getSpikyKernelGradientWeight(dist) / (d2 + eta2);
@@ -142,6 +149,18 @@ void FlameSolver::simulate(const float dt)
 		rates[i] = r;
 	}
 
+	if (solidCoupler_) {
+		// A common limiter preserves the antisymmetric mass-weighted diffusion
+		// flux. Per-particle clamping in react() otherwise silently loses fuel.
+		float fuelScale=1,oxygenScale=1;
+		const auto limit=[dt](float value,float rate) { const float delta=rate*dt;
+			return delta>0?std::min(1.0f,(1-value)/delta):delta<0?std::min(1.0f,-value/delta):1.0f; };
+		for(int i=0;i<particleCount;++i) {
+			fuelScale=std::min(fuelScale,limit(particles[i].getFuel(),rates[i].fuel));
+			oxygenScale=std::min(oxygenScale,limit(particles[i].getOxygen(),rates[i].oxygen));
+		}
+		for(auto& r:rates) { r.fuel*=fuelScale; r.oxygen*=oxygenScale; }
+	}
 	// ---- Pressure + viscosity pass -------------------------------------------
 #pragma omp parallel for
 	for (int i = 0; i < particleCount; ++i) {
@@ -198,6 +217,14 @@ void FlameSolver::simulate(const float dt)
 		particles[i].forwardTime(dt);
 		particles[i].react(dt, &rates[i]);
 	}
+	for (auto* fluid : fluids) {
+		for (float amount : fluid->getParticles().lastBurnedMass) fluid->burnedFuelMass += amount;
+		if (solidCoupler_) {
+			std::vector<Vector3df> old;
+			for (size_t i=0;i<particles.size();++i) if (particles[i].getFluid() == fluid) old.push_back(positions[i]);
+			solidCoupler_->constrain(*fluid,old);
+		}
+	}
 	simTime_ += dt;
 
 	// ---- Pilot (wick) heating: keeps the Physical model's flame anchored ------
@@ -208,6 +235,7 @@ void FlameSolver::simulate(const float dt)
 	// ---- Emitters and lifetime ------------------------------------------------
 	for (auto fluid : fluids) {
 		fluid->updateEmitters(dt);
+		if (solidCoupler_) solidCoupler_->constrain(*fluid,{});
 		fluid->removeDead();
 	}
 
