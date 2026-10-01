@@ -11,6 +11,7 @@ namespace Phantom {
 	namespace Physics {
 		class FlameFluid;
 		class FlameParticle;
+		class FlameSolidCoupler;
 
 /**
  * @brief Solver for the Flame (reacting hot gas) SPH simulation.
@@ -21,9 +22,9 @@ namespace Phantom {
  * Boussinesq buoyancy term, curl-noise velocity decoration, and emitter/
  * lifetime bookkeeping at the end of each step.
  *
- * Deliberately does NOT implement ISPHSolver: Rigid/SoftBody coupling is out
- * of scope for this solver (see internal design notes), so simulate()
- * takes only dt (no maxIter, no boundary-particle registration API).
+ * Does not implement ISPHSolver. Optional FlameSolidCoupler adds static
+ * combustible obstacles, conservative heat exchange and finite gas release
+ * before each gas step; no reaction force drives a rigid or soft body.
  */
 class FlameSolver : private UnCopyable
 {
@@ -40,6 +41,7 @@ public:
 	 * @param dt Time step (seconds).
 	 */
 	void simulate(const float dt);
+	void setSolidCoupler(FlameSolidCoupler* coupler) { solidCoupler_ = coupler; }
 
 	/**
 	 * @brief Sets the gravity vector used by the Boussinesq buoyancy term
@@ -87,6 +89,7 @@ private:
 	std::vector<PlaneBoundary> boundaryPlanes_;
 	// Accumulated simulated time; drives the curl-noise field's 4th (time) axis.
 	float simTime_ = 0.0f;
+	FlameSolidCoupler* solidCoupler_ = nullptr;
 
 	void addBoundaryForce(std::vector<FlameParticle>& particles, const float dt);
 };

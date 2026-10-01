@@ -2,10 +2,12 @@
 
 #include "../Physics/FlameFluid.h"
 #include "../Physics/FlameSolver.h"
+#include "../Physics/FlameSolidCoupler.h"
 
 #include <glm/glm.hpp>
 
 #include <memory>
+#include <cmath>
 
 namespace Phantom {
 
@@ -15,22 +17,12 @@ namespace Phantom {
  * the fluid / rigid / soft domains and the glTF background (it no longer owns
  * the viewport while its control page is open).
  *
- * Owns a FlameFluid + FlameSolver and drives them exactly as FlameView did:
- * the same initial scene (buildScene()), the same fixed 1/60 s step, the same
- * deterministic RNG seed. There is deliberately no Rigid/Soft/Fluid coupling --
- * FlameSolver does not implement ISPHSolver and is not registered with
- * PhysicsSolver (see Physics/CLAUDE.md's Flame section). It sits alongside the
- * fluid/rigid/soft domains in FluidApp with its own Play/Pause/Step, its own
- * control page (ControlPage::Flame) and its own sub-renderer (FlameRenderer),
- * touching none of the coupling machinery.
- *
- * The simulation runs at its native ~3-unit scale (identical numbers to
- * FlameView, so it stays deterministic and stable). FluidApp::syncFlameRenderer()
- * multiplies each particle position by render().renderScale and adds
- * render().renderOffset before handing it to FlameRenderer, so the plume
- * composes with the shared FluidRenderer camera (centred on (20,20,20))
- * instead of being a sub-unit speck. That is a pure display transform -- the
- * SPH state itself is byte-identical to FlameView's.
+ * Owns gas, finite-fuel static solids and their non-owning coupler. With no
+ * solids, the historical burner and its display transform are unchanged.
+ * Coupled steps use <= 0.004 s substeps, a common gas/solid clock, and an
+ * independent FlamePhysicalTransform for both solid and gas placement.
+ * Static combustion is independent of PhysicsSolver / ISPHSolver; moving
+ * rigid-body tracking and deforming geometry are future extensions.
  */
 class FlameWorld {
 public:
@@ -65,7 +57,7 @@ public:
      * it belongs to the world, not to the rebuilt fluid -- so a scenario can
      * compare dt=1/60 against dt=1/120 on otherwise identical scenes.
      */
-    void  setTimeStep(float dt) { timeStep_ = dt; }
+    bool setTimeStep(float dt) { if(!std::isfinite(dt) || dt<=0 || dt>1) return false; timeStep_=dt; return true; }
     float getTimeStep() const   { return timeStep_; }
 
     /** @brief Simulated seconds since the last reset(). */
@@ -74,6 +66,18 @@ public:
     Phantom::Physics::FlameFluid&       fluid()        { return *fluid_; }
     const Phantom::Physics::FlameFluid& fluid() const  { return *fluid_; }
     Phantom::Physics::FlameSolver&      solver()       { return *solver_; }
+
+    uint64_t addBody(Physics::CombustibleBody::Shape shape, const glm::vec3& center,
+                     const glm::vec3& halfExtent, double fuel, int material = 1, int resolution = 2);
+    bool removeBody(uint64_t id);
+    Physics::CombustibleBody* findBody(uint64_t id);
+    const std::vector<std::unique_ptr<Physics::CombustibleBody>>& bodies() const { return bodies_; }
+    Physics::FlameSolidCoupler& coupler() { return coupler_; }
+    const Physics::FlamePhysicalTransform& physicalTransform() const { return physicalTransform_; }
+    bool combustionPreset(int resolution = 2, double fuelMass = 0.006);
+    void stopSource();
+    double gasFuelMass() const;
+    int solidDebugColor = 0; // 0 char, 1 temperature, 2 fuel
 
     /** @brief Display-only parameters (were FlameApp members); never affect the sim. */
     struct RenderParams {
@@ -137,6 +141,10 @@ public:
     const RenderParams& render() const { return render_; }
 
 private:
+    std::vector<std::unique_ptr<Physics::CombustibleBody>> bodies_;
+    Physics::FlameSolidCoupler coupler_;
+    Physics::FlamePhysicalTransform physicalTransform_;
+    uint64_t nextBodyId_ = 1;
     std::unique_ptr<Phantom::Physics::FlameFluid>  fluid_;
     std::unique_ptr<Phantom::Physics::FlameSolver> solver_;
     bool         running_ = false;

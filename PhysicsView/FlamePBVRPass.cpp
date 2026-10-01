@@ -467,6 +467,7 @@ void FlamePBVRPass::record(VkCommandBuffer cmd, uint32_t frameIndex)
 				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 		}
 		ensemble_.beginRenderPass(cmd, { 0.0f, 0.0f, 0.0f, 0.0f }, 1.0f);
+		if (opaqueDraw_) opaqueDraw_(cmd,frameIndex);
 		pointPipeline_->renderIndirect(cmd, frameIndex, vbufs, args_.getBuffer(), e * sizeof(VkDrawIndirectCommand));
 		emissivePipeline_->render(cmd, frameIndex);
 		ensemble_.endRenderPass(cmd);

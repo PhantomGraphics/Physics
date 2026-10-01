@@ -144,6 +144,13 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
     if (auto flameResp = flameDispatcher_.route(cmd)) return flameResp;
     if (auto cloudResp = cloudDispatcher_.route(cmd)) return cloudResp;
 
+    if (sv.rfind("SetCameraTarget:",0)==0) {
+        if(!fluidRenderer_) return std::string("Error:camera not available");
+        const auto parts=split(sv.substr(16),','); float x,y,z;
+        if(parts.size()!=3 || !parseFlt(parts[0],x) || !parseFlt(parts[1],y) || !parseFlt(parts[2],z) ||
+            !std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z)) return std::string("Error:expected x,y,z");
+        fluidRenderer_->setCameraTarget({x,y,z}); return std::string("OK");
+    }
     if (sv.rfind("SetCameraOrbit:", 0) == 0) {
         if (!fluidRenderer_) return std::string("Error:camera not available");
         const auto parts = split(sv.substr(15), ',');

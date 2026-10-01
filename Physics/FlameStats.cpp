@@ -2,6 +2,7 @@
 
 #include "FlameStats.h"
 #include "FlameFluid.h"
+#include "FlameSolidCoupler.h"
 
 #include <algorithm>
 #include <cmath>
@@ -24,9 +25,21 @@ constexpr float kBurningRateEps = 1.0e-3f;
 
 }
 
-FlameStats Phantom::Physics::computeFlameStats(const FlameFluid& fluid)
+FlameStats Phantom::Physics::computeFlameStats(const FlameFluid& fluid, const FlameSolidCoupler* coupler)
 {
 	FlameStats st;
+	st.burnedFuel=fluid.burnedFuelMass; st.outflowFuel=fluid.outflowFuelMass; st.sourceFuel=fluid.sourceFuelMass;
+	const auto& gas=fluid.getParticles();
+	for(size_t i=0;i<gas.size();++i) st.gasFuel+=gas.fuels[i]*fluid.getDensity()*std::pow(2*gas.radii[i],3.0f);
+	if(coupler) {
+		st.initialSolidFuel=coupler->initialFuelMass; st.removedSolidMass=coupler->removedMass;
+		for(const auto* b:coupler->bodies()) { const auto s=b->stats(); st.bodies.push_back(s);
+			st.solidFuel+=s.fuel; st.pendingFuel+=s.pending; st.residueMass+=s.residue;
+			st.pyrolyzedMass+=s.pyrolyzed; st.solidHeatExchange+=s.heatExchange;
+		}
+	}
+	st.fuelBalanceError=st.initialSolidFuel+st.sourceFuel-st.solidFuel-st.pendingFuel-st.residueMass-
+		st.gasFuel-st.burnedFuel-st.outflowFuel-st.removedSolidMass;
 	const auto& soa = fluid.getParticles();
 	st.count = static_cast<int>(soa.size());
 	st.secondaryCount = static_cast<int>(fluid.getSecondaryParticles().size());
@@ -122,11 +135,16 @@ FlameStats Phantom::Physics::computeFlameStats(const FlameFluid& fluid)
 const char* FlameStats::names()
 {
 	return "count,airCount,secondaryCount,nanCount,avgY,maxY,airAvgY,avgSpeed,maxSpeed,"
-		"avgT,maxT,hotY,avgFuel,avgSoot,avgOxygen,burningFraction";
+		"avgT,maxT,hotY,avgFuel,avgSoot,avgOxygen,burningFraction,gasFuel,burnedFuel,outflowFuel,sourceFuel,"
+		"solidFuel,pendingFuel,residueMass,pyrolyzedMass,solidHeatExchange,initialSolidFuel,removedSolidMass,fuelBalanceError";
 }
 
 bool FlameStats::get(const std::string& name, float& out) const
 {
+#define MASS(n) if(name==#n) { out=static_cast<float>(n); return true; }
+	MASS(gasFuel) MASS(burnedFuel) MASS(outflowFuel) MASS(sourceFuel) MASS(solidFuel) MASS(pendingFuel)
+	MASS(residueMass) MASS(pyrolyzedMass) MASS(solidHeatExchange) MASS(initialSolidFuel) MASS(removedSolidMass) MASS(fuelBalanceError)
+#undef MASS
 	if (name == "count") { out = static_cast<float>(count); return true; }
 	if (name == "airCount") { out = static_cast<float>(airCount); return true; }
 	if (name == "secondaryCount") { out = static_cast<float>(secondaryCount); return true; }
@@ -162,5 +180,8 @@ std::string FlameStats::toString() const
 		}
 		s += std::to_string(tempHistogram[b]);
 	}
+	s+=";solidFuel="+std::to_string(solidFuel)+";pendingFuel="+std::to_string(pendingFuel)+
+		";residueMass="+std::to_string(residueMass)+";burnedFuel="+std::to_string(burnedFuel)+
+		";outflowFuel="+std::to_string(outflowFuel)+";fuelBalanceError="+std::to_string(fuelBalanceError);
 	return s;
 }

@@ -39,6 +39,7 @@ struct FlameParticleSoA {
 	std::vector<float> soots;
 	std::vector<float> oxygens; ///< Oxidizer mass fraction (0..1); air carriers spawn at 1, emitted fuel at 0.
 	std::vector<float> ages;
+	std::vector<float> lastBurnedMass; ///< Fuel-equivalent mass consumed by the last reaction.
 	std::vector<bool> airs;
 
 	std::vector<Math::Vector3df> vorticities;
@@ -59,6 +60,7 @@ struct FlameParticleSoA {
 		soots.clear();
 		oxygens.clear();
 		ages.clear();
+		lastBurnedMass.clear();
 		airs.clear();
 		vorticities.clear();
 		vorticityGradAccums.clear();
@@ -80,6 +82,7 @@ struct FlameParticleSoA {
 		// particles override this to 0 (see FlameFluid::updateEmitters()).
 		oxygens.push_back(1.0f);
 		ages.push_back(0.0f);
+		lastBurnedMass.push_back(0.0f);
 		airs.push_back(false);
 		vorticities.push_back(Math::Vector3df(0.0f, 0.0f, 0.0f));
 		vorticityGradAccums.push_back(Math::Vector3df(0.0f, 0.0f, 0.0f));
@@ -108,6 +111,8 @@ struct FlameParticleSoA {
 		oxygens.pop_back();
 		ages[index] = ages.back();
 		ages.pop_back();
+		lastBurnedMass[index] = lastBurnedMass.back();
+		lastBurnedMass.pop_back();
 		airs[index] = airs.back();
 		airs.pop_back();
 		vorticities[index] = vorticities.back();

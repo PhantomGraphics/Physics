@@ -132,6 +132,11 @@ public:
 	/** @brief Returns a mutable view of the particle storage. */
 	FlameParticleSoA& getParticles() { return particles; }
 
+	// Fuel-equivalent mass accounting, excluding oxygen and cosmetic particles.
+	double burnedFuelMass = 0.0;
+	double outflowFuelMass = 0.0;
+	double sourceFuelMass = 0.0;
+
 	/** @brief Returns the number of particles in this fluid. */
 	int getNumParticles() const { return static_cast<int>(particles.size()); }
 

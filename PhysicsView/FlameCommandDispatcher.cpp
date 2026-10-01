@@ -104,7 +104,7 @@ const std::vector<ParamDef>& simParams()
 		{ "combustionModel",
 		  [](FlameWorld& w) { return w.fluid().getCombustionModel() == FlameFluid::CombustionModel::Physical ? 1.0f : 0.0f; },
 		  [](FlameWorld& w, float v) {
-			if (v != 0.0f && v != 1.0f) return false;
+			if ((v != 0.0f && v != 1.0f) || (v==0.0f && !w.bodies().empty())) return false;
 			w.fluid().setCombustionModel(v == 1.0f ? FlameFluid::CombustionModel::Physical : FlameFluid::CombustionModel::Legacy);
 			return true;
 		  } },
@@ -256,6 +256,57 @@ std::optional<std::string> FlameCommandDispatcher::route(const std::string& cmd)
 	}
 	if (!world_) return std::string("Error:flame world not set");
 	auto& w = *world_;
+	if (cmd == "FlameCombustionPreset") { w.combustionPreset(); notifyChanged(); return "OK"; }
+	if (cmd == "StopFlameSource") { w.stopSource(); notifyChanged(); return "OK"; }
+	if (cmd == "GetFlameBodyCount") return std::to_string(w.bodies().size());
+	if (cmd == "GetFlameFuelBudget") {
+		const auto stats=computeFlameStats(w.fluid(),&w.coupler());
+		return "initial="+std::to_string(stats.initialSolidFuel)+";solid="+std::to_string(stats.solidFuel)+";pending="+std::to_string(stats.pendingFuel)+
+			";residue="+std::to_string(stats.residueMass)+";gas="+std::to_string(stats.gasFuel)+
+			";burned="+std::to_string(w.fluid().burnedFuelMass)+";outflow="+std::to_string(w.fluid().outflowFuelMass)+
+			";source="+std::to_string(w.fluid().sourceFuelMass)+";removed="+std::to_string(stats.removedSolidMass);
+	}
+	if (startsWith(sv,"AddFlameBody:")) {
+		std::vector<std::string_view> args; auto rest=sv.substr(13);
+		while (true) { const auto pos=rest.find(','); args.push_back(rest.substr(0,pos)); if(pos==std::string_view::npos) break; rest.remove_prefix(pos+1); }
+		if (args.size()!=9 || (args[0]!="box" && args[0]!="sphere")) return "Error:expected shape,x,y,z,hx,hy,hz,fuel,preset (simulation units)";
+		float values[7]; for(int i=0;i<7;++i) if(!parseFloat(args[i+1],values[i])) return "Error:bad body value";
+		int preset; if(!parseInt(args[8],preset)) return "Error:bad preset";
+		const auto id=w.addBody(args[0]=="box"?CombustibleBody::Shape::Box:CombustibleBody::Shape::Sphere,
+			{values[0],values[1],values[2]},{values[3],values[4],values[5]},values[6],preset);
+		if (!id) return "Error:invalid body";
+		notifyChanged(); return "Id:"+std::to_string(id);
+	}
+	if (startsWith(sv,"RemoveFlameBody:")) {
+		int id; if(!parseInt(sv.substr(16),id) || id<=0 || !w.removeBody(id)) return "Error:unknown body";
+		notifyChanged(); return "OK";
+	}
+	// Stats use a collection index so deterministic scenarios can inspect a
+	// freshly rebuilt preset while IDs stay monotonic across reset/deletion.
+	if (startsWith(sv,"GetFlameBodyStat:") || startsWith(sv,"SetFlameBodyParam:")) {
+		const bool set=startsWith(sv,"SetFlameBodyParam:"); auto args=sv.substr(set?18:17);
+		const auto comma=args.find(','); int index;
+		if(comma==std::string_view::npos || !parseInt(args.substr(0,comma),index) || index<0 || index>=static_cast<int>(w.bodies().size())) return "Error:unknown body index";
+		auto& body=*w.bodies()[index]; args.remove_prefix(comma+1);
+		if(!set) { double v; if(args=="id") return std::to_string(body.id());
+			if(!body.stats().get(std::string(args).c_str(),v)) return "Error:unknown solid stat"; return std::to_string(v); }
+		const auto split=args.find(','); float value;
+		if(split==std::string_view::npos || !parseFloat(args.substr(split+1),value)) return "Error:bad body parameter";
+		const auto name=args.substr(0,split); auto m=body.material();
+		if(name=="preset") { if(value<0 || value>3 || value!=std::floor(value)) return "Error:bad preset"; m=CombustibleMaterial::preset(static_cast<int>(value)); }
+		else if(name=="pyrolysisTemperature") m.pyrolysisTemperature=value;
+		else if(name=="pyrolysisRate") m.pyrolysisRate=value;
+		else if(name=="conductivity") m.conductivity=value;
+		else if(name=="specificHeat") m.specificHeat=value;
+		else if(name=="density") m.density=value;
+		else if(name=="latentHeat") m.latentHeat=value;
+		else if(name=="residueFraction") m.residueFraction=value;
+		else if(name=="combustible") { if(value!=0 && value!=1) return "Error:expected 0 or 1"; m.combustible=value!=0; }
+		else if(name=="x" || name=="y" || name=="z") { auto p=body.center(); p[name=="x"?0:name=="y"?1:2]=value; body.setCenter(p); notifyChanged(); return "OK"; }
+		else return "Error:unknown body parameter";
+		if(!body.setMaterial(m)) return "Error:invalid material";
+		notifyChanged(); return "OK";
+	}
 
 	if (cmd == "SetFlamePage:true" || cmd == "SetFlamePage:false") {
 		if (!setFlamePage_) return std::string("Error:flame page hook not set");
@@ -334,18 +385,19 @@ std::optional<std::string> FlameCommandDispatcher::route(const std::string& cmd)
 		return "Error:unknown PBVR stat '" + std::string(name) + "'";
 	}
 	if (cmd == "GetFlameStats") {
-		return computeFlameStats(w.fluid()).toString();
+		return computeFlameStats(w.fluid(),&w.coupler()).toString();
 	}
 	if (startsWith(sv, "GetFlameStat:")) {
 		const std::string name(sv.substr(13));
 		float v = 0.0f;
-		if (!computeFlameStats(w.fluid()).get(name, v)) {
+		if (!computeFlameStats(w.fluid(),&w.coupler()).get(name, v)) {
 			return "Error:unknown stat '" + name + "' (known: " + FlameStats::names() + ")";
 		}
 		return formatFloat(v);
 	}
 
 	bool changed = false;
+	if (!w.bodies().empty() && cmd=="SetFlameParam:combustionModel,0") return "Error:solid combustion requires Physical mode";
 	if (auto r = handleParam(w, simParams(), sv, "SetFlameParam:", "GetFlameParam:", changed)) {
 		return r;
 	}

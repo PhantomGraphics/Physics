@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <optional>
 #include <vector>
+#include <functional>
 
 namespace Phantom { namespace VKG { class VulkanContext; class VulkanCommandPool; } }
 
@@ -62,6 +63,7 @@ namespace Phantom {
  */
 class FlamePBVRPass {
 public:
+	void setOpaqueDraw(std::function<void(VkCommandBuffer,uint32_t)> draw) { opaqueDraw_=std::move(draw); }
 	static constexpr uint32_t kMaxEnsembles = 8;
 	static constexpr uint32_t kCapacityPerEnsemble = 1u << 17; // sub-particles per ensemble segment
 
@@ -123,6 +125,7 @@ public:
 	const Stats& stats() const { return stats_; }
 
 private:
+	std::function<void(VkCommandBuffer,uint32_t)> opaqueDraw_;
 	bool createTargets(const Phantom::VKG::VulkanContext& ctx, uint32_t width, uint32_t height);
 	void destroyTargets(const Phantom::VKG::VulkanContext& ctx);
 	void writeImageDescriptors(VkDevice device);

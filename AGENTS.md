@@ -5,7 +5,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 ## Overview
 
 流体・剛体・軟体（クロス／ゼリー／ロープ）シミュレーションと SPH ベースの三者結合（Rigid↔Fluid↔SoftBody）を提供するモジュール群。
-`Physics`（コアライブラリ）、`PhysicsTest`（GoogleTest）、`PhysicsView`（スタンドアロン ImGui + Vulkan ビューア。炎 SPH を含む——下記 Flame 節）、`Fluid_GPU_Vk`（GPU Compute CSPH）、`FluidRenderer`（Screen Space Fluid Rendering）の 5 プロジェクトで構成される。単独の `.sln` は持たず、すべて上位の `Phantom2026.sln` でビルドする。旧 `FlameView`（炎 SPH の独立スタンドアロンビューア）は 2026-09-08 に PhysicsView へ統合済み。
+`Physics`（コアライブラリ）、`PhysicsTest`（GoogleTest）、`PhysicsView`（スタンドアロン ImGui + Vulkan ビューア。炎 SPH を含む——下記 Flame 節）、`Fluid_GPU_Vk`（GPU Compute CSPH）、`FluidRenderer`（Screen Space Fluid Rendering）の 5 プロジェクトで構成される。ビルドは上位 `Phantom` の CMake、または本ディレクトリの単独 CMake を使う。旧 `FlameView`（炎 SPH の独立スタンドアロンビューア）は 2026-09-08 に PhysicsView へ統合済み。
 
 親リポジトリの AGENTS.md（`../AGENTS.md`）にビルド方法・全体アーキテクチャ・命名規則が記載されているのであわせて参照すること。
 
@@ -233,7 +233,7 @@ Screen Space Fluid Rendering（SSFR）パイプライン。`ParticleDepthRendere
     （一覧は `FlameCommandDispatcher.h`）。撮影用に汎用の `SetUIVisible`/`SetCameraOrbit`/`GetCameraOrbit` もある。
     `FlameReset` はシミュレーションパラメータを既定に戻す（時間刻みと描画パラメータは残る）。
   - シミュレーションはネイティブの ~3 unit スケールのまま動かし、`RenderParams::renderScale`/`renderOffset`
-    （既定 12 / (20,4,20)）で共有カメラ空間へ写す純粋な描画変換をかける。粒子サイズはワールド径で、各粒子の深度で
+    （既定 12 / (0,0,0)）で共有カメラ空間へ写す純粋な描画変換をかける。物体結合時は下記の物理変換を使う。粒子サイズはワールド径で、各粒子の深度で
     投影する（`particleSize`/`smokeParticleSize` はシミュレーション単位）。
   - **描画は放射・吸収モデル**（`FlameRenderer`）: 放射体（全 SPH 粒子＋火花、`FlameBlackbody` の Planck×CIE 色 LUT、
     Stefan–Boltzmann 輝度、HDR）と吸収体（煙、Beer–Lambert、高温の煤は発光）の 2 ストリーム。色順応
@@ -244,12 +244,30 @@ Screen Space Fluid Rendering（SSFR）パイプライン。`ParticleDepthRendere
     `CGLib/Graphics/EnsembleLodController`（GSView と共有、header-only）による Adaptive。ノイズの 1/√R 減衰は
     `run_flame_pbvr_evaluation.ps1` で確認（tail 傾き ≈ −0.5）。
   - 共有シェーダヘッダ `shaders/flame_common.glsl`（`FlamePointUBO` と同期）。`#include` は Ninja の depfile で追跡される。
-  - Flame ページを開いている間は `FlameRenderer` のみ描画し、fluid/SSFR/rigid/soft の各レンダラーは
-    `setEnabled(false)`。fluid/rigid/soft のシミュレーション自体は他ページと同様バックグラウンドで進む。
+  - Flame は fluid/rigid/soft/glTF と共通のシーンへ描画する。Flame ページを開いても他の物体を非表示にはしない。
+    Cloud ページだけが専用ビューポートとして他の描画を止める。
 - **非スコープ（意図的）**: `RigidBoundary`/`addRigidBoundary()` 等の Rigid/SoftBody 境界結合、シミュレーションの GPU 化
   （`Fluid_GPU_Vk` 相当）、煙レイヤー分離。将来の拡張候補として 内部設計メモ の Phase 4 に記載。
 
 ## Key Conventions
+
+### Flame の静的物体燃焼（2026-10-01、Phase 0〜4）
+
+- `CombustibleBody` / `CombustibleSample` / `CombustibleMaterial` は Box・Sphere の表面熱状態と有限燃料。
+  `SolidCombustionSolver` は保存型伝熱・冷却・潜熱を含む熱分解、`FlameSolidCoupler` は近傍・遮蔽・放出・swept 非貫通。
+- `FlameWorld` が物体を所有し、削除・Reset の前に非所有登録を解除する。結合時は0.004秒以下のサブステップで
+  固体と気相を同じ時計で更新する。気相は必ず Physical モード。固体に pilot・酸素を自動追加しない。
+- 計算座標とシーン座標の変換は `FlamePhysicalTransform`（既定 scale=12、offset=0）。結合中の Render Scale / Offset は
+  物理判定にも結合描画にも影響しない。固体と炎は同じ物理変換で描画する。
+- `FlameStats` は固体・待機・残骸・気相・反応・流出・削除・外部火源の燃料収支を持つ。
+  待機上限で熱分解を抑制し、寿命削除は流出として計上する。固体の質量収支に酸素を加算しない。
+- `CombustibleGltf` / `CombustibleRenderer` はサンプルごとの黒化・温度・残燃料色を不透明 glTF で描画する。
+  PBVR の各アンサンブルにも固体を描き、固体による炎・煙の遮蔽を維持する。
+- コマンド: `FlameCombustionPreset`、`AddFlameBody`、`RemoveFlameBody`、`SetFlameBodyParam`、`GetFlameBodyStat`、
+  `StopFlameSource`、`GetFlameFuelBudget`。BodyStat/BodyParam はコレクション添字、Remove は安定 ID を使う。
+- 追加シナリオは空き番号のない49帯に `49_flame_object_{combustion,controls,occlusion}.json` を追加。
+  詳細な単位・API・検証コマンドは親リポジトリの `docs/guide/flame_object_combustion.md`。
+- Phase 5/6（既存剛体への追従、回転、形状焼失・崩壊）は未実装。静的物体結合は `ISPHSolver` 化を要求しない。
 
 - **例外禁止**: このリポジトリ全体の規約に従い、`throw`/`try`/`catch` は使わない。エラーは `bool`/`std::optional` で返す。
 - **One-Way / Two-Way の呼称**: 剛体または SoftBody が流体に一方的に力を及ぼす（SDF ペナルティ）場合が **One-Way**、Akinci 境界粒子により双方向に力が伝わる場合が **Two-Way (Track B)**。コード・コメント中でこの呼称が統一して使われている。

@@ -107,6 +107,7 @@ public:
 	void notifySimulationAdvanced(bool discontinuous) { animating_ = true; jumped_ = jumped_ || discontinuous; }
 
 	FlamePBVRPass::Settings& pbvrSettings() { return pbvr_.settings(); }
+	void setOpaqueDraw(std::function<void(VkCommandBuffer,uint32_t)> draw) { pbvr_.setOpaqueDraw(std::move(draw)); }
 	const FlamePBVRPass::Stats& pbvrStats() const { return pbvr_.stats(); }
 
 	/** @brief (Re)sizes the PBVR targets to the HDR target; call with the device idle. */

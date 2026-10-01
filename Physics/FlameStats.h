@@ -2,10 +2,12 @@
 
 #include <array>
 #include <string>
+#include "CombustibleBody.h"
 
 namespace Phantom {
 	namespace Physics {
 		class FlameFluid;
+		class FlameSolidCoupler;
 
 /**
  * @brief Scalar summary of a FlameFluid's current particle state.
@@ -20,6 +22,10 @@ namespace Phantom {
  * and would otherwise dilute every temperature figure with ambient samples).
  */
 struct FlameStats {
+	double gasFuel = 0, burnedFuel = 0, outflowFuel = 0, sourceFuel = 0;
+	double solidFuel = 0, pendingFuel = 0, residueMass = 0, pyrolyzedMass = 0, solidHeatExchange = 0;
+	double initialSolidFuel = 0, removedSolidMass = 0, fuelBalanceError = 0;
+	std::vector<CombustibleBodyStats> bodies;
 	static constexpr int kHistogramBins = 8;
 
 	int count = 0;          ///< All primary (SPH) particles.
@@ -61,7 +67,7 @@ struct FlameStats {
 };
 
 /** @brief Computes FlameStats over fluid's current primary + secondary particles. */
-FlameStats computeFlameStats(const FlameFluid& fluid);
+FlameStats computeFlameStats(const FlameFluid& fluid, const FlameSolidCoupler* coupler = nullptr);
 
 	}
 }

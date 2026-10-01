@@ -142,7 +142,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     hdrRenderers_ = { &bgGltfRenderer_, &fluidRenderer_,
                       &rigidGltfRenderer_, &rigidRenderer_,
                       &softGltfRenderer_, &softRenderer_,
-                      &volumeRenderer_, &meshRenderer_, &flameRenderer_,
+                      &volumeRenderer_, &meshRenderer_, &combustibleRenderer_, &flameRenderer_,
                       &cloudVolumeRenderer_ };
     add(&ssfrRenderer_);
 
@@ -357,6 +357,15 @@ void FluidApp::onInit()
         s.shadowVertSpv = ::VKG::loadSPVRepo("shaders/shadow.vert.spv");
         s.shadowFragSpv = ::VKG::loadSPVRepo("shaders/shadow.frag.spv");
         bgGltfRenderer_.setShaders(std::move(s));
+    }
+    {
+        Gltf::GltfSceneRenderer::Shaders s;
+        s.vertSpv=::VKG::loadSPVRepo("shaders/gltf.vert.spv");
+        s.fragSpv=::VKG::loadSPVRepo("shaders/gltf.frag.spv");
+        combustibleRenderer_.setShaders(std::move(s));
+        combustibleRenderer_.bind(&flameWorld_);
+        combustibleRenderer_.setOnChanged([this] { if(!flameWorld_.isRunning()) flameRenderer_.notifySimulationAdvanced(true); });
+        flameRenderer_.setOpaqueDraw([this](VkCommandBuffer cmd,uint32_t frame) { combustibleRenderer_.onRender(cmd,frame); });
     }
     // Rigid-/soft-body shaded pass: same gltf.{vert,frag} + shadow.{vert,frag};
     // each per-body GltfSceneRenderer instance gets its own copy (see
@@ -707,6 +716,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         const glm::vec4 lightDir(glm::normalize(ld), 0.0f);
         const glm::vec4 lightCol(renderBackground_.lightColor(), renderBackground_.lightIntensity());
         rigidGltfRenderer_.setCamera(view, proj, eye);
+        combustibleRenderer_.setCamera(view,proj,eye);
         rigidGltfRenderer_.setLight(lightDir, lightCol);
         softGltfRenderer_.setCamera(view, proj, eye);
         softGltfRenderer_.setLight(lightDir, lightCol);
@@ -996,8 +1006,17 @@ void FluidApp::syncFlameRenderer()
     const auto& particles   = fluid.getParticles();
     const auto& secondaries = fluid.getSecondaryParticles();
 
-    const float     scale  = render.renderScale;
-    const glm::vec3 offset = render.renderOffset;
+    const bool coupled=!flameWorld_.bodies().empty();
+    if(coupled && !flameWasCoupled_) {
+        glm::vec3 center(0);
+        for(const auto& b:flameWorld_.bodies()) center+=flameWorld_.physicalTransform().toScene(b->center());
+        center/=static_cast<float>(flameWorld_.bodies().size());
+        fluidRenderer_.setCameraTarget(center);
+        fluidRenderer_.setCameraOrbit(18,1.1f,1.35f);
+    }
+    flameWasCoupled_=coupled;
+    const float     scale  = coupled?flameWorld_.physicalTransform().scale:render.renderScale;
+    const glm::vec3 offset = coupled?flameWorld_.physicalTransform().offset:render.renderOffset;
     const auto xf = [&](const Phantom::Math::Vector3df& p) {
         return glm::vec3(p.x, p.y, p.z) * scale + offset;
     };

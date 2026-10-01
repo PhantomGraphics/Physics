@@ -36,6 +36,7 @@ public:
     };
 
     void setShaders(Shaders shaders) { shaders_ = std::move(shaders); }
+    void setCameraTarget(const glm::vec3& center) { camera_.setCenter(center); }
     void setParticles(const std::vector<glm::vec3>& positions);
     void setParticles(const std::vector<glm::vec3>& positions,
                       const std::vector<float>& densityDeviations);
