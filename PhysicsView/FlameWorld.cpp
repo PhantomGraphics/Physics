@@ -1,4 +1,4 @@
-#include "FlameWorld.h"
+﻿#include "FlameWorld.h"
 #include <algorithm>
 #include <cmath>
 
@@ -104,7 +104,7 @@ uint64_t FlameWorld::addBody(CombustibleBody::Shape shape, const glm::vec3& cent
 {
     if (material < 0 || material > 3 || bodies_.size() >= 32) return 0;
     auto body=std::make_unique<CombustibleBody>();
-    if (!body->initialize(nextBodyId_,shape,center,extent,resolution,fuel,CombustibleMaterial::preset(material))) return 0;
+    if (!body->initializeParticles(nextBodyId_,shape,center,extent,resolution,fuel,CombustibleMaterial::preset(material))) return 0;
     if (!coupler_.add(body.get())) return 0;
     const auto id=nextBodyId_++; bodies_.push_back(std::move(body));
     solver_->setSolidCoupler(&coupler_); populated_=true;
@@ -139,7 +139,7 @@ double FlameWorld::gasFuelMass() const
 }
 bool FlameWorld::combustionPreset(int resolution, double fuelMass)
 {
-    if(resolution<1 || resolution>16 || !std::isfinite(fuelMass) || fuelMass<=0) return false;
+    if(resolution<1 || resolution>8 || !std::isfinite(fuelMass) || fuelMass<=0) return false;
     reset();
     fluid_->setIgnitionTemperature(350);
     render_.particleSize=0.045f;

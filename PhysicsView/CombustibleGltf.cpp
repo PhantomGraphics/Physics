@@ -27,6 +27,25 @@ Phantom::Gltf::GltfDocument Phantom::makeCombustibleGltf(const Physics::Combusti
     const int n=static_cast<int>(std::lround(std::sqrt(body.samples().size()/(box?6.0:8.0))));
     for(size_t index=0;index<body.samples().size();++index) {
         const auto& s=body.samples()[index]; auto& g=geometry[combustibleColorLevel(s,mode)];
+        if(body.usesSolidParticles()) {
+            // Opaque particle glyphs: the visible colors are the actual volume
+            // particle temperatures/fuel, with the same depth in Normal/PBVR.
+            constexpr int bands=6,slices=8;
+            constexpr float pi=3.14159265359f;
+            const auto base=static_cast<uint32_t>(g.p.size());
+            for(int lat=0;lat<=bands;++lat) for(int lon=0;lon<=slices;++lon) {
+                const float theta=pi*lat/bands,phi=2*pi*lon/slices;
+                const glm::vec3 axis{std::sin(theta)*std::cos(phi),std::cos(theta),std::sin(theta)*std::sin(phi)};
+                g.p.push_back(s.position+axis*s.glyphHalfExtent);
+                g.n.push_back(glm::normalize(axis/s.glyphHalfExtent));
+            }
+            for(int lat=0;lat<bands;++lat) for(int lon=0;lon<slices;++lon) {
+                const auto a=base+lat*(slices+1)+lon,b=a+1,c=a+slices+1,d=c+1;
+                if(lat>0) g.indices.insert(g.indices.end(),{a,b,c});
+                if(lat<bands-1) g.indices.insert(g.indices.end(),{b,d,c});
+            }
+            continue;
+        }
         glm::vec3 p[4],normals[4];
         if(box) {
             int axis=0; if(std::abs(s.normal.y)>0.5f) axis=1; if(std::abs(s.normal.z)>0.5f) axis=2;

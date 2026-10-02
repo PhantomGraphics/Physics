@@ -253,7 +253,10 @@ Screen Space Fluid Rendering（SSFR）パイプライン。`ParticleDepthRendere
 
 ### Flame の静的物体燃焼（2026-10-01、Phase 0〜4）
 
-- `CombustibleBody` / `CombustibleSample` / `CombustibleMaterial` は Box・Sphere の表面熱状態と有限燃料。
+- `CombustibleBody` / `CombustibleParticle` / `CombustibleMaterial` は Box・Sphere 内部の固体 SPH 粒子と有限燃料。
+  `FlameWorld` は `initializeParticles()` で作成し、支持半径内の粒子対で保存型 SPH 伝熱と内部ガス拡散を行う。
+  位置固定で、ガスの衝突・遮蔽は解析外形を維持する。旧表面 API は互換用として残す。
+  気相キャリアは表面待機量を集約した一定質量で、固体粒子分割数に依存しない。
   `SolidCombustionSolver` は保存型伝熱・冷却・潜熱を含む熱分解、`FlameSolidCoupler` は近傍・遮蔽・放出・swept 非貫通。
 - `FlameWorld` が物体を所有し、削除・Reset の前に非所有登録を解除する。結合時は0.004秒以下のサブステップで
   固体と気相を同じ時計で更新する。気相は必ず Physical モード。固体に pilot・酸素を自動追加しない。

@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "FlameControlPanel.h"
 
 namespace Phantom {
@@ -40,9 +40,10 @@ void FlameControlPanel::drawContents()
         Im::dragFloat3("New Center",bodyCenter_,0.01f,-1.0f,2.0f);
         Im::dragFloat3("Half Extent / Radius",bodyExtent_,0.005f,0.01f,0.4f);
         Im::sliderFloat("Initial Fuel Mass",bodyFuel_,0.0001f,0.03f,"%.4f");
+        Im::sliderInt("Solid Particle Resolution",bodyResolution_,1,8);
         if (Im::button("Add Combustible Object")) {
             if(world_->addBody(bodyShape_==0?Physics::CombustibleBody::Shape::Box:Physics::CombustibleBody::Shape::Sphere,
-                {bodyCenter_[0],bodyCenter_[1],bodyCenter_[2]}, {bodyExtent_[0],bodyExtent_[1],bodyExtent_[2]},bodyFuel_,materialPreset_))
+                {bodyCenter_[0],bodyCenter_[1],bodyCenter_[2]}, {bodyExtent_[0],bodyExtent_[1],bodyExtent_[2]},bodyFuel_,materialPreset_,bodyResolution_))
                 selectedBody_=static_cast<int>(world_->bodies().size())-1;
             notifyWorldChanged();
         }
@@ -51,6 +52,7 @@ void FlameControlPanel::drawContents()
             selectedBody_=std::clamp(selectedBody_,0,count-1);
             Im::sliderInt("Selected Object",selectedBody_,0,count-1);
             auto& b=*world_->bodies()[selectedBody_]; const auto s=b.stats();
+            Im::text("Solid SPH particles: %d",static_cast<int>(b.samples().size()));
             Im::text("ID %llu: %s, %.1f K",static_cast<unsigned long long>(b.id()),Physics::combustionStateName(s.state),s.temperature);
             Im::text("Fuel %.1f%% / pending %.5f / residue %.5f",100*s.fuel/s.initialFuel,s.pending,s.residue);
             auto m=b.material(); bool changed=Im::checkbox("Combustible",m.combustible);
