@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "FlameCommandDispatcher.h"
 #include "FlameWorld.h"
 
@@ -269,11 +269,12 @@ std::optional<std::string> FlameCommandDispatcher::route(const std::string& cmd)
 	if (startsWith(sv,"AddFlameBody:")) {
 		std::vector<std::string_view> args; auto rest=sv.substr(13);
 		while (true) { const auto pos=rest.find(','); args.push_back(rest.substr(0,pos)); if(pos==std::string_view::npos) break; rest.remove_prefix(pos+1); }
-		if (args.size()!=9 || (args[0]!="box" && args[0]!="sphere")) return "Error:expected shape,x,y,z,hx,hy,hz,fuel,preset (simulation units)";
+        if ((args.size()!=9 && args.size()!=10) || (args[0]!="box" && args[0]!="sphere")) return "Error:expected shape,x,y,z,hx,hy,hz,fuel,preset[,resolution] (simulation units)";
 		float values[7]; for(int i=0;i<7;++i) if(!parseFloat(args[i+1],values[i])) return "Error:bad body value";
-		int preset; if(!parseInt(args[8],preset)) return "Error:bad preset";
+        int preset; if(!parseInt(args[8],preset)) return "Error:bad preset";
+        int resolution=2; if(args.size()==10 && !parseInt(args[9],resolution)) return "Error:bad resolution";
 		const auto id=w.addBody(args[0]=="box"?CombustibleBody::Shape::Box:CombustibleBody::Shape::Sphere,
-			{values[0],values[1],values[2]},{values[3],values[4],values[5]},values[6],preset);
+            {values[0],values[1],values[2]},{values[3],values[4],values[5]},values[6],preset,resolution);
 		if (!id) return "Error:invalid body";
 		notifyChanged(); return "Id:"+std::to_string(id);
 	}
@@ -288,7 +289,9 @@ std::optional<std::string> FlameCommandDispatcher::route(const std::string& cmd)
 		const auto comma=args.find(','); int index;
 		if(comma==std::string_view::npos || !parseInt(args.substr(0,comma),index) || index<0 || index>=static_cast<int>(w.bodies().size())) return "Error:unknown body index";
 		auto& body=*w.bodies()[index]; args.remove_prefix(comma+1);
-		if(!set) { double v; if(args=="id") return std::to_string(body.id());
+        if(!set) { double v; if(args=="id") return std::to_string(body.id());
+            if(args=="particleCount") return std::to_string(body.samples().size());
+            if(args=="solidSPH") return body.usesSolidParticles()?"1":"0";
 			if(!body.stats().get(std::string(args).c_str(),v)) return "Error:unknown solid stat"; return std::to_string(v); }
 		const auto split=args.find(','); float value;
 		if(split==std::string_view::npos || !parseFloat(args.substr(split+1),value)) return "Error:bad body parameter";

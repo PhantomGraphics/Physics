@@ -1,6 +1,6 @@
 {
   "name": "49_flame_object_combustion",
-  "_comment": "Finite surface fuel: source heats A for one second, then switches off. B cannot pyrolyze before source removal; inert-A unit-test control proves B is heated by A. Capture heating, spread and exhausted residue in Normal/PBVR.",
+  "_comment": "Finite volume solid-SPH fuel: source heats A for one second, then switches off. B cannot pyrolyze before source removal; inert-A unit-test control proves B is heated by A. Capture heating, spread and exhausted particle residue in Normal/PBVR.",
   "tags": ["flame-object"],
   "steps": [
     { "command": "SetFlamePage:true", "expect": "OK" },

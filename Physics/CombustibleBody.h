@@ -24,14 +24,19 @@ struct CombustibleMaterial {
 enum class CombustionState { Unburned, Heating, Burning, Extinguished, Exhausted };
 const char* combustionStateName(CombustionState state);
 
-struct CombustibleSample {
+struct CombustibleParticle {
     Math::Vector3df position{0.0f}, normal{0.0f}; // local simulation coordinates
     float area = 0.0f, volume = 0.0f;
     float temperature = 300.0f;
+    float radius = 0.0f; // positive for volumetric solid SPH particles
+    Math::Vector3df glyphHalfExtent{0.0f}; // cell dimensions, including thin plates
     double initialFuel = 0.0, fuel = 0.0, residue = 0.0, pending = 0.0;
     double pendingHeat = 0.0; // sensible energy above ambient held by pending vapor
     std::vector<size_t> neighbors;
 };
+
+// Compatibility name for the original surface-cell model and its API clients.
+using CombustibleSample = CombustibleParticle;
 
 struct CombustibleBodyStats {
     double initialFuel = 0.0, fuel = 0.0, residue = 0.0, pending = 0.0;
@@ -48,6 +53,12 @@ public:
     bool initialize(uint64_t id, Shape shape, const Math::Vector3df& center,
                     const Math::Vector3df& halfExtent, int resolution,
                     double fuelMass, const CombustibleMaterial& material);
+    bool initializeParticles(uint64_t id, Shape shape, const Math::Vector3df& center,
+                    const Math::Vector3df& halfExtent, int resolution,
+                    double fuelMass, const CombustibleMaterial& material);
+    bool usesSolidParticles() const { return smoothingLength_ > 0; }
+    float smoothingLength() const { return smoothingLength_; }
+    int resolution() const { return resolution_; }
     uint64_t id() const { return id_; }
     Shape shape() const { return shape_; }
     const Math::Vector3df& center() const { return center_; }
@@ -57,7 +68,9 @@ public:
     const CombustibleMaterial& material() const { return material_; }
     std::vector<CombustibleSample>& samples() { return samples_; }
     const std::vector<CombustibleSample>& samples() const { return samples_; }
-    Math::Vector3df surfacePosition(const CombustibleSample& sample) const { return center_ + sample.position; }
+    std::vector<CombustibleParticle>& particles() { return samples_; }
+    const std::vector<CombustibleParticle>& particles() const { return samples_; }
+    Math::Vector3df surfacePosition(const CombustibleSample& sample) const;
     float signedDistance(const Math::Vector3df& point, Math::Vector3df* normal = nullptr) const;
     bool blocksSegment(const Math::Vector3df& a, const Math::Vector3df& b) const;
     CombustibleBodyStats stats() const;
@@ -73,6 +86,8 @@ private:
     Math::Vector3df center_{0.0f}, halfExtent_{1.0f};
     CombustibleMaterial material_;
     std::vector<CombustibleSample> samples_;
+    float smoothingLength_ = 0.0f;
+    int resolution_ = 2;
 };
 
 // Independent of RenderParams. Bodies are stored in simulation space; commands

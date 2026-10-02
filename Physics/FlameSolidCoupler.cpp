@@ -34,6 +34,7 @@ void FlameSolidCoupler::update(FlameFluid& fluid, float dt, double time)
     for (auto* body : bodies_) {
         body->reactionRate = 0;
         for (auto& s : body->samples()) {
+            if(s.area<=0) continue;
             const Vector3df surface = body->surfacePosition(s);
             std::vector<std::pair<size_t,float>> near;
             float sum = 0;
@@ -60,7 +61,54 @@ void FlameSolidCoupler::update(FlameFluid& fluid, float dt, double time)
     }
     // Fixed-size carriers: fraction = emitted mass / carrier mass. No pilot,
     // no injected oxidizer. Gas receives only the current solid temperature.
-    for (auto* body : bodies_) for (auto& s : body->samples()) {
+    for(auto* body:bodies_) if(body->usesSolidParticles()) {
+        // Coalesce surface vapor into carriers of a resolution-independent mass.
+        // Otherwise refining the solid also shrinks the gas particles and fills
+        // the gas-particle budget before an equivalent amount of fuel can leave.
+        const double carrierMass=static_cast<double>(fluid.getDensity())*8*0.0125*0.0125*0.0125;
+        const float radius=0.0125f;
+        while(fluid.getMaxParticles()>0 && gas.size()<static_cast<size_t>(fluid.getMaxParticles())) {
+            CombustibleSample* outlet=nullptr; double available=0;
+            for(auto& s:body->samples()) if(s.area>0 && s.pending>0) {
+                available+=s.pending;
+                if(!outlet || s.pending>outlet->pending) outlet=&s;
+            }
+            if(!outlet || available<1e-14 || carrierMass<=0) break;
+            if(available<carrierMass && body->stats().fuel>body->stats().initialFuel*1e-6) break;
+            // Distribute carriers over the surface reservoir deterministically.
+            double cursor=std::fmod((std::floor(body->emitted/carrierMass)+1)*0.618033988749895,1.0)*available;
+            for(auto& s:body->samples()) if(s.area>0 && s.pending>0) {
+                cursor-=s.pending; if(cursor<=0) { outlet=&s; break; }
+            }
+            auto freeOutlet=[&](const CombustibleSample& s) {
+                const auto p=body->surfacePosition(s)+s.normal*(radius+1e-4f);
+                for(const auto* other:bodies_) if(other->signedDistance(p)<radius-1e-6f) return false;
+                return true;
+            };
+            if(!freeOutlet(*outlet)) {
+                outlet=nullptr;
+                for(auto& s:body->samples()) if(s.area>0 && s.pending>0 && freeOutlet(s)) { outlet=&s; break; }
+                if(!outlet) break;
+            }
+            const auto position=body->surfacePosition(*outlet)+outlet->normal*(radius+1e-4f);
+            const double amount=std::min(carrierMass,available);
+            double remaining=amount,heat=0;
+            // Withdraw a common fraction from all exposed reservoirs. Internal
+            // vapor must still reach the surface through SPH porous diffusion.
+            for(auto& s:body->samples()) if(s.area>0 && s.pending>0) {
+                const double take=std::min(remaining,s.pending*amount/available);
+                const double q=s.pendingHeat*take/s.pending;
+                s.pending-=take; s.pendingHeat-=q; heat+=q; remaining-=take;
+            }
+            const double emittedAmount=amount-remaining;
+            gas.push_back(position,radius,fluid.getDensity(),fluid.getAmbientTemperature()+
+                static_cast<float>(heat/(carrierMass*gasSpecificHeat)));
+            gas.fuels.back()=static_cast<float>(emittedAmount/carrierMass); gas.oxygens.back()=0;
+            gas.velocities.back()=outlet->normal*emissionSpeed; body->emitted+=emittedAmount;
+        }
+    }
+    for (auto* body : bodies_) if(!body->usesSolidParticles()) for (auto& s : body->samples()) {
+        if(s.area<=0) continue;
         const double mass=std::min(static_cast<double>(fluid.getDensity())*8*0.0125*0.0125*0.0125,
             s.initialFuel*solidSolver.pendingFractionLimit*0.5);
         const float radius=static_cast<float>(std::cbrt(mass/(8*fluid.getDensity())));
