@@ -28,6 +28,11 @@ void FlameSolidCoupler::update(FlameFluid& fluid, float dt, double time)
 {
     if (!std::isfinite(dt) || dt <= 0 || exchangeDistance <= 0) return;
     auto& gas = fluid.getParticles();
+    // Resolve the solid's motion before exchange/emission. Newborn vapor is
+    // already in the current pose and must not receive the old-to-new sweep.
+    const auto beforeMotion=gas.positions;
+    constrain(fluid,beforeMotion);
+    for(auto* body:bodies_) body->beginMotionStep();
     // Surface-area-weighted, normalized kernel for each cell. Increasing gas
     // count does not multiply surface conductance. Only the outward hemisphere
     // is visible; segment tests also reject thin-wall and third-body occlusion.
@@ -40,7 +45,7 @@ void FlameSolidCoupler::update(FlameFluid& fluid, float dt, double time)
             float sum = 0;
             for (size_t i = 0; i < gas.size(); ++i) {
                 const Vector3df d = gas.positions[i]-surface; const float distance = glm::length(d);
-                if (distance >= exchangeDistance || glm::dot(d,s.normal) < 0 || occluded(surface,gas.positions[i])) continue;
+                if (distance >= exchangeDistance || glm::dot(d,body->surfaceNormal(s)) < 0 || occluded(surface,gas.positions[i])) continue;
                 const float weight = 1-distance/exchangeDistance;
                 near.emplace_back(i,weight); sum += weight;
                 body->reactionRate += fluid.computeReactionRate(gas.temperatures[i],gas.fuels[i],gas.oxygens[i]) *
@@ -81,7 +86,7 @@ void FlameSolidCoupler::update(FlameFluid& fluid, float dt, double time)
                 cursor-=s.pending; if(cursor<=0) { outlet=&s; break; }
             }
             auto freeOutlet=[&](const CombustibleSample& s) {
-                const auto p=body->surfacePosition(s)+s.normal*(radius+1e-4f);
+                const auto p=body->surfacePosition(s)+body->surfaceNormal(s)*(radius+1e-4f);
                 for(const auto* other:bodies_) if(other->signedDistance(p)<radius-1e-6f) return false;
                 return true;
             };
@@ -90,7 +95,7 @@ void FlameSolidCoupler::update(FlameFluid& fluid, float dt, double time)
                 for(auto& s:body->samples()) if(s.area>0 && s.pending>0 && freeOutlet(s)) { outlet=&s; break; }
                 if(!outlet) break;
             }
-            const auto position=body->surfacePosition(*outlet)+outlet->normal*(radius+1e-4f);
+            const auto position=body->surfacePosition(*outlet)+body->surfaceNormal(*outlet)*(radius+1e-4f);
             const double amount=std::min(carrierMass,available);
             double remaining=amount,heat=0;
             // Withdraw a common fraction from all exposed reservoirs. Internal
@@ -104,7 +109,7 @@ void FlameSolidCoupler::update(FlameFluid& fluid, float dt, double time)
             gas.push_back(position,radius,fluid.getDensity(),fluid.getAmbientTemperature()+
                 static_cast<float>(heat/(carrierMass*gasSpecificHeat)));
             gas.fuels.back()=static_cast<float>(emittedAmount/carrierMass); gas.oxygens.back()=0;
-            gas.velocities.back()=outlet->normal*emissionSpeed; body->emitted+=emittedAmount;
+            gas.velocities.back()=body->velocityAt(position)+body->surfaceNormal(*outlet)*emissionSpeed; body->emitted+=emittedAmount;
         }
     }
     for (auto* body : bodies_) if(!body->usesSolidParticles()) for (auto& s : body->samples()) {
@@ -113,7 +118,7 @@ void FlameSolidCoupler::update(FlameFluid& fluid, float dt, double time)
             s.initialFuel*solidSolver.pendingFractionLimit*0.5);
         const float radius=static_cast<float>(std::cbrt(mass/(8*fluid.getDensity())));
         if (s.pending <= 1e-14 || mass <= 0 || fluid.getMaxParticles()<=0 || gas.size() >= static_cast<size_t>(fluid.getMaxParticles())) continue;
-        const Vector3df position = body->surfacePosition(s)+s.normal*(radius+1e-4f);
+        const Vector3df position = body->surfacePosition(s)+body->surfaceNormal(s)*(radius+1e-4f);
         bool blocked = false;
         for (const auto* other : bodies_) if (other->signedDistance(position) < radius) { blocked = true; break; }
         if (blocked) continue;
@@ -125,7 +130,7 @@ void FlameSolidCoupler::update(FlameFluid& fluid, float dt, double time)
         const float temperature=fluid.getAmbientTemperature()+static_cast<float>(heat/(mass*gasSpecificHeat));
         gas.push_back(position,radius,fluid.getDensity(),temperature);
         gas.fuels.back() = static_cast<float>(amount/mass); gas.oxygens.back() = 0;
-        gas.velocities.back() = s.normal*emissionSpeed;
+        gas.velocities.back() = body->velocityAt(position)+body->surfaceNormal(s)*emissionSpeed;
         s.pending -= amount; s.pendingHeat-=heat; body->emitted += amount;
     }
 }
@@ -134,19 +139,20 @@ void FlameSolidCoupler::constrain(FlameFluid& fluid, const std::vector<Vector3df
 {
     auto& gas = fluid.getParticles();
     for (size_t i = 0; i < gas.size(); ++i) for (const auto* body : bodies_) {
+        const Vector3df start=i<previous.size()?body->sweepStart(previous[i]):gas.positions[i];
         Vector3df normal;
         const float distance = body->signedDistance(gas.positions[i],&normal);
-        if (i < previous.size() && body->blocksSegment(previous[i],gas.positions[i]) && body->signedDistance(previous[i]) >= gas.radii[i]) {
+        if (i < previous.size() && body->blocksSegment(start,gas.positions[i]) && body->signedDistance(start) >= gas.radii[i]) {
             // Swept collision prevents crossing a plate in one integration.
             float lo=0,hi=1;
             for (int n=0;n<24;++n) { const float mid=(lo+hi)*0.5f;
-                if (body->blocksSegment(previous[i],glm::mix(previous[i],gas.positions[i],mid))) hi=mid; else lo=mid; }
-            gas.positions[i]=glm::mix(previous[i],gas.positions[i],lo);
+                if (body->blocksSegment(start,glm::mix(start,gas.positions[i],mid))) hi=mid; else lo=mid; }
+            gas.positions[i]=glm::mix(start,gas.positions[i],lo);
             const float d=body->signedDistance(gas.positions[i],&normal);
             gas.positions[i]+=normal*std::max(0.0f,gas.radii[i]-d);
         } else if (distance < gas.radii[i]) gas.positions[i]+=normal*(gas.radii[i]-distance);
         else continue;
-        const float inward = glm::dot(gas.velocities[i],normal);
+        const float inward = glm::dot(gas.velocities[i]-body->velocityAt(gas.positions[i]),normal);
         if (inward < 0) gas.velocities[i]-=normal*inward;
     }
 }

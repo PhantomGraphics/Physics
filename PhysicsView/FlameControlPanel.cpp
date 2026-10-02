@@ -1,5 +1,6 @@
 ﻿#include "pch.h"
 #include "FlameControlPanel.h"
+#include "RigidBodyWorld.h"
 
 namespace Phantom {
 
@@ -60,8 +61,31 @@ void FlameControlPanel::drawContents()
             changed|=Im::sliderFloat("Pyrolysis Temperature",m.pyrolysisTemperature,350,1200);
             changed|=Im::sliderFloat("Pyrolysis Rate",m.pyrolysisRate,0,2);
             if(changed) b.setMaterial(m);
-            auto p=b.center(); float position[]={p.x,p.y,p.z};
-            if(Im::dragFloat3("Object Position",position,0.01f,-1.0f,2.0f)) b.setCenter({position[0],position[1],position[2]});
+            const auto rigidId=world_->rigidBodyId(b.id());
+            if(rigidId) {
+                Im::text("Rigid ID %llu / shared Flame clock",static_cast<unsigned long long>(rigidId));
+                if(Im::button("Unbind Rigid Body")) { world_->unbindRigidBody(b.id()); notifyWorldChanged(); }
+            } else {
+                auto p=b.center(); float position[]={p.x,p.y,p.z};
+                if(Im::dragFloat3("Object Position",position,0.01f,-1.0f,2.0f)) b.setCenter({position[0],position[1],position[2]});
+                auto angles=glm::degrees(glm::eulerAngles(b.orientation())); float rotation[]={angles.x,angles.y,angles.z};
+                if(Im::dragFloat3("Object Rotation (degrees)",rotation,1,-180,180)) {
+                    b.setMotion(b.center(),Math::Quaternion(glm::radians(glm::vec3(rotation[0],rotation[1],rotation[2]))),{0,0,0},{0,0,0});
+                    b.beginMotionStep(); notifyWorldChanged();
+                }
+                if(auto* rigid=world_->rigidWorld()) {
+                    const int count=static_cast<int>(rigid->getWorld().getBodies().size());
+                    if(count>0) {
+                        Im::sliderInt("Rigid Body Index",rigidIndex_,0,count-1);
+                        if(Im::button("Bind to Rigid Body")) {
+                            bindingFailed_=!world_->bindRigidBody(b.id(),rigidIndex_); notifyWorldChanged();
+                        }
+                        Im::textDisabled("Requires matching shape / scene size (simulation size x 12).\n"
+                            "Rigid-fluid coupling must be off. Play/Pause/Step share the Flame clock.");
+                        if(bindingFailed_) Im::text("Binding failed: check shape, size and coupling.");
+                    }
+                }
+            }
             if(Im::button("Remove Selected Object")) { world_->removeBody(b.id()); notifyWorldChanged(); }
         }
         const char* colors[]={"Char / Residue","Temperature","Remaining Fuel"};

@@ -7,9 +7,11 @@
 #include <glm/glm.hpp>
 
 #include <memory>
+#include <functional>
 #include <cmath>
 
 namespace Phantom {
+class RigidBodyWorld;
 
 /**
  * @brief Flame (reacting hot-gas SPH) domain for FluidApp, folded in from the
@@ -21,12 +23,23 @@ namespace Phantom {
  * solids, the historical burner and its display transform are unchanged.
  * Coupled steps use <= 0.004 s substeps, a common gas/solid clock, and an
  * independent FlamePhysicalTransform for both solid and gas placement.
- * Static combustion is independent of PhysicsSolver / ISPHSolver; moving
- * rigid-body tracking and deforming geometry are future extensions.
+ * Optional stable rigid-body handles follow position/orientation/velocity.
+ * While bound, Flame owns the rigid world's clock; forced rigid Steps delegate
+ * here and interactive rigid updates are suppressed to avoid double stepping.
+ * Deforming geometry and rigid-fluid-flame three-way coupling remain separate.
  */
 class FlameWorld {
 public:
     FlameWorld();
+    ~FlameWorld();
+    void setRigidWorld(RigidBodyWorld* world);
+    RigidBodyWorld* rigidWorld() const { return rigidWorld_; }
+    bool bindRigidBody(uint64_t bodyId, std::size_t rigidIndex);
+    void setCanBindRigid(std::function<bool()> callback) { canBindRigid_=std::move(callback); }
+    bool unbindRigidBody(uint64_t bodyId);
+    uint64_t rigidBodyId(uint64_t bodyId) const;
+    bool hasRigidBindings() const { return !rigidBindings_.empty(); }
+    void syncRigidBindings();
 
     /** @brief Rebuilds the fluid/solver and re-seeds the initial scene. */
     void reset();
@@ -43,8 +56,8 @@ public:
     /** @brief Empty-scene reset (File > New): fresh initial scene, stopped, not drawn. */
     void clear();
 
-    void setRunning(bool r) { running_ = r; if (r) populated_ = true; }
-    bool isRunning() const { return running_; }
+    void setRunning(bool r);
+    bool isRunning() const;
 
     /** @brief Advances the flame sim by one fixed step (getTimeStep()) if running. */
     void step();
@@ -141,6 +154,11 @@ public:
     const RenderParams& render() const { return render_; }
 
 private:
+    std::function<bool()> canBindRigid_;
+    RigidBodyWorld* rigidWorld_=nullptr; // owner must outlive this FlameWorld
+    struct RigidBinding { uint64_t bodyId, rigidId; };
+    std::vector<RigidBinding> rigidBindings_;
+    void releaseRigidClock();
     std::vector<std::unique_ptr<Physics::CombustibleBody>> bodies_;
     Physics::FlameSolidCoupler coupler_;
     Physics::FlamePhysicalTransform physicalTransform_;

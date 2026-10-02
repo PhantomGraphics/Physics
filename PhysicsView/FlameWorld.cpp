@@ -1,4 +1,5 @@
 ﻿#include "FlameWorld.h"
+#include "RigidBodyWorld.h"
 #include <algorithm>
 #include <cmath>
 
@@ -16,6 +17,8 @@ FlameWorld::FlameWorld()
 
 void FlameWorld::reset()
 {
+    releaseRigidClock();
+    rigidBindings_.clear();
     if (solver_) solver_->setSolidCoupler(nullptr);
     coupler_.clear();
     bodies_.clear();
@@ -87,15 +90,47 @@ void FlameWorld::buildScene()
 
 void FlameWorld::step()
 {
-    if (!running_) return;
+    syncRigidBindings();
+    if (!isRunning()) return;
     stepOnce();
 }
 
 void FlameWorld::stepOnce()
 {
     populated_ = true;
-    const int count = bodies_.empty() ? 1 : std::max(1,static_cast<int>(std::ceil(timeStep_/0.004f)));
-    for (int i=0;i<count;++i) solver_->simulate(timeStep_/count);
+    syncRigidBindings();
+    int count = bodies_.empty() ? 1 : std::max(1,static_cast<int>(std::ceil(timeStep_/0.004f)));
+    // Bound the relative-pose sweep approximation for rotating thin solids.
+    // Limit the work for pathological input before converting to an integer.
+    for(const auto& binding:rigidBindings_) {
+        const auto* rigid=rigidWorld_->findBody(binding.rigidId);
+        const auto* solid=findBody(binding.bodyId);
+        const double angular=glm::length(glm::dvec3(rigid->angularVelocity));
+        const auto extent=solid->halfExtent();
+        const double speed=glm::length(glm::dvec3(rigid->linearVelocity))/physicalTransform_.scale+
+            angular*glm::length(glm::dvec3(extent));
+        const double motionSteps=std::max(angular*timeStep_/0.05,
+            speed*timeStep_/(0.5*std::min(extent.x,std::min(extent.y,extent.z))));
+        count=std::max(count,static_cast<int>(std::min(4096.0,std::ceil(motionSteps))));
+    }
+    std::vector<std::pair<Vector3df,Vector3df>> forces;
+    if(hasRigidBindings()) for(const auto* rigid:rigidWorld_->getWorld().getBodies())
+        forces.emplace_back(rigid->forceAccum,rigid->torqueAccum);
+    for (int i=0;i<count;++i) {
+        for (const auto& body:bodies_) body->beginMotionStep();
+        if (hasRigidBindings()) {
+            auto& rigid=rigidWorld_->getWorld(); const float saved=rigid.timeStep;
+            // The solver clears force accumulators per substep. Frame forces
+            // must act for the full common interval, not just the first slice.
+            for(size_t j=0;j<forces.size();++j) {
+                rigid.getBodies()[j]->forceAccum=forces[j].first;
+                rigid.getBodies()[j]->torqueAccum=forces[j].second;
+            }
+            rigid.timeStep=timeStep_/count; rigid.stepUnconditional(); rigid.timeStep=saved;
+            syncRigidBindings();
+        }
+        solver_->simulate(timeStep_/count);
+    }
     simTime_ += timeStep_;
 }
 
@@ -123,10 +158,95 @@ bool FlameWorld::removeBody(uint64_t id)
 {
     const auto it=std::find_if(bodies_.begin(),bodies_.end(),[id](const auto& b){return b->id()==id;});
     if (it==bodies_.end()) return false;
+    unbindRigidBody(id);
     coupler_.remove(id); bodies_.erase(it);
     if (bodies_.empty()) solver_->setSolidCoupler(nullptr);
     return true;
 }
+FlameWorld::~FlameWorld() { releaseRigidClock(); }
+
+void FlameWorld::releaseRigidClock()
+{
+    if (rigidWorld_ && hasRigidBindings()) {
+        running_=rigidWorld_->isRunning();
+        rigidWorld_->setExternalClock({});
+        for(const auto& b:rigidBindings_) {
+            rigidWorld_->setCombustibleRepresentation(b.rigidId,false);
+            if(auto* solid=findBody(b.bodyId)) {
+                solid->setMotion(solid->center(),solid->orientation(),Vector3df(0),Vector3df(0));
+                solid->beginMotionStep();
+            }
+        }
+    }
+}
+void FlameWorld::setRigidWorld(RigidBodyWorld* world)
+{
+    releaseRigidClock(); rigidBindings_.clear(); rigidWorld_=world;
+}
+void FlameWorld::setRunning(bool r)
+{
+    running_=r; if(r) populated_=true;
+    if(hasRigidBindings()) rigidWorld_->setRunning(r);
+}
+bool FlameWorld::isRunning() const
+{
+    return hasRigidBindings()?rigidWorld_->isRunning():running_;
+}
+uint64_t FlameWorld::rigidBodyId(uint64_t id) const
+{
+    for(const auto& b:rigidBindings_) if(b.bodyId==id) return b.rigidId;
+    return 0;
+}
+bool FlameWorld::bindRigidBody(uint64_t id, std::size_t index)
+{
+    auto* solid=findBody(id);
+    if(!solid || !rigidWorld_ || (canBindRigid_ && !canBindRigid_())) return false;
+    const auto rigidId=rigidWorld_->bodyId(index);
+    auto* rigid=rigidWorld_->findBody(rigidId);
+    if(!rigid || !rigid->shape) return false;
+    for(const auto& b:rigidBindings_) if(b.rigidId==rigidId && b.bodyId!=id) return false;
+    Vector3df extent;
+    if(rigid->shape->getType()==ShapeType::Box && solid->shape()==CombustibleBody::Shape::Box)
+        extent=static_cast<BoxShape*>(rigid->shape)->halfExtents/physicalTransform_.scale;
+    else if(rigid->shape->getType()==ShapeType::Sphere && solid->shape()==CombustibleBody::Shape::Sphere)
+        extent=Vector3df(static_cast<SphereShape*>(rigid->shape)->radius/physicalTransform_.scale);
+    else return false;
+    if(!std::isfinite(extent.x) || !std::isfinite(extent.y) || !std::isfinite(extent.z) ||
+        std::min(extent.x,std::min(extent.y,extent.z))<=0) return false;
+    if(glm::length(extent-solid->halfExtent())>1e-5f) return false;
+    if(!solid->setMotion(physicalTransform_.toSimulation(rigid->position),rigid->orientation,
+        physicalTransform_.velocityToSimulation(rigid->linearVelocity),rigid->angularVelocity)) return false;
+    const bool first=!hasRigidBindings();
+    for(auto& b:rigidBindings_) if(b.bodyId==id) { rigidWorld_->setCombustibleRepresentation(b.rigidId,false); b.rigidId=rigidId;
+        rigidWorld_->setCombustibleRepresentation(rigidId,true); solid->beginMotionStep(); return true; }
+    rigidBindings_.push_back({id,rigidId}); solid->beginMotionStep();
+    rigidWorld_->setCombustibleRepresentation(rigidId,true);
+    if(first) { rigidWorld_->setRunning(running_); rigidWorld_->setExternalClock([this]{ stepOnce(); }); }
+    return true;
+}
+bool FlameWorld::unbindRigidBody(uint64_t id)
+{
+    auto it=std::find_if(rigidBindings_.begin(),rigidBindings_.end(),[id](const auto& b){return b.bodyId==id;});
+    if(it==rigidBindings_.end()) return false;
+    rigidWorld_->setCombustibleRepresentation(it->rigidId,false);
+    if(rigidBindings_.size()==1) releaseRigidClock();
+    if(auto* body=findBody(id)) { body->setMotion(body->center(),body->orientation(),Vector3df(0),Vector3df(0)); body->beginMotionStep(); }
+    rigidBindings_.erase(it); return true;
+}
+void FlameWorld::syncRigidBindings()
+{
+    for(std::size_t i=0;i<rigidBindings_.size();) {
+        const auto binding=rigidBindings_[i];
+        auto* rigid=rigidWorld_->findBody(binding.rigidId); auto* solid=findBody(binding.bodyId);
+        if(!rigid || !solid) { unbindRigidBody(binding.bodyId); continue; }
+        if(!solid->setMotion(physicalTransform_.toSimulation(rigid->position),rigid->orientation,
+            physicalTransform_.velocityToSimulation(rigid->linearVelocity),rigid->angularVelocity)) {
+            unbindRigidBody(binding.bodyId); continue;
+        }
+        ++i;
+    }
+}
+
 void FlameWorld::stopSource()
 {
     for (auto& e:fluid_->getEmittersMutable()) { e.rate=0; e.accumulator=0; e.pilotTemperature=0; }

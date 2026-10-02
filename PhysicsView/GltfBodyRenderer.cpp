@@ -119,7 +119,8 @@ void GltfBodyRenderer::syncFromWorld() {
     if (!ready_ || !world_) return;
 
     const auto& bodies = world_->getWorld().getBodies();
-    std::unordered_set<const Physics::RigidBody*> live(bodies.begin(), bodies.end());
+    std::unordered_set<const Physics::RigidBody*> live;
+    for(const auto* body:bodies) if(!world_->hasCombustibleRepresentation(body)) live.insert(body);
 
     // Drop instances whose body is gone (preset switch / RemoveBody). A command
     // like SetPreset runs mid-frame (dispatcher_.processQueue() in onUpdate,
@@ -139,7 +140,7 @@ void GltfBodyRenderer::syncFromWorld() {
     // stage and z-fights with it when both sit at y=0. The wireframe renderer
     // still draws the floor grid as a spatial reference.
     for (const Physics::RigidBody* body : bodies) {
-        if (!body || instances_.count(body)) continue;
+        if (!body || !live.count(body) || instances_.count(body)) continue;
         if (body->shape && body->shape->getType() == Physics::ShapeType::Plane) continue;
         instances_.emplace(body, makeInstance(*body));
     }

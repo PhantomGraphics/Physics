@@ -36,8 +36,8 @@ void CombustibleRenderer::onUpdate(uint32_t frame)
         }
         const auto& physical=world_->physicalTransform();
         const glm::vec3 center=physical.toScene(b->center());
-        changed=changed || center!=inst.center; inst.center=center;
-        inst.renderer.setModelMatrix(glm::scale(glm::translate(glm::mat4(1),center),glm::vec3(physical.scale)));
+        changed=changed || center!=inst.center || b->orientation()!=inst.orientation; inst.center=center; inst.orientation=b->orientation();
+        inst.renderer.setModelMatrix(glm::scale(glm::translate(glm::mat4(1),center)*glm::mat4_cast(b->orientation()),glm::vec3(physical.scale)));
         inst.renderer.setCamera(view_,proj_,eye_);
         inst.renderer.setLight(glm::vec4(glm::normalize(glm::vec3(-0.3f,-1,-0.25f)),0),glm::vec4(1,1,1,3));
         inst.renderer.onUpdate(frame);

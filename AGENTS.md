@@ -251,7 +251,7 @@ Screen Space Fluid Rendering（SSFR）パイプライン。`ParticleDepthRendere
 
 ## Key Conventions
 
-### Flame の静的物体燃焼（2026-10-01、Phase 0〜4）
+### Flame の物体燃焼（2026-10-02、Phase 0〜5）
 
 - `CombustibleBody` / `CombustibleParticle` / `CombustibleMaterial` は Box・Sphere 内部の固体 SPH 粒子と有限燃料。
   `FlameWorld` は `initializeParticles()` で作成し、支持半径内の粒子対で保存型 SPH 伝熱と内部ガス拡散を行う。
@@ -270,7 +270,12 @@ Screen Space Fluid Rendering（SSFR）パイプライン。`ParticleDepthRendere
   `StopFlameSource`、`GetFlameFuelBudget`。BodyStat/BodyParam はコレクション添字、Remove は安定 ID を使う。
 - 追加シナリオは空き番号のない49帯に `49_flame_object_{combustion,controls,occlusion}.json` を追加。
   詳細な単位・API・検証コマンドは親リポジトリの `docs/guide/flame_object_combustion.md`。
-- Phase 5/6（既存剛体への追従、回転、形状焼失・崩壊）は未実装。静的物体結合は `ISPHSolver` 化を要求しない。
+- Phase 5: `BindFlameBody:ID,rigidIndex` で寸法が一致する既存 Box/Sphere に姿勢・速度を追従する。
+  剛体の単調増加ハンドルを保持し、Preset/Clear 後の再利用を防ぐ。剛体世界全体と Flame は Flame の
+  共通時計で更新し、剛体側の通常 step は抑止、stepForced は FlameStep へ委譲する。
+  回転した面の放出・遮蔽・描画と移動境界の相対速度を統一する。通常剛体描画は固体 SPH 表示へ置換する。
+  剛体と水の結合との同時使用は拒否する。形状焼失・変形・崩壊（Phase 6）は未実装。
+  物体結合は `ISPHSolver` 化を要求しない。詳細は親リポジトリの `docs/guide/flame_object_combustion.md`。
 
 - **例外禁止**: このリポジトリ全体の規約に従い、`throw`/`try`/`catch` は使わない。エラーは `bool`/`std::optional` で返す。
 - **One-Way / Two-Way の呼称**: 剛体または SoftBody が流体に一方的に力を及ぼす（SDF ペナルティ）場合が **One-Way**、Akinci 境界粒子により双方向に力が伝わる場合が **Two-Way (Track B)**。コード・コメント中でこの呼称が統一して使われている。
