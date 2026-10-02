@@ -44,7 +44,7 @@ void RigidBodyControlPanel::buildUi() {
         world_->setRunning(!world_->isRunning());
     });
     stepButton_.setFunction([this] {
-        world_->step();
+        world_->stepForced();
         notifyWorldChanged();
     });
     resetButton_.setFunction([this] {

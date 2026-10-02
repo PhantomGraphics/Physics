@@ -1,0 +1,205 @@
+{
+  "name": "49_flame_object_rigid",
+  "tags": [
+    "flame-object",
+    "flame-rigid"
+  ],
+  "steps": [
+    {
+      "command": "NewScene",
+      "expect": "OK"
+    },
+    {
+      "command": "SetGravity:0:0:0",
+      "expect": "OK"
+    },
+    {
+      "command": "SetTimeStep:0.1",
+      "expect": "OK"
+    },
+    {
+      "command": "AddBox:0:6:0:1.2:0.6:0.96:1",
+      "expect": "OK"
+    },
+    {
+      "command": "AddFlameBody:box,0,0.5,0,0.1,0.05,0.08,0.006,3",
+      "expect": "Id:1"
+    },
+    {
+      "command": "GetFlameBodyStat:0,rigidId",
+      "expect_range": "0,0"
+    },
+    {
+      "command": "GetFlameBodyStat:0,x",
+      "expect_range": "0,0"
+    },
+    {
+      "command": "GetFlameBodyStat:0,qw",
+      "expect_range": "1,1"
+    },
+    {
+      "command": "BindFlameBody:1,99",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "BindFlameBody:1,0",
+      "expect": "OK"
+    },
+    {
+      "command": "GetFlameBodyStat:0,rigidId",
+      "expect_range": "1,1"
+    },
+    {
+      "command": "GetFlameBodyStat:0,y",
+      "expect_range": "0.49999,0.50001"
+    },
+    {
+      "command": "SetCouplingEnabled:true",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFlameBodyParam:0,x,1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFlameBodyPose:1,0,0,0,1,0,0,0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFlameRigidVelocity:1,nan,0,0,0,0,0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFlameRigidVelocity:1,1.2,0,0,0,0,2",
+      "expect": "OK"
+    },
+    {
+      "command": "SetFlameParam:timeStep,0.02",
+      "expect": "OK"
+    },
+    {
+      "command": "SetFlameParam:emitterRate,0",
+      "expect": "OK"
+    },
+    {
+      "command": "SetFlameParam:emitterAirRate,0",
+      "expect": "OK"
+    },
+    {
+      "command": "SetFlameRenderParam:renderScale,35",
+      "expect": "OK"
+    },
+    {
+      "command": "FlameStep:10",
+      "expect": "OK"
+    },
+    {
+      "command": "GetFlameBodyStat:0,x",
+      "expect_range": "0.01999,0.02001"
+    },
+    {
+      "command": "GetFlameBodyStat:0,qz",
+      "expect_range": "0.198,0.200"
+    },
+    {
+      "command": "GetFlameBodyStat:0,fuel",
+      "expect_range": "0.005999,0.006001"
+    },
+    {
+      "command": "GetFlameSimTime",
+      "expect_range": "0.19999,0.20001"
+    },
+    {
+      "command": "Step:5",
+      "expect": "OK"
+    },
+    {
+      "command": "GetFlameBodyStat:0,x",
+      "expect_range": "0.02999,0.03001"
+    },
+    {
+      "command": "GetFlameSimTime",
+      "expect_range": "0.29999,0.30001"
+    },
+    {
+      "command": "SetFlameRigidVelocity:1,0,0,0,0,0,0",
+      "expect": "OK"
+    },
+    {
+      "command": "SetFlameRunning:true",
+      "expect": "OK"
+    },
+    {
+      "command": "IsFlameRunning",
+      "expect": "true"
+    },
+    {
+      "command": "SetRunning:false",
+      "expect": "OK"
+    },
+    {
+      "command": "IsFlameRunning",
+      "expect": "false"
+    },
+    {
+      "command": "SetFlameRigidVelocity:1,1.2,0,0,0,0,2",
+      "expect": "OK"
+    },
+    {
+      "command": "UnbindFlameBody:1",
+      "expect": "OK"
+    },
+    {
+      "command": "GetFlameBodyStat:0,rigidId",
+      "expect_range": "0,0"
+    },
+    {
+      "command": "Step:1",
+      "expect": "OK"
+    },
+    {
+      "command": "GetFlameBodyStat:0,x",
+      "expect_range": "0.02999,0.03001"
+    },
+    {
+      "command": "SetFlameBodyPose:1,0,0.5,0,0.7071068,0,0,0.7071068",
+      "expect": "OK"
+    },
+    {
+      "command": "GetFlameBodyStat:0,qz",
+      "expect_range": "0.7071,0.7072"
+    },
+    {
+      "command": "SetFlameBodyPose:1,0,0,0,0,0,0,0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "BindFlameBody:1,0",
+      "expect": "OK"
+    },
+    {
+      "command": "SetPreset:Custom",
+      "expect": "OK"
+    },
+    {
+      "command": "GetFlameBodyStat:0,rigidId",
+      "expect_range": "0,0"
+    },
+    {
+      "command": "GetFlameBodyStat:0,fuel",
+      "expect_range": "0.005999,0.006001"
+    },
+    {
+      "command": "GetFlameStat:fuelBalanceError",
+      "expect_range": "-0.0000002,0.0000002"
+    },
+    {
+      "command": "FlameReset",
+      "expect": "OK"
+    },
+    {
+      "command": "GetFlameBodyCount",
+      "expect_range": "0,0"
+    }
+  ]
+}

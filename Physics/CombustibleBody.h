@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CGLib/Math/Vector3d.h"
+#include "CGLib/Math/Quaternion.h"
 #include <cstdint>
 #include <vector>
 
@@ -64,6 +65,16 @@ public:
     const Math::Vector3df& center() const { return center_; }
     const Math::Vector3df& halfExtent() const { return halfExtent_; }
     bool setCenter(const Math::Vector3df& center);
+    bool setMotion(const Math::Vector3df& center, const Math::Quaternion& orientation,
+                   const Math::Vector3df& linearVelocity, const Math::Vector3df& angularVelocity);
+    const Math::Quaternion& orientation() const { return orientation_; }
+    Math::Vector3df worldPosition(const Math::Vector3df& local) const { return center_ + orientation_ * local; }
+    Math::Vector3df surfaceNormal(const CombustibleSample& sample) const { return orientation_ * sample.normal; }
+    Math::Vector3df velocityAt(const Math::Vector3df& point) const { return linearVelocity_ + glm::cross(angularVelocity_, point-center_); }
+    void beginMotionStep() { previousCenter_=center_; previousOrientation_=orientation_; }
+    Math::Vector3df sweepStart(const Math::Vector3df& point) const {
+        return worldPosition(glm::conjugate(previousOrientation_) * (point-previousCenter_));
+    }
     bool setMaterial(const CombustibleMaterial& material);
     const CombustibleMaterial& material() const { return material_; }
     std::vector<CombustibleSample>& samples() { return samples_; }
@@ -84,6 +95,8 @@ private:
     uint64_t id_ = 0;
     Shape shape_ = Shape::Box;
     Math::Vector3df center_{0.0f}, halfExtent_{1.0f};
+    Math::Quaternion orientation_{1,0,0,0}, previousOrientation_{1,0,0,0};
+    Math::Vector3df linearVelocity_{0}, angularVelocity_{0}, previousCenter_{0};
     CombustibleMaterial material_;
     std::vector<CombustibleSample> samples_;
     float smoothingLength_ = 0.0f;

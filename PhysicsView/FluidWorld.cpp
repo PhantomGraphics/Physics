@@ -240,7 +240,7 @@ void FluidWorld::step()
     const bool doRigid = rigid_.isRunning();
     const bool doSoft  = softCouplingEnabled_ && softWorld_ && softWorld_->isRunning();
 
-    const bool rigidCoupled = couplingEnabled_     && doFluid && doRigid && supportsOneWayCoupling();
+    const bool rigidCoupled = !rigid_.hasExternalClock() && couplingEnabled_     && doFluid && doRigid && supportsOneWayCoupling();
     const bool softCoupled  = softCouplingEnabled_  && doFluid && doSoft && supportsTwoWayCoupling();
 
     if (rigidCoupled || softCoupled) {
@@ -263,7 +263,7 @@ void FluidWorld::step()
 
 void FluidWorld::stepOnce()
 {
-    const bool rigidCoupled = couplingEnabled_ && supportsOneWayCoupling();
+    const bool rigidCoupled = !rigid_.hasExternalClock() && couplingEnabled_ && supportsOneWayCoupling();
     const bool softCoupled  = softCouplingEnabled_ && softWorld_ && supportsTwoWayCoupling();
 
     if (rigidCoupled) physicsSolver_.rigidFluidSolver().syncBoundaries();
@@ -299,6 +299,7 @@ float FluidWorld::coupledTimeStep() const
 
 void FluidWorld::setCouplingEnabled(bool v)
 {
+    if (v && rigid_.hasExternalClock()) return;
     couplingEnabled_ = v;
     if (couplingEnabled_) {
         refreshCoupling();

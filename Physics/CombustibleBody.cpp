@@ -41,6 +41,8 @@ bool CombustibleBody::initialize(uint64_t id, Shape shape, const Vector3df& cent
     if (!id || !finite(center) || !finite(extent) || glm::min(extent.x, glm::min(extent.y, extent.z)) <= 0 ||
         n < 1 || n > 16 || !std::isfinite(fuelMass) || fuelMass <= 0 || !material.valid()) return false;
     id_ = id; shape_ = shape; center_ = center; halfExtent_ = extent; material_ = material;
+    orientation_ = Math::Quaternion(1,0,0,0); linearVelocity_=angularVelocity_=Vector3df(0);
+    beginMotionStep();
     smoothingLength_ = 0; resolution_ = n;
     if (shape == Shape::Sphere) halfExtent_ = Vector3df(extent.x);
     samples_.clear();
@@ -140,19 +142,29 @@ bool CombustibleBody::initializeParticles(uint64_t id, Shape shape, const Vector
 
 Vector3df CombustibleBody::surfacePosition(const CombustibleSample& s) const
 {
-    const Vector3df p=center_+s.position;
-    return usesSolidParticles() && s.area>0 ? p-s.normal*signedDistance(p) : p;
+    const Vector3df p=worldPosition(s.position);
+    return usesSolidParticles() && s.area>0 ? p-surfaceNormal(s)*signedDistance(p) : p;
 }
 
-bool CombustibleBody::setCenter(const Vector3df& center) { if (!finite(center)) return false; center_ = center; return true; }
+bool CombustibleBody::setCenter(const Vector3df& center) { if (!finite(center)) return false; center_ = center; beginMotionStep(); return true; }
+bool CombustibleBody::setMotion(const Vector3df& center, const Math::Quaternion& q,
+    const Vector3df& linear, const Vector3df& angular)
+{
+    const float length=glm::length(q);
+    if (!finite(center) || !finite(linear) || !finite(angular) ||
+        !std::isfinite(length) || length<=1e-8f) return false;
+    center_=center; orientation_=q/length; linearVelocity_=linear; angularVelocity_=angular;
+    return true;
+}
+
 bool CombustibleBody::setMaterial(const CombustibleMaterial& m) { if (!m.valid()) return false; material_ = m; return true; }
 
 float CombustibleBody::signedDistance(const Vector3df& p, Vector3df* normal) const
 {
-    const Vector3df d = p - center_;
+    const Vector3df d = glm::conjugate(orientation_) * (p - center_);
     if (shape_ == Shape::Sphere) {
         const float len = glm::length(d);
-        if (normal) *normal = len > 1e-8f ? d / len : Vector3df(0,1,0);
+        if (normal) *normal = orientation_ * (len > 1e-8f ? d / len : Vector3df(0,1,0));
         return len - halfExtent_.x;
     }
     const Vector3df q = glm::abs(d) - halfExtent_;
@@ -163,6 +175,7 @@ float CombustibleBody::signedDistance(const Vector3df& p, Vector3df* normal) con
         else { int axis = q.y > q.x ? 1 : 0; if (q.z > q[axis]) axis = 2;
             *normal = Vector3df(0); (*normal)[axis] = d[axis] < 0 ? -1.0f : 1.0f; }
     }
+    if (normal) *normal = orientation_ * *normal;
     return len + std::min(0.0f, std::max(q.x, std::max(q.y, q.z)));
 }
 
@@ -174,11 +187,13 @@ bool CombustibleBody::blocksSegment(const Vector3df& a, const Vector3df& b) cons
         const float t = d2 > 0 ? std::clamp(glm::dot(center_-a,d)/d2, 0.0f, 1.0f) : 0;
         return signedDistance(a + d*t) < -1e-6f;
     }
+    const Vector3df localA=glm::conjugate(orientation_)*(a-center_);
+    const Vector3df localD=glm::conjugate(orientation_)*d;
     float lo = 0, hi = 1;
     for (int k = 0; k < 3; ++k) {
-        const float min = center_[k] - halfExtent_[k] + 1e-6f, max = center_[k] + halfExtent_[k] - 1e-6f;
-        if (std::abs(d[k]) < 1e-10f) { if (a[k] <= min || a[k] >= max) return false; }
-        else { float t0 = (min-a[k])/d[k], t1 = (max-a[k])/d[k]; if (t0 > t1) std::swap(t0,t1);
+        const float min = -halfExtent_[k] + 1e-6f, max = halfExtent_[k] - 1e-6f;
+        if (std::abs(localD[k]) < 1e-10f) { if (localA[k] <= min || localA[k] >= max) return false; }
+        else { float t0 = (min-localA[k])/localD[k], t1 = (max-localA[k])/localD[k]; if (t0 > t1) std::swap(t0,t1);
             lo = std::max(lo,t0); hi = std::min(hi,t1); if (lo >= hi) return false; }
     }
     return lo < hi;

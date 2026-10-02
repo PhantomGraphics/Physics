@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_set>
 
 namespace Phantom {
 
@@ -47,6 +48,15 @@ public:
 
     /** @brief Advances one step regardless of isRunning() (see RigidBodyWorld::stepUnconditional()). */
     void stepForced();
+    // Stable handles, independent of collection indices and allocator reuse.
+    uint64_t bodyId(std::size_t index) const { return index<bodyIds_.size()?bodyIds_[index]:0; }
+    Physics::RigidBody* findBody(uint64_t id) const;
+    void setExternalClock(std::function<void()> step) { externalStep_=std::move(step); }
+    void setCombustibleRepresentation(uint64_t id, bool enabled) {
+        if(enabled) combustibleIds_.insert(id); else combustibleIds_.erase(id);
+    }
+    bool hasCombustibleRepresentation(const Physics::RigidBody* body) const;
+    bool hasExternalClock() const { return static_cast<bool>(externalStep_); }
 
     bool isRunning() const  { return physicsSolver_.rigidSolver().isRunning(); }
     void setRunning(bool v) { physicsSolver_.rigidSolver().setRunning(v); }
@@ -82,6 +92,10 @@ private:
     // 1:1 and no shape is ever shared between bodies) the ICollisionShape backing its
     // RigidBody::shape pointer too.
     std::vector<std::unique_ptr<Physics::RigidBody>>       bodies_;
+    std::vector<uint64_t> bodyIds_;
+    std::unordered_set<uint64_t> combustibleIds_;
+    uint64_t nextBodyId_=1;
+    std::function<void()> externalStep_;
     std::vector<std::unique_ptr<Physics::ICollisionShape>> shapes_;
 
     void buildPreset();

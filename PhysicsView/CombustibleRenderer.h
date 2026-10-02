@@ -16,7 +16,7 @@ public:
     void onRender(VkCommandBuffer cmd,uint32_t frame) override;
     void onCleanup(VkDevice device) override;
 private:
-    struct Instance { Gltf::GltfDocument doc; Gltf::GltfSceneRenderer renderer; std::vector<int> colorKeys; glm::vec3 center{0}; };
+    struct Instance { Gltf::GltfDocument doc; Gltf::GltfSceneRenderer renderer; std::vector<int> colorKeys; glm::vec3 center{0}; Math::Quaternion orientation{1,0,0,0}; };
     FlameWorld* world_=nullptr;
     std::function<void()> onChanged_;
     VKG::VulkanContext* ctx_=nullptr;

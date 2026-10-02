@@ -62,7 +62,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
         world_.refreshSoftCoupling();
         syncSoftRenderer();
     });
-    flameControlPanel_.setOnWorldChanged([this]() { syncFlameRenderer(); });
+    flameControlPanel_.setOnWorldChanged([this]() { syncFlameRenderer(); syncRigidRenderer(); });
     flameControlPanel_.setPBVRStatsSource([this] { return flameRenderer_.pbvrStats(); });
     ssfrTestPanel_.bindSSFRRenderer(&ssfrRenderer_);
     ssfrTestPanel_.init();
@@ -84,6 +84,8 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     dispatcher_.setFluidRenderer(&fluidRenderer_);
     dispatcher_.setUIVisibilityHooks([this](bool v) { uiVisible_ = v; },
                                      [this] { return uiVisible_; });
+    flameWorld_.setRigidWorld(&world_.rigid());
+    flameWorld_.setCanBindRigid([this]{ return !world_.isCouplingEnabled(); });
     dispatcher_.flame().setWorld(&flameWorld_);
     dispatcher_.flame().setPageHooks(
         [this](bool on) {
@@ -92,7 +94,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
         },
         [this] { return controlHost_.getPage() == ControlPage::Flame; });
     dispatcher_.flame().setPBVRStatsHook([this] { return flameRenderer_.pbvrStats(); });
-    dispatcher_.flame().setOnFlameChanged([this]() { syncFlameRenderer(); });
+    dispatcher_.flame().setOnFlameChanged([this]() { syncFlameRenderer(); syncRigidRenderer(); });
     cloudControlPanel_.setOnWorldChanged([this]() { cloudDirty_ = true; });
     dispatcher_.cloud().setWorld(&cloudWorld_);
     dispatcher_.cloud().setPageHooks(
@@ -585,6 +587,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         // Steps whichever of fluid/rigid are running; if both are running and
         // Rigid-Fluid coupling is enabled, they step together in lock-step
         // (see FluidWorld::step()) instead of independently.
+        flameWorld_.syncRigidBindings();
         world_.step();
 
         // softWorld_ is independent of world_ unless SoftBody-Fluid coupling
@@ -647,10 +650,14 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     // Flame steps and renders on every page (its own Play/Pause); the fluid
     // renderers above keep whatever mode they chose -- the flame is composited
     // into the same linear-HDR scene the SSFR composite tonemaps.
+    const bool hadBindings=flameWorld_.hasRigidBindings();
+    flameWorld_.syncRigidBindings();
+    if(hadBindings && !flameWorld_.hasRigidBindings()) syncRigidRenderer();
     const bool flameInScene = flameWorld_.isPopulated();
     if (flameInScene) {
         if (flameWorld_.isRunning()) flameWorld_.step();
         syncFlameRenderer();
+        if(flameWorld_.hasRigidBindings()) syncRigidRenderer();
     }
     flameRenderer_.setEnabled(flameInScene && !cloudActive);
     // Cloud page: the air particles replace the fluid display in the shared

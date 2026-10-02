@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 #include "FlameCommandDispatcher.h"
 #include "FlameWorld.h"
+#include "RigidBodyWorld.h"
 
 #include "../Physics/FlameStats.h"
 
@@ -256,6 +257,37 @@ std::optional<std::string> FlameCommandDispatcher::route(const std::string& cmd)
 	}
 	if (!world_) return std::string("Error:flame world not set");
 	auto& w = *world_;
+    if (startsWith(sv,"BindFlameBody:")) {
+        const auto args=sv.substr(14); const auto comma=args.find(','); int id,index;
+        if(comma==std::string_view::npos || !parseInt(args.substr(0,comma),id) || id<=0 ||
+            !parseInt(args.substr(comma+1),index) || index<0 || !w.bindRigidBody(id,index))
+            return "Error:expected body ID,rigid index with matching Box/Sphere size and no rigid-fluid coupling";
+        notifyChanged(); return "OK";
+    }
+    if (startsWith(sv,"UnbindFlameBody:")) {
+        int id; if(!parseInt(sv.substr(16),id) || id<=0 || !w.unbindRigidBody(id)) return "Error:unknown binding";
+        notifyChanged(); return "OK";
+    }
+    if (startsWith(sv,"SetFlameRigidVelocity:")) {
+        auto rest=sv.substr(22); std::vector<std::string_view> args;
+        while(true) { auto pos=rest.find(','); args.push_back(rest.substr(0,pos)); if(pos==std::string_view::npos) break; rest.remove_prefix(pos+1); }
+        int id; float v[6];
+        if(args.size()!=7 || !parseInt(args[0],id) || id<=0 || !w.rigidWorld()) return "Error:expected bound ID,vx,vy,vz,wx,wy,wz";
+        auto* rigid=w.rigidWorld()->findBody(w.rigidBodyId(id)); if(!rigid) return "Error:unknown binding";
+        for(int i=0;i<6;++i) if(!parseFloat(args[i+1],v[i])) return "Error:invalid velocity";
+        rigid->linearVelocity={v[0],v[1],v[2]}; rigid->angularVelocity={v[3],v[4],v[5]};
+        w.syncRigidBindings(); notifyChanged(); return "OK";
+    }
+    if (startsWith(sv,"SetFlameBodyPose:")) {
+        auto rest=sv.substr(17); std::vector<std::string_view> args;
+        while(true) { auto pos=rest.find(','); args.push_back(rest.substr(0,pos)); if(pos==std::string_view::npos) break; rest.remove_prefix(pos+1); }
+        int id; float v[7];
+        if(args.size()!=8 || !parseInt(args[0],id) || id<=0) return "Error:expected ID,x,y,z,qw,qx,qy,qz";
+        auto* body=w.findBody(id); if(!body || w.rigidBodyId(id)) return "Error:unknown or bound body";
+        for(int i=0;i<7;++i) if(!parseFloat(args[i+1],v[i])) return "Error:invalid pose";
+        if(!body->setMotion({v[0],v[1],v[2]},{v[3],v[4],v[5],v[6]},{0,0,0},{0,0,0})) return "Error:invalid pose";
+        body->beginMotionStep(); notifyChanged(); return "OK";
+    }
 	if (cmd == "FlameCombustionPreset") { w.combustionPreset(); notifyChanged(); return "OK"; }
 	if (cmd == "StopFlameSource") { w.stopSource(); notifyChanged(); return "OK"; }
 	if (cmd == "GetFlameBodyCount") return std::to_string(w.bodies().size());
@@ -289,7 +321,14 @@ std::optional<std::string> FlameCommandDispatcher::route(const std::string& cmd)
 		const auto comma=args.find(','); int index;
 		if(comma==std::string_view::npos || !parseInt(args.substr(0,comma),index) || index<0 || index>=static_cast<int>(w.bodies().size())) return "Error:unknown body index";
 		auto& body=*w.bodies()[index]; args.remove_prefix(comma+1);
-        if(!set) { double v; if(args=="id") return std::to_string(body.id());
+        w.syncRigidBindings();
+        if(!set) { double v;
+            if(args=="rigidId") return std::to_string(w.rigidBodyId(body.id()));
+            if(args=="x" || args=="y" || args=="z") return std::to_string(body.center()[args=="x"?0:args=="y"?1:2]);
+            if(args=="qw" || args=="qx" || args=="qy" || args=="qz") {
+                const auto q=body.orientation(); return std::to_string(args=="qw"?q.w:args=="qx"?q.x:args=="qy"?q.y:q.z);
+            }
+            if(args=="id") return std::to_string(body.id());
             if(args=="particleCount") return std::to_string(body.samples().size());
             if(args=="solidSPH") return body.usesSolidParticles()?"1":"0";
 			if(!body.stats().get(std::string(args).c_str(),v)) return "Error:unknown solid stat"; return std::to_string(v); }
@@ -305,7 +344,7 @@ std::optional<std::string> FlameCommandDispatcher::route(const std::string& cmd)
 		else if(name=="latentHeat") m.latentHeat=value;
 		else if(name=="residueFraction") m.residueFraction=value;
 		else if(name=="combustible") { if(value!=0 && value!=1) return "Error:expected 0 or 1"; m.combustible=value!=0; }
-		else if(name=="x" || name=="y" || name=="z") { auto p=body.center(); p[name=="x"?0:name=="y"?1:2]=value; body.setCenter(p); notifyChanged(); return "OK"; }
+		else if(name=="x" || name=="y" || name=="z") { if(w.rigidBodyId(body.id())) return "Error:unbind before editing pose"; auto p=body.center(); p[name=="x"?0:name=="y"?1:2]=value; body.setCenter(p); notifyChanged(); return "OK"; }
 		else return "Error:unknown body parameter";
 		if(!body.setMaterial(m)) return "Error:invalid material";
 		notifyChanged(); return "OK";

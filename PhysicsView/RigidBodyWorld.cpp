@@ -1,8 +1,8 @@
-#include "pch.h"
 #include "RigidBodyWorld.h"
 
 #include <unordered_set>
 #include <cmath>
+#include <cstdio>
 
 namespace Phantom {
 
@@ -17,6 +17,8 @@ RigidBodyWorld::RigidBodyWorld(Physics::PhysicsSolver& solver) : physicsSolver_(
 void RigidBodyWorld::clear() {
     physicsSolver_.rigidSolver().clear();
     bodies_.clear();
+    bodyIds_.clear();
+    combustibleIds_.clear();
     shapes_.clear();
     clearComponents();
     physicsSolver_.rigidSolver().saveSnapshot();
@@ -25,6 +27,8 @@ void RigidBodyWorld::clear() {
 void RigidBodyWorld::setPreset(ScenePreset preset) {
     physicsSolver_.rigidSolver().clear();
     bodies_.clear();
+    bodyIds_.clear();
+    combustibleIds_.clear();
     shapes_.clear();
     clearComponents();  // the preset's add*() calls re-register below
     preset_ = preset;
@@ -32,16 +36,27 @@ void RigidBodyWorld::setPreset(ScenePreset preset) {
     physicsSolver_.rigidSolver().saveSnapshot();
 }
 
+bool RigidBodyWorld::hasCombustibleRepresentation(const Physics::RigidBody* body) const {
+    for(std::size_t i=0;i<bodies_.size();++i) if(bodies_[i].get()==body) return combustibleIds_.count(bodyIds_[i])>0;
+    return false;
+}
+
+Physics::RigidBody* RigidBodyWorld::findBody(uint64_t id) const {
+    for (std::size_t i=0;i<bodyIds_.size();++i) if(bodyIds_[i]==id) return bodies_[i].get();
+    return nullptr;
+}
+
 void RigidBodyWorld::reset() {
     physicsSolver_.rigidSolver().reset();
 }
 
 void RigidBodyWorld::step() {
-    physicsSolver_.rigidSolver().step();
+    if (!externalStep_) physicsSolver_.rigidSolver().step();
 }
 
 void RigidBodyWorld::stepForced() {
-    physicsSolver_.rigidSolver().stepUnconditional();
+    if (externalStep_) { auto step=externalStep_; step(); }
+    else physicsSolver_.rigidSolver().stepUnconditional();
 }
 
 Physics::RigidBody* RigidBodyWorld::addSphere(const Math::Vector3df& pos, float radius,
@@ -62,6 +77,7 @@ Physics::RigidBody* RigidBodyWorld::addSphere(const Math::Vector3df& pos, float 
     body->friction    = friction;
     Physics::RigidBody* ptr = body.get();
     bodies_.push_back(std::move(body));
+    bodyIds_.push_back(nextBodyId_++);
     physicsSolver_.rigidSolver().addBody(ptr);
     // Re-snapshot so Reset() (RigidBodySolver::reset() restores by index up
     // to snapshots_.size(), see its doc comment) knows about this body too --
@@ -94,6 +110,7 @@ Physics::RigidBody* RigidBodyWorld::addBox(const Math::Vector3df& pos,
     body->friction    = friction;
     Physics::RigidBody* ptr = body.get();
     bodies_.push_back(std::move(body));
+    bodyIds_.push_back(nextBodyId_++);
     physicsSolver_.rigidSolver().addBody(ptr);
     physicsSolver_.rigidSolver().saveSnapshot();  // see addSphere()'s comment above
     syncComponents();
@@ -115,6 +132,7 @@ void RigidBodyWorld::addFloor(float y) {
     body->friction    = 0.5f;
     Physics::RigidBody* ptr = body.get();
     bodies_.push_back(std::move(body));
+    bodyIds_.push_back(nextBodyId_++);
     physicsSolver_.rigidSolver().addBody(ptr);
     physicsSolver_.rigidSolver().saveSnapshot();  // see addSphere()'s comment above
     syncComponents();
@@ -320,7 +338,7 @@ RigidBodyWorld::WireData RigidBodyWorld::buildWireData() const {
     const glm::vec4 kContact = {1.0f, 0.3f, 0.3f, 1.f};
 
     for (const Physics::RigidBody* body : physicsSolver_.rigidSolver().getBodies()) {
-        if (!body->shape) continue;
+        if (!body->shape || hasCombustibleRepresentation(body)) continue;
 
         glm::vec4 color;
         if (body->isStatic())

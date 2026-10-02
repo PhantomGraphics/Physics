@@ -121,7 +121,9 @@ if(PHANTOM_GTEST_FOUND)
         ${PHYSICS_ROOT}/PhysicsView/SoftMeshGltf.cpp
         ${PHYSICS_ROOT}/PhysicsView/FlameBlackbody.cpp
         ${PHYSICS_ROOT}/PhysicsView/CloudWorld.cpp)
-    target_sources(PhysicsTest PRIVATE ${PHYSICS_ROOT}/PhysicsView/FlameWorld.cpp)
+    target_sources(PhysicsTest PRIVATE ${PHYSICS_ROOT}/PhysicsView/FlameWorld.cpp
+        ${PHYSICS_ROOT}/PhysicsView/RigidBodyWorld.cpp
+        ${PHYSICS_ROOT}/PhysicsView/SceneComponentRegistry.cpp)
     target_sources(PhysicsTest PRIVATE ${PHYSICS_ROOT}/PhysicsView/CombustibleGltf.cpp)
     set_target_properties(PhysicsTest PROPERTIES
         CXX_STANDARD 20

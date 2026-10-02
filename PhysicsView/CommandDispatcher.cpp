@@ -262,6 +262,8 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
     }
 
     if (cmd == "SetCouplingEnabled:true" || cmd == "SetCouplingEnabled:false") {
+        if (cmd == "SetCouplingEnabled:true" && world_->rigid().hasExternalClock())
+            return "Error:rigid world uses the Flame clock; unbind Flame bodies first";
         world_->setCouplingEnabled(cmd == "SetCouplingEnabled:true");
         return std::string("OK");
     }
