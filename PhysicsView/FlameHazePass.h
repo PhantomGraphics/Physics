@@ -31,8 +31,8 @@ namespace Phantom {
  *                        compatible render pass.
  *  3. apply()         -- inside the HDR scene pass: fullscreen draw that copies
  *                        that background over, displaced by animated noise
- *                        scaled by the field (colour and depth, so the flame
- *                        still depth-tests against the scene).
+ *                        scaled by the heat and its gradient. Only colour is
+ *                        displaced; depth stays at the true scene geometry.
  */
 class FlameHazePass {
 public:

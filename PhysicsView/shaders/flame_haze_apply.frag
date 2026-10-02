@@ -1,7 +1,7 @@
 #version 450
 
 // Heat haze: re-draws the background scene into the HDR scene target with a
-// noise-driven, heat-weighted displacement of the *colour* (depth is copied
+// heat-gradient and evolving turbulence displacement of the *colour* (depth is copied
 // unchanged, see the end of main()). Everything is
 // fetched by texel (nearest sampler); colour and the haze field are filtered by
 // hand so the source pixel can move by sub-pixel amounts.
@@ -45,6 +45,11 @@ vec4 fetchBilinear(sampler2D s, vec2 pixel) {
     return mix(a, b, f.y);
 }
 
+float heatAt(vec2 pixel) {
+    float h = max(fetchBilinear(hazeField, pixel).r, 0.0);
+    return h / (1.0 + h);
+}
+
 void main() {
     ivec2 size = textureSize(bgColor, 0);
     ivec2 own = ivec2(gl_FragCoord.xy);
@@ -52,25 +57,39 @@ void main() {
 
     // Heat at this pixel (field is low-res: map by normalised position).
     vec2 uv = gl_FragCoord.xy / vec2(size);
-    vec4 field = fetchBilinear(hazeField, uv * vec2(textureSize(hazeField, 0)));
+    vec2 fieldPixel = uv * vec2(textureSize(hazeField, 0));
+    vec4 field = fetchBilinear(hazeField, fieldPixel);
     float heat = field.r / (1.0 + field.r);              // soft saturation
     float flameDepth = field.g / max(field.r, 1.0e-5);
     // Geometry in front of the hot gas is not seen through it.
-    float behind = smoothstep(flameDepth - 0.002, flameDepth + 0.0005, d0);
+    float behind = smoothstep(flameDepth, flameDepth + 0.0005, d0);
 
     vec2 offset = vec2(0.0);
     if (heat > 1.0e-4 && behind > 0.0) {
         float aspect = float(size.x) / float(size.y);
         vec2 p = vec2(uv.x * aspect, uv.y) * pc.a.z;
         p.y += pc.a.y * pc.a.w * pc.a.z;                 // pattern rises with time
-        vec2 n = noise2(p) + 0.5 * noise2(p * 2.1 + 7.7);
-        offset = n * 2.0 * pc.a.x * heat * behind;
+        // Domain warping lets eddies deform as they rise instead of sliding a
+        // fixed screen-space pattern. Use the simulation clock: pause freezes it.
+        float phase = pc.a.y * pc.a.w;
+        vec2 warp = noise2(p * 0.47 + vec2(phase * 0.31, -phase * 0.19));
+        vec2 n = noise2(p + warp * 1.7) +
+                 0.5 * noise2(p * 2.1 + vec2(-phase * 0.73, phase * 0.41) + 7.7);
+        // Refraction responds to the transverse temperature gradient, with
+        // smaller turbulent eddies inside the hot plume. Saturated heat keeps
+        // overlapping SPH splats from producing unbounded displacements.
+        vec2 gradient = vec2(
+            heatAt(fieldPixel + vec2(1, 0)) - heatAt(fieldPixel - vec2(1, 0)),
+            heatAt(fieldPixel + vec2(0, 1)) - heatAt(fieldPixel - vec2(0, 1))) * 0.5;
+        vec2 distortion = gradient * 3.0 + n * vec2(1.6, 0.9) * heat;
+        offset = distortion / max(1.0, length(distortion)) * pc.a.x * behind;
     }
 
     vec2 srcPixel = clamp(gl_FragCoord.xy + offset, vec2(0.5), vec2(size) - 0.5);
     float d1 = texelFetch(bgDepth, ivec2(srcPixel), 0).r;
-    // Never pull a nearer object's colour onto a farther pixel (silhouette smear).
-    if (d1 < d0 - 1.0e-4) {
+    // Reject foreground silhouettes, not every negative depth slope. The old
+    // d1 < d0 test suppressed shimmer across ordinary tilted background faces.
+    if (field.r > 1.0e-5 && d1 <= flameDepth + 0.0005) {
         srcPixel = gl_FragCoord.xy;
     }
     outColor = fetchBilinear(bgColor, srcPixel);

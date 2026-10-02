@@ -33,7 +33,17 @@ rem alpha-blended smoke, and the unified opaque PBVR pass. See FlameRenderer.
 "%VULKAN_SDK%\Bin\glslc.exe" flame_point.frag -o flame_point.frag.spv
 "%VULKAN_SDK%\Bin\glslc.exe" flame_smoke.vert -o flame_smoke.vert.spv
 "%VULKAN_SDK%\Bin\glslc.exe" flame_smoke.frag -o flame_smoke.frag.spv
-"%VULKAN_SDK%\Bin\glslc.exe" flame_pbvr.vert -o flame_pbvr.vert.spv
-"%VULKAN_SDK%\Bin\glslc.exe" flame_pbvr.frag -o flame_pbvr.frag.spv
+"%VULKAN_SDK%\Bin\glslc.exe" flame_pbvr_point.vert -o flame_pbvr_point.vert.spv
+"%VULKAN_SDK%\Bin\glslc.exe" flame_pbvr_point.frag -o flame_pbvr_point.frag.spv
+"%VULKAN_SDK%\Bin\glslc.exe" flame_pbvr_generate.comp -o flame_pbvr_generate.comp.spv
+"%VULKAN_SDK%\Bin\glslc.exe" flame_pbvr_finalize.comp -o flame_pbvr_finalize.comp.spv
+"%VULKAN_SDK%\Bin\glslc.exe" flame_fullscreen.vert -o flame_fullscreen.vert.spv
+"%VULKAN_SDK%\Bin\glslc.exe" flame_pbvr_blend.frag -o flame_pbvr_blend.frag.spv
+"%VULKAN_SDK%\Bin\glslc.exe" flame_pbvr_composite.frag -o flame_pbvr_composite.frag.spv
+
+rem Heat-haze refraction (both Normal and PBVR).
+"%VULKAN_SDK%\Bin\glslc.exe" flame_haze_field.vert -o flame_haze_field.vert.spv
+"%VULKAN_SDK%\Bin\glslc.exe" flame_haze_field.frag -o flame_haze_field.frag.spv
+"%VULKAN_SDK%\Bin\glslc.exe" flame_haze_apply.frag -o flame_haze_apply.frag.spv
 
 echo Done.
