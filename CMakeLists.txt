@@ -332,13 +332,16 @@ phantom_add_runtime_shaders(PhysicsView
 
 # Default cubemap used by SSFR when the viewer starts. Generate it beside the
 # executable so binary images do not need to be stored in source control.
-find_program(PHANTOM_POWERSHELL_EXECUTABLE NAMES pwsh powershell REQUIRED)
-add_custom_command(TARGET PhysicsView POST_BUILD
-    COMMAND "${PHANTOM_POWERSHELL_EXECUTABLE}"
-        -NoProfile -ExecutionPolicy Bypass
-        -File "${PHYSICS_ROOT}/FluidRenderer/assets/default_envmap/generate_indoor_envmap.ps1"
-        -OutputDir "$<TARGET_FILE_DIR:PhysicsView>/envmap"
-    VERBATIM)
+option(PHYSICS_GENERATE_DEFAULT_ENVMAP "Generate the default SSFR cubemap after building PhysicsView (needs Windows PowerShell + System.Drawing)" ON)
+if(PHYSICS_GENERATE_DEFAULT_ENVMAP)
+    find_program(PHANTOM_POWERSHELL_EXECUTABLE NAMES pwsh powershell REQUIRED)
+    add_custom_command(TARGET PhysicsView POST_BUILD
+        COMMAND "${PHANTOM_POWERSHELL_EXECUTABLE}"
+            -NoProfile -ExecutionPolicy Bypass
+            -File "${PHYSICS_ROOT}/FluidRenderer/assets/default_envmap/generate_indoor_envmap.ps1"
+            -OutputDir "$<TARGET_FILE_DIR:PhysicsView>/envmap"
+        VERBATIM)
+endif()
 
 # FlameView (the former standalone flame-SPH viewer) was folded into PhysicsView
 # on 2026-09-08: FlameRenderer/FlamePipeline/FlameSmokePipeline/FlamePBVRPipeline
