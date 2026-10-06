@@ -101,14 +101,14 @@ private:
 
     std::array<PageSlot, kControlPageCount> pages_{};
     ControlPage activePage_ = ControlPage::Fluid;
-    bool visible_ = true;
+    bool visible_ = false;   // hidden on first run; opened from the menus / outliner
     UI::IWindow* statusView_ = nullptr;
 
     std::string layoutPath_;
     bool        layoutLoaded_ = false;
     bool        uiBuilt_ = false;
     ControlPage lastSavedPage_ = ControlPage::Fluid;
-    bool        lastSavedVisible_ = true;
+    bool        lastSavedVisible_ = false;
 
     // --- widget tree -------------------------------------------------------
     UI::Window    window_ {"Control"};

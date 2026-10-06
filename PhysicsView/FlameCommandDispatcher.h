@@ -34,7 +34,11 @@ class FlameWorld;
  *       carrierDebug (0 radiance, 1 temperature, 2 velocity) and sphereWire
  *       are exposed by SetFlameRenderParam.
  *   FlameStep / FlameStep:<n>
- *       Advance <n> fixed steps synchronously (independent of the Running flag).
+ *       Advance <n> fixed steps (independent of the Running flag). The steps are spread
+ *       over frames within a time budget (tick()) so the window stays responsive during
+ *       long runs; the answer ("OK") is deferred until the last step is done, and the
+ *       dispatcher is busy() (CommandDispatcher holds back later commands) until then.
+ *       The step count -- not the frame rate -- decides the result, so it stays deterministic.
  *   SetFlameRunning:{true|false} / IsFlameRunning
  *       Free-run while the Flame page is shown (frame-rate dependent; scenarios
  *       that assert on numbers should stay paused and use FlameStep).
@@ -69,8 +73,23 @@ public:
 	/** @brief Called after anything that changes what the flame renderer should show. */
 	void setOnFlameChanged(std::function<void()> fn) { onFlameChanged_ = std::move(fn); }
 
-	/** @brief Returns the response, or nullopt if cmd is not a Flame command. */
+	/**
+	 * @brief Returns the response, or nullopt if cmd is not a Flame command.
+	 * An empty string means "answer comes later" (FlameStep:<n>): see tick().
+	 */
 	std::optional<std::string> route(const std::string& cmd);
+
+	/** @brief True while a FlameStep:<n> still has steps left. */
+	bool busy() const { return stepsRemaining_ > 0; }
+
+	/** @brief Receives the deferred answer of a finished FlameStep:<n>. */
+	void setDeferredDone(std::function<void(const std::string&)> fn) { deferredDone_ = std::move(fn); }
+
+	/**
+	 * @brief Runs pending FlameStep work for at most ~budgetMs (always at least one
+	 * step), then answers "OK" once the last step is done. Call once per frame.
+	 */
+	void tick(double budgetMs);
 
 private:
 	FlameWorld* world_ = nullptr;
@@ -78,6 +97,8 @@ private:
 	std::function<bool()> isFlamePage_;
 	std::function<void()> onFlameChanged_;
 	std::function<FlamePBVRPass::Stats()> pbvrStats_;
+	std::function<void(const std::string&)> deferredDone_;
+	int stepsRemaining_ = 0;
 
 	void notifyChanged() { if (onFlameChanged_) onFlameChanged_(); }
 };

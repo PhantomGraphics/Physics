@@ -198,6 +198,7 @@ namespace Phantom {
         // IScenarioDispatcher
         void dispatch(const std::string& command) override;
         std::vector<std::string> collectResponses() override;
+        std::vector<CommandInfo> commandCatalog() const override;
 
         // Passthrough for RigidBodyViewApp's screenshot-on-scenario-command pattern.
         std::optional<std::filesystem::path> takePendingScreenshot() { return rigidDispatcher_.takePendingScreenshot(); }

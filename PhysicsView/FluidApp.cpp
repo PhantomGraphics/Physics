@@ -166,7 +166,44 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     add(&objectListPanel_);
     add(&scenarioBrowser_);
 
+    // Standard screen: render area + menu + Command + Outliner. The existing windows keep
+    // drawing themselves; the shell owns their visibility (hidden by default, imgui.ini)
+    // and first-use placement.
+    shell_.setDispatcher(&dispatcher_);
+    shell_.bindPanel("Control", {0.70f, 0.00f, 0.30f, 0.66f},
+                     [this] { return controlHost_.isVisible(); }, [this](bool v) { controlHost_.setVisible(v); });
+    shell_.bindPanel("Scene Objects", {0.45f, 0.00f, 0.25f, 0.50f},
+                     [this] { return objectListPanel_.isVisible(); }, [this](bool v) { objectListPanel_.setVisible(v); });
+    shell_.bindPanel("Scenario Browser", {0.30f, 0.05f, 0.40f, 0.55f},
+                     [this] { return scenarioBrowser_.isVisible(); }, [this](bool v) { scenarioBrowser_.setVisible(v); });
+    shell_.setOutlinerProvider([this] {
+        std::vector<ViewShell::OutlinerItem> items;
+        for (const auto& c : sceneComponents_.components()) {
+            const char* page = "Fluid";
+            if (c.kind == SceneComponentKind::RigidBody) page = "RigidBody";
+            else if (c.kind == SceneComponentKind::SoftBody) page = "SoftBody";
+            items.push_back({static_cast<uint64_t>(c.id),
+                             "#" + std::to_string(c.id) + " " + c.label + ": " + (c.describe ? c.describe() : std::string{}),
+                             page});
+        }
+        return items;
+    });
+    // An outliner entry opens the page of its domain in the Control window.
+    shell_.setOpenHandler([this](const std::string& page) {
+        ControlPage p = ControlPage::Fluid;
+        if (page == "RigidBody") p = ControlPage::RigidBody;
+        else if (page == "SoftBody") p = ControlPage::SoftBody;
+        controlHost_.setPage(p);
+        controlHost_.setVisible(true);
+    });
+
     buildMenuBar();
+}
+
+void FluidApp::onImGuiReady()
+{
+    // Context exists, imgui.ini is not read until the first frame.
+    shell_.installSettings();
 }
 
 void FluidApp::buildMenuBar()
@@ -205,7 +242,15 @@ void FluidApp::buildMenuBar()
         }}});
     }
 
-    windowMenu_.build({{"Control Window",
+    windowMenu_.build({{"Outliner",
+                [this] { shell_.setPanelVisible("Outliner", !shell_.isPanelVisible("Outliner")); },
+                [this] { return shell_.isPanelVisible("Outliner"); }},
+
+        {"Command",
+                [this] { shell_.setPanelVisible("Command", !shell_.isPanelVisible("Command")); },
+                [this] { return shell_.isPanelVisible("Command"); }},
+
+        {"Control Window",
                 [this] { controlHost_.setVisible(!controlHost_.isVisible()); },
                 [this] { return controlHost_.isVisible(); }},
 
@@ -215,7 +260,12 @@ void FluidApp::buildMenuBar()
 
         {"Scenario Browser", [this] {
         scenarioBrowser_.setVisible(!scenarioBrowser_.isVisible());
-    }, [this] { return scenarioBrowser_.isVisible(); }} });
+    }, [this] { return scenarioBrowser_.isVisible(); }},
+
+        {"Reset Layout", [this] {
+        shell_.resetLayout();
+        controlHost_.setVisible(false);
+    }} });
 
     viewMenu_.build({
         {"Camera XY", [this] { fluidRenderer_.viewXY(); }},
@@ -761,9 +811,16 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     // position overlaps the Control window and ends up in --screenshot captures of every page.
     if (exitOnComplete_ && runner_.isActive()) scenarioBrowser_.setVisible(false);
 
+    // Single place that collects responses: first the ones for commands typed
+    // into the Command window (scenario commands included -- they run through
+    // it too), the rest go to the running scenario. Deferred answers
+    // (SaveScreenshot) arrive in a later frame and are matched by order.
+    auto responses = dispatcher_.collectResponses();
+    shell_.consumeResponses(responses);
+    shell_.setScenarioActive(runner_.isActive());
+
     if (runner_.isActive()) {
-        auto responses = dispatcher_.collectResponses();
-        if (runner_.tick(dispatcher_, responses)) {
+        if (runner_.tick(shell_.scenarioDispatcher(), responses)) {
             if (runner_.hasFailed()) {
                 fprintf(stderr, "[Scenario] FAILED: %s\n", runner_.failMessage().c_str());
                 exitCode_ = 1;
@@ -854,7 +911,9 @@ void FluidApp::onImGui()
     // SetUIVisible:false (scenario screenshots) hides every window.
     if (!uiVisible_) return;
     menuBar_.show();
-    ::VKG::VkAppBase::onImGui();
+    shell_.drawWindows();         // Command + Outliner, and syncs bound panel visibility
+    ::VKG::VkAppBase::onImGui(); // the other windows draw themselves
+    shell_.placeBoundPanels();
 }
 
 void FluidApp::onCleanup()
@@ -880,10 +939,14 @@ void FluidApp::setupCallbacks()
 {
     auto& win = getWindow();
 
+    // Camera input is ignored while ImGui owns the mouse and while a scenario
+    // runs; a release is always forwarded so a drag can end.
     win.onMouseButton = [this](int button, int action, int) {
         if (button != GLFW_MOUSE_BUTTON_LEFT) {
             return;
         }
+        if (action == GLFW_PRESS && (ImGui::GetIO().WantCaptureMouse || runner_.isActive()))
+            return;
 
         double x = 0.0, y = 0.0;
         glfwGetCursorPos(getWindow().get(), &x, &y);
@@ -901,6 +964,7 @@ void FluidApp::setupCallbacks()
     };
 
     win.onScroll = [this](double, double dy) {
+        if (ImGui::GetIO().WantCaptureMouse || runner_.isActive()) return;
         fluidRenderer_.handleScroll(static_cast<float>(dy));
         ssfrRenderer_.setCamera(fluidRenderer_.getProjMatrix(), fluidRenderer_.getViewMatrix());
         syncBackgroundCamera();

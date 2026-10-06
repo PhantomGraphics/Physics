@@ -1,0 +1,7 @@
+{
+  "name": "command_catalog",
+  "steps": [
+    { "label": "Unknown command reports an error", "command": "NoSuchCommand", "expect_prefix": "Error:" },
+    { "label": "App still alive",                  "command": "GetStatus",     "expect": "OK" }
+  ]
+}
