@@ -82,6 +82,7 @@ public:
 		float smokeShadowAmbient = 0.25f; ///< unoccluded fill fraction
 		glm::vec3 smokeLightDirection{ -0.5f, -1.0f, -0.3f }; ///< direction of light travel
 		glm::vec3 smokeLightRadiance{ 1.0f };
+		float smokeFlameLight = 1.0f; ///< PBVR flame illumination gain, 0=off
 		bool operator==(const Shading& o) const;
 	};
 

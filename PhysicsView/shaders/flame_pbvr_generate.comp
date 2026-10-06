@@ -38,6 +38,7 @@ layout(push_constant) uniform PC {
     uint seedBase;
     uint capacity;     // vertices per ensemble segment
     uint maxPerSource;
+    uint shadowMode; // 1: independent, camera-free opaque light-space particle set
 } pc;
 
 uint pcg(uint v) {
@@ -87,14 +88,17 @@ void main() {
         return;
     }
     vec4 clip = ubo.mvp * vec4(s.posSize.xyz, 1.0);
-    if (clip.w <= 1.0e-3) {
+    if (pc.shadowMode == 0u && clip.w <= 1.0e-3) {
         return; // behind the camera
     }
     float sizePx = flameProjectedSize(S, clip);
-    float k = clamp(min(ubo.smoke.z, sizePx / max(ubo.view.z, 0.5)), 1.0, 8.0);
+    float k = pc.shadowMode != 0u ? clamp(ubo.flameShadow.w,1.0,8.0) :
+        clamp(min(ubo.smoke.z, sizePx / max(ubo.view.z, 0.5)), 1.0, 8.0);
     float lambda = (2.0 / 3.0) * tau0 * k * k * ubo.view.w;
 
-    rngState = pcg(i ^ pcg(pc.seedBase + e * 0x9E3779B9u));
+    // Independent light-space samples avoid correlation with camera visibility.
+    uint streamSeed = pc.seedBase ^ (pc.shadowMode != 0u ? 0xA511E9B3u : 0u);
+    rngState = pcg(i ^ pcg(streamSeed + e * 0x9E3779B9u));
     uint n = min(samplePoisson(lambda), pc.maxPerSource);
     if (n == 0u) {
         return;
@@ -132,7 +136,7 @@ void main() {
         uint idx = atomicAdd(counts[e], 1u);
         if (idx < pc.capacity) {
             outPos[base + idx] = vec4(p, sub);
-            outCol[base + idx] = shadedColor;
+            if (pc.shadowMode == 0u) outCol[base + idx] = shadedColor;
         }
     }
 }

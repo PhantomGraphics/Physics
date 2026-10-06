@@ -17,6 +17,9 @@ layout(set = 0, binding = 0) uniform FlameUBO {
     vec4 lut[64];     // blackbody chromaticity (unit luminance, linear sRGB), see FlameBlackbody.h
     vec4 smokeShadow; // xyz = direction to light, w = self-shadow strength (PBVR only)
     vec4 smokeShadowLight; // rgb = directional radiance, w = unoccluded fill fraction
+    vec4 flameLightPosition; // xyz=importance-sampled emitter, w=illumination gain
+    vec4 flameLightFlux; // rgb=emitted flux / selection probability, w=source radius
+    vec4 flameShadow; // far distance, shadow image size, hemisphere sign, shadow subdivision
 } ubo;
 
 vec3 flameBlackbody(float T) {

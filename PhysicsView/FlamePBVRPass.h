@@ -3,6 +3,7 @@
 #include "FlameFullscreenPass.h"
 #include "FlamePointPipeline.h"
 #include "FlameStreamBuffer.h"
+#include "FlameLightSampler.h"
 
 #include "CGLib/Graphics/EnsembleLodController.h"
 #include "CGLib/VulkanGraphics/VulkanBuffer.h"
@@ -47,7 +48,18 @@ namespace Phantom {
  * probability T (the smoke's transmittance in front of it), so the ensemble
  * mean is sum e_i T_i -- exactly the emission-absorption integral -- and the
  * mean alpha is 1 - T. No emitter needs to be sampled, and emission never
- * occludes anything.
+ * occludes anything. This describes directly visible emission.
+ *
+ * Flame illumination of smoke samples one actual emissive particle per ensemble,
+ * weighted by luminance and corrected by its selection probability. A separate
+ * Poisson smoke realization supplies binary light visibility: two 256-square
+ * dual-paraboloid maps store the nearest opaque sphere intersection in every
+ * direction. The camera ensemble receives the selected light only when visible,
+ * and the running mean estimates the sum of attenuated source contributions.
+ * No voxel density reconstruction or ray marching is used. Shadow subdivision
+ * is camera-independent; finite particle size and map resolution approximate
+ * the medium. This is single scattering; solid-object light shadows and multiple
+ * scattering are not included. Smoke Flame Light controls the artistic gain.
  *
  * History: while the frame is static (paused sim, same camera and params) the
  * average is the exact progressive mean 1/(n+1) and stops at
@@ -73,6 +85,7 @@ public:
 		std::vector<uint32_t> fullscreenVert;             // flame_fullscreen
 		std::vector<uint32_t> blendFrag, compositeFrag;   // flame_pbvr_blend / _composite
 		std::vector<uint32_t> generateComp, finalizeComp; // flame_pbvr_generate / _finalize
+		std::vector<uint32_t> shadowVert, shadowFrag;     // independent opaque light-space particles
 	};
 
 	enum class LodMode { Manual, Adaptive };
@@ -94,6 +107,8 @@ public:
 		float    gpuMs = 0.0f;           ///< GPU time of the whole pass (last completed frame)
 		bool     timestampsSupported = false;
 		int      lodState = 0;           ///< Phantom::Graphics::EnsembleLodController::State
+		uint32_t shadowGenerated = 0;
+		uint32_t shadowOverflowed = 0;
 	};
 
 	bool create(const Phantom::VKG::VulkanContext& ctx, const Phantom::VKG::VulkanCommandPool& pool,
@@ -143,6 +158,11 @@ private:
 
 	std::optional<FlamePointPipeline> pointPipeline_;
 	std::optional<FlamePointPipeline> emissivePipeline_;
+	std::optional<FlamePointPipeline> shadowPipeline_;
+	std::array<Phantom::VKG::VulkanOffscreen,2> lightShadow_;
+	std::array<FlamePointUBO,kMaxEnsembles> ensembleUbo_;
+	bool lightShadowNeedsInit_ = true;
+	bool flameLightActive_ = false;
 	FlameFullscreenPass blend_;
 	FlameFullscreenPass composite_;
 
@@ -150,18 +170,22 @@ private:
 	Phantom::VKG::VulkanDescriptorSetLayout genLayout_;
 	Phantom::VKG::VulkanDescriptorPool genPool_;
 	std::vector<VkDescriptorSet> genSets_;
+	std::vector<VkDescriptorSet> shadowGenSets_;
 	std::vector<VkBuffer> genBoundSources_; // source SSBO handle each frame set currently points at
 	Phantom::VKG::VulkanComputePipeline genPipeline_;
 	Phantom::VKG::VulkanDescriptorSetLayout finLayout_;
 	Phantom::VKG::VulkanDescriptorPool finPool_;
 	std::vector<VkDescriptorSet> finSets_;
+	std::vector<VkDescriptorSet> shadowFinSets_;
 	Phantom::VKG::VulkanComputePipeline finPipeline_;
 
 	std::vector<Phantom::VKG::VulkanBuffer> computeUbo_;  // per frame
 	FlameStreamBuffer sources_;                           // per frame
 	Phantom::VKG::VulkanBuffer outPos_, outColor_;        // kMaxEnsembles * capacity each
 	Phantom::VKG::VulkanBuffer counters_, args_;
+	Phantom::VKG::VulkanBuffer shadowPos_, shadowArgs_;
 	std::vector<Phantom::VKG::VulkanBuffer> genStats_;    // per frame, host-visible readback
+	std::vector<Phantom::VKG::VulkanBuffer> shadowStats_;
 
 	VkQueryPool queryPool_ = VK_NULL_HANDLE;
 	float tsPeriodNs_ = 0.0f;
