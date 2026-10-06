@@ -10,6 +10,29 @@ using namespace Phantom::Math;
 using namespace Phantom::Physics;
 
 namespace {
+
+// Several random numbers drawn for one vector must be drawn in a stated order. Writing
+// Vector3df(dist(rng), dist(rng), dist(rng)) leaves it to the compiler (unspecified evaluation
+// order: MSVC right-to-left, clang/gcc left-to-right), which used to give every platform a
+// different flame from the same seed. The order below (z, then y, then x) is what MSVC did, so
+// existing Windows scenes and baselines are unchanged and the other compilers now match them.
+template <typename Dist>
+Vector3df drawXYZ(std::mt19937& rng, Dist& dist)
+{
+	const float z = dist(rng);
+	const float y = dist(rng);
+	const float x = dist(rng);
+	return Vector3df(x, y, z);
+}
+
+// Same, for a vector with only x and z random (z first).
+template <typename Dist>
+Vector3df drawXZ(std::mt19937& rng, Dist& dist)
+{
+	const float z = dist(rng);
+	const float x = dist(rng);
+	return Vector3df(x, 0.0f, z);
+}
 // Emitter particle radius is deliberately not part of the plan's minimal
 // Emitter struct (center/radius/rate); this small fixed value keeps emitted
 // particles consistent with the ~thousands-of-particles CPU budget.
@@ -111,7 +134,7 @@ void FlameFluid::updateEmitters(const float dt)
 			// Pure fuel vapor: it has to mix with air carriers (via the
 			// solver's diffusion pass) before the Physical model lets it burn.
 			particles.oxygens[idx] = 0.0f;
-			particles.velocities[idx] = Vector3df(jitterDist(rng), 1.0f + jitterDist(rng), jitterDist(rng));
+			particles.velocities[idx] = drawXYZ(rng, jitterDist) + Vector3df(0.0f, 1.0f, 0.0f);
 		}
 
 		e.airAccumulator += e.airRate * dt;
@@ -128,7 +151,7 @@ void FlameFluid::updateEmitters(const float dt)
 			particles.push_back(e.center + offset, kEmittedParticleRadius, density, ambientTemperature);
 			const size_t idx = particles.size() - 1;
 			particles.airs[idx] = true;
-			particles.velocities[idx] = Vector3df(airJitterDist(rng), airJitterDist(rng), airJitterDist(rng));
+			particles.velocities[idx] = drawXYZ(rng, airJitterDist);
 		}
 	}
 }
@@ -252,7 +275,7 @@ void FlameFluid::updateSecondaryParticles(const float dt, const Vector3df& gravi
 		SecondaryParticle sp;
 		sp.kind = SecondaryKind::Smoke;
 		sp.position = particles.positions[si];
-		sp.velocity = particles.velocities[si] * 0.3f + Vector3df(jitterDist(rng), smokeRiseSpeed, jitterDist(rng));
+		sp.velocity = particles.velocities[si] * 0.3f + drawXZ(rng, jitterDist) + Vector3df(0.0f, smokeRiseSpeed, 0.0f);
 		sp.vorticity = particles.vorticities[si];
 		// Smoke starts at the source's own temperature (glowing soot fresh out
 		// of the flame front) and cools toward ambient over its early life --
@@ -296,11 +319,11 @@ void FlameFluid::updateSecondaryParticles(const float dt, const Vector3df& gravi
 			// sqrt(dt) so the accumulated spread after a given *time* does not
 			// depend on the step size (plan A3). kSparkJitterRate matches the
 			// old fixed +-0.15 kick at dt = 1/60 (0.15 * sqrt(60)).
-			sp.velocity += Vector3df(jitterDist(rng), jitterDist(rng), jitterDist(rng)) * sparkJitterScale;
+			sp.velocity += drawXYZ(rng, jitterDist) * sparkJitterScale;
 			sp.position += sp.velocity * dt;
 			sp.temperature += (ambientTemperature - sp.temperature) * std::min(1.0f, 4.0f * dt);
 		} else {
-			sp.velocity += Vector3df(jitterDist(rng), 0.0f, jitterDist(rng)) * 0.3f * dt;
+			sp.velocity += drawXZ(rng, jitterDist) * 0.3f * dt;
 			sp.position += sp.velocity * dt;
 
 			const float ageRatio = std::clamp(sp.age / sp.lifeMax, 0.0f, 1.0f);
