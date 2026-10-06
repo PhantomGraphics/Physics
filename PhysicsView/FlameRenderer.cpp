@@ -22,7 +22,7 @@ bool FlameRenderer::Shading::operator==(const Shading& o) const
 		pbvrMinSubPixels == o.pbvrMinSubPixels && pbvrDensityScale == o.pbvrDensityScale &&
 		smokeShadowStrength == o.smokeShadowStrength && smokeShadowAmbient == o.smokeShadowAmbient &&
 		smokeLightDirection == o.smokeLightDirection && smokeLightRadiance == o.smokeLightRadiance &&
-		smokeFlameLight == o.smokeFlameLight && objectFlameLight == o.objectFlameLight;
+		smokeFlameLight == o.smokeFlameLight && objectFlameLight == o.objectFlameLight && smokeDensityProfile == o.smokeDensityProfile;
 }
 
 void FlameRenderer::setEmitters(std::vector<float> positions, std::vector<float> temperatures, std::vector<float> sizes)
@@ -98,7 +98,7 @@ FlamePointUBO FlameRenderer::makeUBO()
 	// Vulkan projections often flip Y (negative [1][1]); only the scale matters here.
 	ubo.view = glm::vec4(std::abs(proj_[1][1]), viewportHeight_, shading_.pbvrMinSubPixels, shading_.pbvrDensityScale);
 	ubo.thermal = glm::vec4(shading_.ambientTemperature, shading_.referenceTemperature, shading_.exposure, 0.0f);
-	ubo.smoke = glm::vec4(shading_.smokeExtinction, shading_.smokeGlow, shading_.pbvrSubdivision, 0.0f);
+	ubo.smoke = glm::vec4(shading_.smokeExtinction, shading_.smokeGlow, shading_.pbvrSubdivision, shading_.smokeDensityProfile);
 	ubo.smokeAlbedo = glm::vec4(shading_.smokeAlbedo, 0.0f);
 	const float lightLength = glm::length(shading_.smokeLightDirection);
 	const glm::vec3 toLight = lightLength > 1.0e-6f ? -shading_.smokeLightDirection / lightLength : glm::vec3(0, 1, 0);
@@ -148,7 +148,7 @@ void FlameRenderer::onUpdate(uint32_t frameIndex)
 						absSizes_[i], shading_.smokeExtinction * absDensities_[i] * shading_.pbvrDensityScale});
 				}
 				FlameSmokeShadow shadow;
-				shadow.build(std::move(puffs));
+				shadow.build(std::move(puffs),shading_.smokeDensityProfile);
 				for (size_t i = 0; i < nAbs; ++i) smokeShadowDepth_[i] = shadow.opticalDepth(static_cast<unsigned>(i), glm::vec3(ubo.smokeShadow));
 			}
 			smokeShadowDirty_ = false;

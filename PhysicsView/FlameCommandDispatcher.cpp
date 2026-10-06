@@ -198,6 +198,8 @@ const std::vector<ParamDef>& renderParams()
 		{ "smokeExtinction", FLAME_R(smokeExtinction) },
 		{ "smokeGlow", FLAME_R(smokeGlow) },
 		{ "smokeAlbedo", FLAME_R(smokeAlbedo) },
+		{ "smokeDensityProfile", [](FlameWorld& w) { return w.render().smokeDensityProfile; },
+			[](FlameWorld& w, float v) { if (v<0 || v>1) return false; w.render().smokeDensityProfile=v; return true; } },
 		{ "smokeShadowStrength", FLAME_R(smokeShadowStrength) },
 		{ "smokeFlameLight", FLAME_R(smokeFlameLight) },
 		{ "objectFlameLight", FLAME_R(objectFlameLight) },

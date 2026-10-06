@@ -123,6 +123,7 @@ public:
         // optical depth = smokeExtinction * density.
         float smokeOpacityScale = 1.0f;
         float smokeExtinction   = 2.0f;
+        float smokeDensityProfile = 1.0f;       ///< 0 uniform, 1 normalized SPH poly6
         // Hot soot re-emits in proportion to what it absorbs (Kirchhoff).
         // Relative to one optically-thin gas sprite -- which sums over
         // overlapping neighbours -- an opaque soot sample needs ~the typical

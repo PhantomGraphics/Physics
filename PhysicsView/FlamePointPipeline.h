@@ -33,7 +33,7 @@ struct FlamePointUBO {
 	glm::mat4 mvp{ 1.0f };
 	glm::vec4 view{ 1.0f, 720.0f, 1.5f, 1.0f };     ///< x=|proj[1][1]|, y=viewport height (px), z=min PBVR sub-particle px, w=PBVR density scale
 	glm::vec4 thermal{ 300.0f, 2000.0f, 1.0f, 0.0f }; ///< x=T_ambient, y=T_ref (radiance 1), z=flame exposure
-	glm::vec4 smoke{ 4.0f, 0.2f, 2.0f, 0.0f };      ///< x=extinction sigma, y=smoke glow scale, z=PBVR subdivision
+	glm::vec4 smoke{ 4.0f, 0.2f, 2.0f, 1.0f };      ///< extinction sigma, smoke glow, PBVR subdivision, density profile
 	glm::vec4 smokeAlbedo{ 0.02f, 0.02f, 0.02f, 0.0f };
 	glm::vec4 lutRange{ 500.0f, 4000.0f, 0.0f, 0.0f };
 	glm::vec4 lut[kLutSize]{};

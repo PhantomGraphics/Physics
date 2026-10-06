@@ -4,16 +4,18 @@
 // PBVR particle generation for the Flame page (plan Phase 4).
 //
 // One invocation per (absorbing source i, ensemble e). Each source is a smoke
-// puff: a uniform sphere of world diameter S whose optical depth through the
-// centre is tau0 = sigma * density (the same Beer-Lambert sphere Normal mode
-// draws with flame_smoke.frag). It is replaced by N ~ Poisson(lambda) opaque
-// sub-particles of diameter s = S / k placed uniformly inside the sphere.
+// puff of world diameter S. tau0 = sigma * density is the old uniform sphere's
+// central-depth scale. Compact poly6 changes the radial distribution while
+// preserving the integrated density, so it keeps the same Poisson(lambda)
+// count and sub-particle diameter s=S/k. Inverse-CDF sampling places particles
+// according to the radial mass (the profile also used for light-space samples).
 //
 // Particle density from opacity (Sakamoto et al., PBVR): a ray whose chord
 // through the sphere is L crosses n * L * (pi s^2 / 4) sub-particle discs on
-// average, so matching exp(-tau0 * L / S) needs n * pi s^2 / 4 = tau0 / S,
+// average. For the uniform reference, exp(-tau0*L/S) needs n*pi*s^2/4=tau0/S,
 // i.e. lambda = n * (pi S^3 / 6) = (2/3) * tau0 * k^2 -- the PBVR relation
-// rho = -ln(1 - alpha) / (pi r^2 dt) written for this geometry.
+// rho = -ln(1-alpha)/(pi*r^2*dt). The normalized nonuniform profile preserves
+// lambda and makes the spatial Poisson intensity proportional to local density.
 //
 // k is clamped so a sub-particle never projects below ubo.view.z pixels: the
 // density cap of Sakamoto's "one particle per pixel footprint" argument
@@ -22,6 +24,7 @@
 layout(local_size_x = 64) in;
 
 #include "flame_common.glsl"
+#include "flame_smoke_profile.glsl"
 
 struct Source {
     vec4 posSize; // xyz = world position, w = world diameter
@@ -109,23 +112,24 @@ void main() {
     float radius = 0.5 * S;
     uint base = e * pc.capacity;
     for (uint j = 0u; j < n; ++j) {
-        // Uniform in the sphere: cube-root radius, uniform direction.
-        float r = radius * pow(rand01(), 1.0 / 3.0);
+        // Importance-sample the normalized puff density; directions are uniform.
+        float r = radius * smokeSampleRadius(rand01(),ubo.smoke.w);
         float cz = 2.0 * rand01() - 1.0;
         float phi = 6.2831853 * rand01();
         float sz = sqrt(max(0.0, 1.0 - cz * cz));
         vec3 p = s.posSize.xyz + r * vec3(sz * cos(phi), sz * sin(phi), cz);
 
         vec4 shadedColor = color;
-        if (ubo.smokeShadow.w > 0.0) {
-            // Analytic exit distance within the receiving puff at this PBVR sample.
+        if (pc.shadowMode == 0u && ubo.smokeShadow.w > 0.0) {
+            // Analytic density integral from this sample to the puff boundary.
             // Other puffs are BVH-traced at the source centre on the CPU. No
             // density volume, shadow layers, or camera-dependent shadow sampling.
             vec3 offset = p - s.posSize.xyz;
             float along = dot(offset, ubo.smokeShadow.xyz);
-            float exitDistance = max(0.0, -along + sqrt(max(0.0,
-                along * along + radius * radius - dot(offset, offset))));
-            float tau = max(0.0, s.attr.z) + tau0 * ubo.view.w * exitDistance / S;
+            float impactSquared=max(0.0,(dot(offset,offset)-along*along)/(radius*radius));
+            float exitCoordinate=sqrt(max(0.0,1.0-impactSquared));
+            float selfColumn=smokeProfileColumn(impactSquared,along/radius,exitCoordinate,ubo.smoke.w);
+            float tau = max(0.0, s.attr.z) + tau0 * ubo.view.w * selfColumn;
             float transmission = exp(-ubo.smokeShadow.w * tau);
             float fill = clamp(ubo.smokeShadowLight.w, 0.0, 1.0);
             vec3 illumination = vec3(fill) + (1.0 - fill) * ubo.smokeShadowLight.rgb * transmission;

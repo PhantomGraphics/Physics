@@ -7,6 +7,7 @@
 #include <numeric>
 #include <utility>
 #include <vector>
+#include "FlameSmokeProfile.h"
 
 namespace Phantom {
 
@@ -17,9 +18,10 @@ namespace Phantom {
  */
 class FlameSmokeShadow {
 public:
-    struct Puff { glm::vec3 centre; float diameter; float tau; };
+    struct Puff { glm::vec3 centre; float diameter; float tau; }; // tau: uniform-reference depth scale
 
-    void build(std::vector<Puff> puffs) {
+    void build(std::vector<Puff> puffs, float profile = 0.0f) {
+        profile_=std::clamp(profile,0.0f,1.0f);
         puffs_ = std::move(puffs);
         order_.resize(puffs_.size());
         std::iota(order_.begin(), order_.end(), 0u);
@@ -33,7 +35,7 @@ public:
         return trace(0, puffs_[receiver].centre, toLight, receiver);
     }
 
-    static float rayDepth(const Puff& puff, const glm::vec3& origin, const glm::vec3& direction) {
+    static float rayDepth(const Puff& puff, const glm::vec3& origin, const glm::vec3& direction, float profile = 0.0f) {
         if (puff.diameter <= 0.0f || puff.tau <= 0.0f) return 0.0f;
         const glm::vec3 delta = puff.centre - origin;
         const float along = glm::dot(delta, direction);
@@ -41,8 +43,10 @@ public:
         const float discriminant = radius * radius - (glm::dot(delta, delta) - along * along);
         if (discriminant <= 0.0f) return 0.0f;
         const float halfChord = std::sqrt(discriminant);
-        const float length = std::max(0.0f, along + halfChord - std::max(0.0f, along - halfChord));
-        return puff.tau * length / puff.diameter;
+        const double begin=std::max(-halfChord,-along)/radius;
+        const double end=halfChord/radius;
+        const double impactSquared=std::max(0.0f,glm::dot(delta,delta)-along*along)/(double(radius)*radius);
+        return static_cast<float>(puff.tau*FlameSmokeProfile::column(impactSquared,begin,end,profile));
     }
 
 private:
@@ -50,6 +54,7 @@ private:
     std::vector<Puff> puffs_;
     std::vector<unsigned> order_;
     std::vector<Node> nodes_;
+    float profile_=0;
 
     unsigned buildNode(unsigned begin, unsigned end) {
         glm::vec3 lo(FLT_MAX), hi(-FLT_MAX);
@@ -95,7 +100,7 @@ private:
         if (n.left != 0) return trace(n.left, origin, direction, receiver) + trace(n.right, origin, direction, receiver);
         float tau = 0.0f;
         for (unsigned i = n.begin; i < n.end; ++i) {
-            if (order_[i] != receiver) tau += rayDepth(puffs_[order_[i]], origin, direction);
+            if (order_[i] != receiver) tau += rayDepth(puffs_[order_[i]], origin, direction,profile_);
         }
         return tau;
     }

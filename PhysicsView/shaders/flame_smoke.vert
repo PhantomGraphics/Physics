@@ -9,7 +9,7 @@ layout(location = 3) in float inTemperature;
 
 #include "flame_common.glsl"
 
-layout(location = 0) out float outTau;   // optical depth through the sprite centre
+layout(location = 0) out float outTau;   // uniform-reference optical-depth scale
 layout(location = 1) out vec3 outColor;  // re-emitted colour per unit opacity
 
 void main() {
