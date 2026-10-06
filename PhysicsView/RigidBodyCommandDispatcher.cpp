@@ -33,30 +33,19 @@ std::vector<std::string_view> split(std::string_view sv, char delim) {
 } // namespace
 
 void RigidBodyCommandDispatcher::dispatch(const std::string& command) {
-    std::lock_guard<std::mutex> lk(mutex_);
-    inputQueue_.push(command);
+    queue_.submit(command);
 }
 
 std::vector<std::string> RigidBodyCommandDispatcher::collectResponses() {
-    std::vector<std::string> out;
-    std::lock_guard<std::mutex> lk(mutex_);
-    while (!outputQueue_.empty()) {
-        out.push_back(std::move(outputQueue_.front()));
-        outputQueue_.pop();
-    }
-    return out;
+    return queue_.collectResponses();
 }
 
 void RigidBodyCommandDispatcher::processQueue() {
-    std::queue<std::string> local;
-    { std::lock_guard<std::mutex> lk(mutex_); std::swap(local, inputQueue_); }
+    std::queue<std::string> local = queue_.takeAll();
     while (!local.empty()) {
         std::string resp = route(local.front());
         local.pop();
-        if (!resp.empty()) {
-            std::lock_guard<std::mutex> lk(mutex_);
-            outputQueue_.push(std::move(resp));
-        }
+        if (!resp.empty()) queue_.respond(std::move(resp));
     }
 }
 
@@ -67,8 +56,7 @@ std::optional<std::filesystem::path> RigidBodyCommandDispatcher::takePendingScre
 }
 
 void RigidBodyCommandDispatcher::signalScreenshotDone(bool ok, const std::string& path) {
-    std::lock_guard<std::mutex> lk(mutex_);
-    outputQueue_.push(ok ? "OK" : "FAIL:" + path);
+    queue_.respond(ok ? "OK" : "FAIL:" + path);
 }
 
 std::string RigidBodyCommandDispatcher::route(const std::string& cmd) {

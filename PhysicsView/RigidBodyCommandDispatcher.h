@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CGLib/VkAppBase/ScenarioRunner/IScenarioDispatcher.h"
+#include "CGLib/VkAppBase/ScenarioRunner/CommandQueue.h"
 
 #include <filesystem>
 #include <functional>
@@ -35,9 +36,7 @@ private:
 
     std::optional<std::filesystem::path> pendingScreenshot_;
 
-    std::mutex              mutex_;
-    std::queue<std::string> inputQueue_;
-    std::queue<std::string> outputQueue_;
+    CommandQueue queue_;
 };
 
 } // namespace Phantom
