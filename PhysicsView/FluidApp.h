@@ -72,6 +72,7 @@ public:
     // Scenario runner control (call before run()).
     bool loadScenario(const std::string& jsonPath) override;
     void disableInteractiveLayoutPersistence() { controlHost_.setLayoutFile({}); }
+    void useVerificationLayout(std::string ini) { verificationLayout_=std::move(ini); }
     void setExitOnScenarioComplete(bool v) override { exitOnComplete_ = v; }
     int  getExitCode() const               { return exitCode_; }
 
@@ -91,6 +92,7 @@ protected:
     void onCleanup() override;
 
 private:
+    std::string verificationLayout_;
     // ID-keyed list of every scene object; each world registers into it.
     // Declared first so it outlives the worlds that hold ids into it.
     SceneComponentRegistry sceneComponents_;
@@ -145,6 +147,8 @@ private:
     FluidVolumeConvertPanel volumeConvertPanel_;
 
     RigidBodyWireRenderer rigidRenderer_;
+    RigidBodyWireRenderer flameDebugRenderer_;
+    bool flameWasSpherical_ = false;
     // Rigid-body PBR ("shaded") pass, an alternative to rigidRenderer_'s
     // wireframe (docs/todo/PLAN_physicsview_gltf_rendering.md Phase 2). One
     // GltfSceneRenderer + synthesized unit primitive per body; SetRigidRenderMode

@@ -57,6 +57,22 @@ Vector3df curlNoise(const Vector3df& p, const float frequency, const float w)
 void FlameSolver::simulate(const float dt)
 {
 	if (!std::isfinite(dt) || dt <= 0) return;
+	// A solid coupler currently adds carriers. Reject the incompatible combination.
+	if (solidCoupler_) for (auto* fluid : fluids) if (fluid->fixedCarriers) return;
+	// Fixed mode substeps rather than changing the requested diffusion coefficient.
+	float stableDt = dt;
+	for (auto* fluid : fluids) if (fluid->fixedCarriers) {
+		const float k = std::max({fluid->getThermalDiffusivity(), fluid->getFuelDiffusivity(),
+			fluid->getOxygenDiffusivity(), fluid->getSootDiffusivity()});
+		if (k > 0) stableDt = std::min(stableDt, kMaxDiffusionNumber * effectLength * effectLength / k);
+		stableDt = std::min(stableDt, 0.25f * effectLength /
+			(std::max(0.01f, fluid->getMaxSpeed()) + std::sqrt(std::max(0.0f, fluid->getPressureCoe()))));
+	}
+	if (dt > stableDt * 1.001f) {
+		const int steps = static_cast<int>(std::ceil(dt / stableDt));
+		for (int i = 0; i < steps; ++i) simulate(dt / steps);
+		return;
+	}
 	if (solidCoupler_) for (auto* fluid : fluids) {
 		fluid->setCombustionModel(FlameFluid::CombustionModel::Physical);
 		solidCoupler_->update(*fluid,dt,simTime_);
@@ -66,6 +82,19 @@ void FlameSolver::simulate(const float dt)
 		auto& soa = fluid->getParticles();
 		for (size_t i = 0; i < soa.size(); ++i) {
 			particles.emplace_back(soa, i, fluid);
+			if (sphere_) {
+				auto& p = particles.back();
+				const float allowed = std::max(0.0f, sphere_->getRadius()-soa.radii[i]);
+				const auto offset = p.getPosition()-sphere_->getCenter(); const float distance = Math::getLength(offset);
+				if (distance > allowed && distance > 0) {
+					const auto normal=offset/distance;
+					fluid->maxAttemptedWallPenetration=std::max(fluid->maxAttemptedWallPenetration,distance-allowed);
+					const float speed2=Math::getLengthSquared(p.getVelocity());
+					p.move(sphere_->getCenter()+normal*allowed-p.getPosition());
+					p.setVelocity(p.getVelocity()-normal*std::max(0.0f,glm::dot(p.getVelocity(),normal)));
+					fluid->boundaryEnergyLoss+=0.5*p.getMass()*(speed2-Math::getLengthSquared(p.getVelocity()));
+				}
+			}
 		}
 	}
 
@@ -94,13 +123,29 @@ void FlameSolver::simulate(const float dt)
 	const int particleCount = static_cast<int>(particles.size());
 	CSRNeighborList neighbors;
 	neighbors.build(positions, effectLength);
+	// Mirror samples across each near-wall particle's local tangent plane.
+	// These supply missing kernel support and pressure reaction without adding carriers.
+	const auto mirror = [&](int i, int j) {
+		const auto offset = positions[i]-sphere_->getCenter();
+		const float distance = Math::getLength(offset);
+		const auto normal = distance > 0 ? offset/distance : Vector3df(0,1,0);
+		const auto wall = sphere_->getCenter()+normal*sphere_->getRadius();
+		return positions[j]+normal*(2*glm::dot(wall-positions[j],normal));
+	};
+	const auto nearWall = [&](int i) {
+		return sphere_ && particles[i].getFluid()->fixedCarriers && sphere_->getSignedDistance(positions[i]) < effectLength;
+	};
 
 	// ---- Density pass -------------------------------------------------------
 #pragma omp parallel for
 	for (int i = 0; i < particleCount; ++i) {
 		for (const int neighbor : neighbors[i]) {
 			particles[i].addDensity(particles[neighbor]);
+			if (nearWall(i)) particles[i].addDensity(particles[neighbor].getMass()*
+				kernel.getPoly6Kernel(Math::getDistance(positions[i],mirror(i,neighbor))));
 		}
+		if (nearWall(i)) particles[i].addDensity(particles[i].getMass()*
+			kernel.getPoly6Kernel(Math::getDistance(positions[i],mirror(i,i))));
 	}
 	for (auto& p : particles) {
 		p.addSelfDensity();
@@ -149,17 +194,24 @@ void FlameSolver::simulate(const float dt)
 		rates[i] = r;
 	}
 
-	if (solidCoupler_) {
+	bool conservative = solidCoupler_ != nullptr;
+	for (auto* fluid : fluids) conservative |= fluid->fixedCarriers;
+	if (conservative) {
 		// A common limiter preserves the antisymmetric mass-weighted diffusion
 		// flux. Per-particle clamping in react() otherwise silently loses fuel.
-		float fuelScale=1,oxygenScale=1;
+		float fuelScale=1,oxygenScale=1,temperatureScale=1,sootScale=1;
 		const auto limit=[dt](float value,float rate) { const float delta=rate*dt;
 			return delta>0?std::min(1.0f,(1-value)/delta):delta<0?std::min(1.0f,-value/delta):1.0f; };
 		for(int i=0;i<particleCount;++i) {
 			fuelScale=std::min(fuelScale,limit(particles[i].getFuel(),rates[i].fuel));
 			oxygenScale=std::min(oxygenScale,limit(particles[i].getOxygen(),rates[i].oxygen));
+			if (rates[i].temperature < 0) temperatureScale = std::min(temperatureScale,
+				particles[i].getTemperature() / (-dt * rates[i].temperature));
+			if (rates[i].soot < 0) sootScale = std::min(sootScale,
+				particles[i].getSoot() / (-dt * rates[i].soot));
 		}
-		for(auto& r:rates) { r.fuel*=fuelScale; r.oxygen*=oxygenScale; }
+		for(auto& r:rates) { r.fuel*=fuelScale; r.oxygen*=oxygenScale;
+			r.temperature*=temperatureScale; r.soot*=sootScale; }
 	}
 	// ---- Pressure + viscosity pass -------------------------------------------
 #pragma omp parallel for
@@ -167,7 +219,11 @@ void FlameSolver::simulate(const float dt)
 		for (const int neighbor : neighbors[i]) {
 			particles[i].solvePressureForce(particles[neighbor]);
 			particles[i].solveViscosityForce(particles[neighbor]);
+			if (nearWall(i)) particles[i].addForce(kernel.getSpikyKernelGradient(positions[i]-mirror(i,neighbor))*
+				(0.5f*(particles[i].getPressure()+particles[neighbor].getPressure())*particles[neighbor].getMass()));
 		}
+		if (nearWall(i)) particles[i].addForce(kernel.getSpikyKernelGradient(positions[i]-mirror(i,i))*
+			(particles[i].getPressure()*particles[i].getMass()));
 	}
 
 	// ---- Vorticity confinement: pass A (omega), pass B (grad |omega|) -------
@@ -212,11 +268,44 @@ void FlameSolver::simulate(const float dt)
 	this->addBoundaryForce(particles, dt);
 
 	// ---- Integrate and react -------------------------------------------------
+	std::vector<float> oldTemperature(particleCount), oldOxygen(particleCount), oldFuel(particleCount);
+	for (int i = 0; i < particleCount; ++i) {
+		oldTemperature[i] = particles[i].getTemperature();
+		oldOxygen[i] = particles[i].getOxygen();
+		oldFuel[i] = particles[i].getFuel();
+	}
 #pragma omp parallel for
 	for (int i = 0; i < particleCount; ++i) {
 		particles[i].forwardTime(dt);
 		particles[i].react(dt, &rates[i]);
 	}
+	// Serial accounting avoids writing shared fluid counters from OpenMP workers.
+	for (int i = 0; i < particleCount; ++i) {
+		auto& p = particles[i]; auto* fluid = p.getFluid();
+		const float mass = p.getMass();
+		const float before = oldTemperature[i] + rates[i].temperature * dt;
+		const double burned = (oldOxygen[i] + rates[i].oxygen * dt - p.getOxygen()) * mass;
+		const double reaction = (oldFuel[i] + rates[i].fuel * dt - p.getFuel()) * mass * fluid->getHeatRelease();
+		const double cooling = mass * fluid->getCoolRate() * (before - fluid->getAmbientTemperature()) * dt;
+		if (fluid->fixedCarriers) {
+			fluid->consumedOxygen += burned;
+			fluid->reactionHeat += reaction; fluid->coolingHeat += cooling;
+			fluid->clampHeat += mass * (before - p.getTemperature()) + reaction - cooling;
+		}
+		if (sphere_) {
+			const float radius = std::max(0.0f, sphere_->getRadius() - 0.5f * p.getDiameter());
+			const auto offset = p.getPosition() - sphere_->getCenter(); const float distance = Math::getLength(offset);
+			if (distance > radius && distance > 0) {
+				const auto normal = offset / distance;
+				fluid->maxAttemptedWallPenetration=std::max(fluid->maxAttemptedWallPenetration,distance-radius);
+				const float speed2=Math::getLengthSquared(p.getVelocity());
+				p.move(sphere_->getCenter() + normal * radius - p.getPosition());
+				p.setVelocity(p.getVelocity() - normal * std::max(0.0f, glm::dot(p.getVelocity(), normal)));
+				fluid->boundaryEnergyLoss+=0.5*mass*(speed2-Math::getLengthSquared(p.getVelocity()));
+			}
+		}
+	}
+	applyThermalBoundary(dt);
 	for (auto* fluid : fluids) {
 		for (float amount : fluid->getParticles().lastBurnedMass) fluid->burnedFuelMass += amount;
 		if (solidCoupler_) {
@@ -229,12 +318,12 @@ void FlameSolver::simulate(const float dt)
 
 	// ---- Pilot (wick) heating: keeps the Physical model's flame anchored ------
 	for (auto fluid : fluids) {
-		fluid->applyPilots();
+		if (!fluid->fixedCarriers) fluid->applyPilots();
 	}
 
 	// ---- Emitters and lifetime ------------------------------------------------
 	for (auto fluid : fluids) {
-		fluid->updateEmitters(dt);
+		if (!fluid->fixedCarriers) fluid->updateEmitters(dt);
 		if (solidCoupler_) solidCoupler_->constrain(*fluid,{});
 		fluid->removeDead();
 	}
@@ -247,7 +336,7 @@ void FlameSolver::simulate(const float dt)
 
 void FlameSolver::addBoundaryForce(std::vector<FlameParticle>& particles, const float dt)
 {
-	if (boundaryPlanes_.empty()) {
+	if (boundaryPlanes_.empty() && !sphere_) {
 		return;
 	}
 #pragma omp parallel for
@@ -256,6 +345,56 @@ void FlameSolver::addBoundaryForce(std::vector<FlameParticle>& particles, const 
 		for (const auto& plane : boundaryPlanes_) {
 			force += plane.getBoundaryForce(particles[i].getPosition(), dt);
 		}
+		if (sphere_) {
+			const SphereBoundary wall(sphere_->getCenter(), std::max(0.001f,
+				sphere_->getRadius() - particles[i].getDiameter() * 0.5f));
+			force += wall.getBoundaryForce(particles[i].getPosition(), particles[i].getVelocity(), dt, sphereDamping_);
+		}
 		particles[i].addForce(force * particles[i].getDensity());
+	}
+}
+
+bool FlameSolver::setBoundarySphere(const Vector3df& center, float radius, float damping)
+{
+	if (!std::isfinite(center.x) || !std::isfinite(center.y) || !std::isfinite(center.z) ||
+		!std::isfinite(radius) || radius <= 0 || !std::isfinite(damping) || damping < 0 || damping > 0.5f) return false;
+	sphere_.emplace(center, radius); sphereDamping_ = damping; boundaryPlanes_.clear(); return true;
+}
+
+bool FlameSolver::setThermalBoundary(const ThermalBoundary& t)
+{
+	if (!std::isfinite(t.sourceCenter.x) || !std::isfinite(t.sourceCenter.y) || !std::isfinite(t.sourceCenter.z)) return false;
+	for (float v : {t.sourceRadius, t.sourcePower, t.sourceDuration, t.wallTemperature, t.wallRate, t.wallThickness})
+		if (!std::isfinite(v) || v < 0) return false;
+	if (t.sourceRadius <= 0 || t.wallThickness <= 0) return false;
+	thermal_ = t; return true;
+}
+
+void FlameSolver::applyThermalBoundary(float dt)
+{
+	if (!sphere_) return;
+	const float activeDt = thermal_.sourceDuration > 0 ?
+		std::clamp(thermal_.sourceDuration - simTime_, 0.0f, dt) : dt;
+	for (auto* fluid : fluids) {
+		if (!fluid->fixedCarriers) continue;
+		auto& gas = fluid->getParticles(); double sourceMass = 0;
+		for (size_t i = 0; i < gas.size(); ++i) if (Math::getDistance(gas.positions[i], thermal_.sourceCenter) <= thermal_.sourceRadius)
+			sourceMass += FlameParticle(gas, i, fluid).getMass();
+		for (size_t i = 0; i < gas.size(); ++i) {
+			const float mass = FlameParticle(gas, i, fluid).getMass();
+			if (sourceMass > 0 && Math::getDistance(gas.positions[i], thermal_.sourceCenter) <= thermal_.sourceRadius) {
+				const float delta = static_cast<float>(thermal_.sourcePower * activeDt / sourceMass);
+				const float before = gas.temperatures[i];
+				gas.temperatures[i] = std::min(fluid->getMaxTemperature(), before + delta);
+				fluid->sourceHeat += mass * delta;
+				fluid->clampHeat += mass * (before + delta - gas.temperatures[i]);
+			}
+			const float wallDistance = sphere_->getSignedDistance(gas.positions[i]) - gas.radii[i];
+			const float weight = std::clamp(1 - wallDistance / thermal_.wallThickness, 0.0f, 1.0f);
+			const float before = gas.temperatures[i];
+			gas.temperatures[i] = thermal_.wallTemperature + (before - thermal_.wallTemperature) *
+				std::exp(-thermal_.wallRate * weight * dt);
+			fluid->wallHeat += mass * (before - gas.temperatures[i]);
+		}
 	}
 }

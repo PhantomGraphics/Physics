@@ -80,6 +80,7 @@ Box3df FlameFluid::getBoundingBox() const
 
 void FlameFluid::updateEmitters(const float dt)
 {
+	if (fixedCarriers) return;
 	std::uniform_real_distribution<float> unit(0.0f, 1.0f);
 	std::uniform_real_distribution<float> angleDist(0.0f, kTwoPi);
 	std::uniform_real_distribution<float> jitterDist(-0.2f, 0.2f);
@@ -134,6 +135,7 @@ void FlameFluid::updateEmitters(const float dt)
 
 void FlameFluid::applyPilots()
 {
+	if (fixedCarriers) return;
 	for (const auto& e : emitters) {
 		if (e.pilotTemperature <= 0.0f) {
 			continue;
@@ -151,6 +153,7 @@ void FlameFluid::applyPilots()
 
 void FlameFluid::removeDead()
 {
+	if (fixedCarriers) return;
 	for (size_t i = 0; i < particles.size();) {
 		FlameParticle p(particles, i, this);
 		if (p.isDead()) {

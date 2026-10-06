@@ -3,14 +3,190 @@
 #include "../Physics/FlameFluid.h"
 #include "../Physics/FlameParticle.h"
 #include "../Physics/FlameSolver.h"
+#include "../Physics/FlameStats.h"
+#include "../PhysicsView/FlameWorld.h"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <vector>
 
 using namespace Phantom::Math;
 using namespace Phantom::Physics;
+
+namespace {
+void seedClosedSphere(FlameFluid& fluid, FlameSolver& solver)
+{
+  fluid.fixedCarriers=true; fluid.setDensity(1); fluid.setEffectLength(0.12f);
+  fluid.setPressureCoe(20); fluid.setCoolRate(0); fluid.setBurnRate(0);
+  fluid.setCurlNoiseStrength(0); fluid.setVorticityEps(0);
+  fluid.setThermalDiffusivity(0.005f); fluid.setFuelDiffusivity(0.005f);
+  fluid.setOxygenDiffusivity(0.005f); fluid.setSootDiffusivity(0.005f);
+  fluid.setLifeMax(0.001f);
+  solver.add(&fluid); solver.setEffectLength(0.12f); solver.setBoundarySphere({0,0,0},0.3f);
+  for(int z=-4;z<=4;++z) for(int y=-4;y<=4;++y) for(int x=-4;x<=4;++x) {
+    const Vector3df pos(x*0.06f,y*0.06f,z*0.06f);
+    if(getLength(pos)>0.27f) continue;
+    fluid.createParticle(pos,0.03f);
+    const auto i=fluid.getParticles().size()-1;
+    FlameParticle p(fluid.getParticles(),i,&fluid); p.setAir(true);
+    fluid.initialOxygenMass+=p.getMass(); fluid.initialHeat+=p.getMass()*p.getTemperature();
+  }
+}
+}
+
+TEST(FlameSolverTest, FixedSphereRetainsColdCarriersAndDisablesSources)
+{
+  FlameFluid fluid; FlameSolver solver; seedClosedSphere(fluid,solver);
+  FlameFluid::Emitter emitter; emitter.rate=1000; emitter.airRate=1000;
+  emitter.pilotTemperature=2000; emitter.radius=1; emitter.pilotHeight=1;
+  fluid.addEmitter(emitter);
+  const int count=fluid.getNumParticles();
+  fluid.updateEmitters(1); fluid.applyPilots(); fluid.removeDead();
+  EXPECT_EQ(count,fluid.getNumParticles());
+  for(int i=0;i<60;++i) solver.simulate(1.0f/60);
+  const auto st=computeFlameStats(fluid,nullptr,&solver);
+  EXPECT_EQ(count,st.count); EXPECT_EQ(0,st.nanCount);
+  EXPECT_NEAR(300,st.allAvgT,1e-3); EXPECT_LT(st.maxSpeed,0.03f); // Small lattice pressure relaxation.
+  EXPECT_LT(st.maxWallPenetration,1e-6f);
+}
+
+TEST(FlameSolverTest, SphereProjectionKeepsTangentialVelocity)
+{
+  FlameFluid fluid; fluid.fixedCarriers=true; fluid.setPressureCoe(0); fluid.setBurnRate(0);
+  fluid.setCoolRate(0); fluid.setCurlNoiseStrength(0); fluid.setVorticityEps(0);
+  fluid.createParticle({1.2f,0,0},0.05f);
+  fluid.getParticles().velocities[0]={1,0.4f,0};
+  FlameSolver solver; solver.add(&fluid); solver.setGravity({0,0,0});
+  ASSERT_TRUE(solver.setBoundarySphere({0,0,0},1));
+  solver.simulate(0.001f);
+  EXPECT_LE(getLength(fluid.getParticles().positions[0]),0.950001f);
+  EXPECT_GT(fluid.getParticles().velocities[0].y,0.39f);
+  EXPECT_GT(fluid.maxAttemptedWallPenetration,0.2f);
+  EXPECT_GT(fluid.boundaryEnergyLoss,0);
+  EXPECT_FALSE(solver.setBoundarySphere({0,0,0},-1));
+  EXPECT_EQ(1.0f,solver.getBoundarySphere()->getRadius());
+}
+
+TEST(FlameSolverTest, ClosedSphereHeatAndChemicalDiffusionConserveTotals)
+{
+  FlameFluid fluid; FlameSolver solver; seedClosedSphere(fluid,solver);
+  solver.setGravity({0,0,0});
+  auto& gas=fluid.getParticles();
+  fluid.initialHeat=0; fluid.initialOxygenMass=0;
+  for(size_t i=0;i<gas.size();++i) {
+    FlameParticle p(gas,i,&fluid);
+    p.setTemperature(i%2?300.0f:700.0f); p.setFuel(i%2?0.0f:1.0f); p.setOxygen(i%2?1.0f:0.0f);
+    fluid.initialHeat+=p.getMass()*p.getTemperature();
+    fluid.initialFuelMass+=p.getMass()*p.getFuel(); fluid.initialOxygenMass+=p.getMass()*p.getOxygen();
+  }
+  for(int i=0;i<60;++i) solver.simulate(1.0f/60);
+  const auto st=computeFlameStats(fluid,nullptr,&solver);
+  EXPECT_NEAR(0,st.fuelBalanceError,1e-6); EXPECT_NEAR(0,st.oxygenBalanceError,1e-6);
+  EXPECT_NEAR(0,st.heatBalanceError,1e-4);
+  EXPECT_LT(st.maxT,700); EXPECT_GT(st.maxT,300);
+}
+
+TEST(FlameSolverTest, WallCoolingAndFiniteHeatingCloseHeatBudget)
+{
+  FlameFluid fluid; FlameSolver solver; seedClosedSphere(fluid,solver);
+  solver.setGravity({0,0,0});
+  FlameSolver::ThermalBoundary t; t.sourceCenter={0,-0.15f,0}; t.sourceRadius=0.12f;
+  t.sourcePower=1; t.sourceDuration=0.2f; t.wallRate=2; t.wallThickness=0.12f;
+  ASSERT_TRUE(solver.setThermalBoundary(t));
+  for(int i=0;i<60;++i) solver.simulate(1.0f/60);
+  const auto st=computeFlameStats(fluid,nullptr,&solver);
+  EXPECT_NEAR(0.2,st.sourceHeat,1e-5); EXPECT_GT(st.wallHeat,0);
+  EXPECT_NEAR(0,st.heatBalanceError,1e-4);
+  t.wallRate=-1; EXPECT_FALSE(solver.setThermalBoundary(t));
+}
+
+TEST(FlameSolverTest, ClosedSphereBuoyancyDrivesFlowWithoutNoise)
+{
+  float kinetic[2]={};
+  for(int trial=0;trial<2;++trial) {
+    FlameFluid fluid; FlameSolver solver; seedClosedSphere(fluid,solver);
+    if(!trial) solver.setGravity({0,0,0});
+    FlameSolver::ThermalBoundary t; t.sourceCenter={0,-0.15f,0}; t.sourceRadius=0.12f;
+    t.sourcePower=4; t.wallRate=2; t.wallThickness=0.12f;
+    solver.setThermalBoundary(t);
+    double core=0,outer=0,covariance=0;
+    for(int i=0;i<240;++i) {
+      solver.simulate(1.0f/60);
+      if(i>=120) { const auto st=computeFlameStats(fluid,nullptr,&solver);
+        core+=st.coreVelocityY; outer+=st.outerVelocityY; covariance+=st.thermalVelocityCovariance; }
+    }
+    const auto st=computeFlameStats(fluid,nullptr,&solver);
+    kinetic[trial]=static_cast<float>(st.kineticEnergy);
+    std::printf("sphere trial=%d core=%g outer=%g covariance=%g maxSpeed=%g densityError=%g\n",
+      trial,core/120,outer/120,covariance/120,st.maxSpeed,st.densityError);
+    EXPECT_EQ(0,st.nanCount); EXPECT_LT(st.maxWallPenetration,1e-6f);
+    if(trial) { EXPECT_GT(core,0); EXPECT_LT(outer,0); EXPECT_GT(covariance,0); EXPECT_LT(st.speedCapFraction,0.01f); }
+  }
+  EXPECT_GT(kinetic[1],kinetic[0]+1e-6f);
+}
+
+TEST(FlameSolverTest, FiniteReactionRetainsParticlesAndClosesFuelBudget)
+{
+  FlameFluid fluid; FlameSolver solver; seedClosedSphere(fluid,solver);
+  solver.setGravity({0,0,0}); fluid.setBurnRate(10);
+  auto& gas=fluid.getParticles(); fluid.initialHeat=0; fluid.initialOxygenMass=0;
+  for(size_t i=0;i<gas.size();++i) {
+    FlameParticle p(gas,i,&fluid); p.setTemperature(1600); p.setFuel(0.2f); p.setOxygen(0.8f); p.setAir(false);
+    fluid.initialHeat+=p.getMass()*p.getTemperature(); fluid.initialFuelMass+=p.getMass()*p.getFuel();
+    fluid.initialOxygenMass+=p.getMass()*p.getOxygen();
+  }
+  const int count=fluid.getNumParticles();
+  for(int i=0;i<120;++i) solver.simulate(1.0f/60);
+  const auto st=computeFlameStats(fluid,nullptr,&solver);
+  EXPECT_EQ(count,st.count); EXPECT_GT(st.burnedFuel,fluid.initialFuelMass*0.99);
+  EXPECT_NEAR(0,st.fuelBalanceError,1e-6); EXPECT_NEAR(0,st.oxygenBalanceError,1e-6);
+  EXPECT_NEAR(0,st.heatBalanceError,1e-4); EXPECT_LT(st.burningFraction,0.001f);
+}
+
+TEST(FlameWorld, SpherePresetIgnitesAndRejectsIncompatibleSolidRelease)
+{
+  Phantom::FlameWorld world;
+  ASSERT_TRUE(world.sphericalPreset(true,0.3f,0.06f));
+  const int count=world.fluid().getNumParticles();
+  EXPECT_FALSE(world.sphericalPreset(false,-1,0.06f));
+  EXPECT_EQ(count,world.fluid().getNumParticles());
+  EXPECT_EQ(0u,world.addBody(CombustibleBody::Shape::Sphere,{0,0,0},{0.1f,0.1f,0.1f},0.01));
+  for(int i=0;i<60;++i) world.stepOnce();
+  const auto st=computeFlameStats(world.fluid(),nullptr,&world.solver());
+  std::printf("sphere preset maxT=%g burned=%g initial=%g heatError=%g\n",st.maxT,st.burnedFuel,world.fluid().initialFuelMass,st.heatBalanceError);
+  EXPECT_EQ(count,st.count); EXPECT_GT(st.burnedFuel,world.fluid().initialFuelMass*0.01);
+  EXPECT_NEAR(0,st.fuelBalanceError,1e-6); EXPECT_NEAR(0,st.heatBalanceError,1e-4);
+  world.stopSource(); EXPECT_EQ(0,world.solver().getThermalBoundary().sourcePower);
+  world.reset(); EXPECT_FALSE(world.fluid().fixedCarriers); EXPECT_FALSE(world.solver().getBoundarySphere());
+}
+
+TEST(FlameWorld, SphereConvectionSurvivesTimeStepAndResolutionChanges)
+{
+  float temperatures[3]={};
+  for(int trial=0;trial<3;++trial) {
+    Phantom::FlameWorld world;
+    ASSERT_TRUE(world.sphericalPreset(false,0.3f,trial==2?0.05f:0.06f));
+    const float dt=trial==1?1.0f/120:1.0f/60;
+    ASSERT_TRUE(world.setTimeStep(dt));
+    auto thermal=world.solver().getThermalBoundary(); thermal.sourcePower=4;
+    world.solver().setThermalBoundary(thermal);
+    double core=0,outer=0,covariance=0; int samples=0;
+    for(int i=0;i<(trial==1?240:120);++i) {
+      world.stepOnce();
+      if(world.getSimTime()>1) { const auto st=computeFlameStats(world.fluid(),nullptr,&world.solver());
+        core+=st.coreVelocityY; outer+=st.outerVelocityY; covariance+=st.thermalVelocityCovariance; ++samples; }
+    }
+    const auto st=computeFlameStats(world.fluid(),nullptr,&world.solver()); temperatures[trial]=st.allAvgT;
+    std::printf("sphere convergence trial=%d T=%g core=%g outer=%g cov=%g\n",trial,st.allAvgT,core/samples,outer/samples,covariance/samples);
+    EXPECT_EQ(0,st.nanCount); EXPECT_GT(core,0); EXPECT_LT(outer,0); EXPECT_GT(covariance,0);
+    EXPECT_NEAR(0,st.heatBalanceError,1e-4);
+  }
+  // Time-step refinement should keep the global thermal state within 5%.
+  EXPECT_NEAR(temperatures[0],temperatures[1],temperatures[0]*0.05f);
+  EXPECT_NEAR(temperatures[0],temperatures[2],temperatures[0]*0.1f);
+}
 
 namespace
 {

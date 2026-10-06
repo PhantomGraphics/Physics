@@ -137,6 +137,7 @@ void FlameWorld::stepOnce()
 uint64_t FlameWorld::addBody(CombustibleBody::Shape shape, const glm::vec3& center,
     const glm::vec3& extent, double fuel, int material, int resolution)
 {
+    if (fluid_->fixedCarriers) return 0; // The current solid release adds gas carriers.
     if (material < 0 || material > 3 || bodies_.size() >= 32) return 0;
     auto body=std::make_unique<CombustibleBody>();
     if (!body->initializeParticles(nextBodyId_,shape,center,extent,resolution,fuel,CombustibleMaterial::preset(material))) return 0;
@@ -147,6 +148,53 @@ uint64_t FlameWorld::addBody(CombustibleBody::Shape shape, const glm::vec3& cent
     // burning cannot represent oxygen starvation.
     fluid_->setCombustionModel(FlameFluid::CombustionModel::Physical);
     return id;
+}
+
+bool FlameWorld::sphericalPreset(bool combustion, float radius, float spacing)
+{
+    if (!std::isfinite(radius) || !std::isfinite(spacing) || radius < 0.05f || radius > 10 || spacing < 0.005f ||
+        spacing > radius || radius / spacing > 16) return false;
+    const Vector3df center(0, radius, 0);
+    std::vector<Vector3df> seeds;
+    const int cells = static_cast<int>(std::floor((radius - spacing * 0.5f) / spacing));
+    for (int z=-cells; z<=cells; ++z) for (int y=-cells; y<=cells; ++y) for (int x=-cells; x<=cells; ++x) {
+        const Vector3df offset(x*spacing,y*spacing,z*spacing);
+        if (getLength(offset) <= radius - spacing * 0.5f) seeds.push_back(center + offset);
+    }
+    if (seeds.empty() || seeds.size() > 12000) return false;
+    reset(); running_ = false;
+    fluid_->clearEmitters(); fluid_->getParticles().clear(); fluid_->fixedCarriers = true;
+    fluid_->setMaxParticles(static_cast<int>(seeds.size()));
+    fluid_->setEffectLength(spacing * 2.0f); solver_->setEffectLength(fluid_->getEffectLength());
+    fluid_->setCoolRate(0); fluid_->setCurlNoiseStrength(0); fluid_->setVorticityEps(0);
+    fluid_->setSparkCountPerPrimary(0); fluid_->setSmokeCountPerPrimary(0);
+    fluid_->setThermalExpansionPressure(false);
+    fluid_->setBurnRate(combustion ? 10.0f : 0.0f);
+    fluid_->setThermalDiffusivity(0.005f); fluid_->setFuelDiffusivity(0.005f);
+    fluid_->setOxygenDiffusivity(0.005f); fluid_->setSootDiffusivity(0.005f);
+    solver_->setBoundarySphere(center, radius);
+    FlameSolver::ThermalBoundary thermal;
+    thermal.sourceCenter = center - Vector3df(0, radius * 0.5f, 0);
+    thermal.sourceRadius = radius * 0.3f;
+    const float volumeScale=std::pow(radius/0.6f,3.0f);
+    thermal.sourcePower = (combustion ? 150.0f : 8.0f)*volumeScale;
+    thermal.sourceDuration = combustion ? 0.3f : 0.0f;
+    thermal.wallThickness = spacing * 2; thermal.wallRate = 2;
+    solver_->setThermalBoundary(thermal);
+    for (const auto& pos : seeds) {
+        fluid_->createParticle(pos, spacing * 0.5f);
+        const size_t i = fluid_->getParticles().size()-1;
+        FlameParticle p(fluid_->getParticles(), i, fluid_.get());
+        const bool fuel = combustion && getDistance(pos,thermal.sourceCenter) <= radius*0.35f;
+        p.setFuel(fuel ? 0.3f : 0); p.setOxygen(fuel ? 0.7f : 1);
+        p.setAir(!fuel);
+        fluid_->initialFuelMass += p.getMass()*p.getFuel();
+        fluid_->initialOxygenMass += p.getMass()*p.getOxygen();
+        fluid_->initialHeat += p.getMass()*p.getTemperature();
+    }
+    render_.hazeEnabled = false;
+    render_.carrierDebug = combustion ? 0 : 2;
+    return true;
 }
 
 CombustibleBody* FlameWorld::findBody(uint64_t id)
@@ -249,6 +297,7 @@ void FlameWorld::syncRigidBindings()
 
 void FlameWorld::stopSource()
 {
+    auto thermal=solver_->getThermalBoundary(); thermal.sourcePower=0; solver_->setThermalBoundary(thermal);
     for (auto& e:fluid_->getEmittersMutable()) { e.rate=0; e.accumulator=0; e.pilotTemperature=0; }
 }
 double FlameWorld::gasFuelMass() const

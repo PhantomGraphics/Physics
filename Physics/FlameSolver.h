@@ -2,6 +2,8 @@
 
 #include "SPHKernel.h"
 #include "PlaneBoundary.h"
+#include "SphereBoundary.h"
+#include <optional>
 #include "CGLib/Util/UnCopyable.h"
 #include "CGLib/Math/Box3d.h"
 
@@ -30,6 +32,21 @@ class FlameSolver : private UnCopyable
 {
 public:
 	FlameSolver() = default;
+
+	/** Selects a closed sphere; invalid settings leave the previous domain intact. */
+	bool setBoundarySphere(const Math::Vector3df& center, float radius, float damping = 0.25f);
+	const std::optional<SphereBoundary>& getBoundarySphere() const { return sphere_; }
+	struct ThermalBoundary {
+		Math::Vector3df sourceCenter{0, 0, 0};
+		float sourceRadius = 0.2f;
+		float sourcePower = 0; // carrier-mass * kelvin / second, normalized over source carriers
+		float sourceDuration = 0; // 0 = continuous
+		float wallTemperature = 300;
+		float wallRate = 0; // 1/second; 0 = adiabatic
+		float wallThickness = 0.12f;
+	};
+	const ThermalBoundary& getThermalBoundary() const { return thermal_; }
+	bool setThermalBoundary(const ThermalBoundary& settings);
 
 	/** @brief Registers a fluid object with the solver. */
 	void add(FlameFluid* fluid) { fluids.push_back(fluid); }
@@ -60,6 +77,7 @@ public:
 	{
 		(void)timeStep;   // ignored -- see setBoundaryPlanes() below
 		boundaryPlanes_ = makeBoxPlaneBoundaries(box);
+		sphere_.reset();
 	}
 
 	/**
@@ -74,6 +92,7 @@ public:
 	{
 		(void)timeStep;
 		boundaryPlanes_ = std::move(planes);
+		sphere_.reset();
 	}
 
 	/** @brief Simulated seconds accumulated by simulate() (curl-noise clock). */
@@ -90,6 +109,10 @@ private:
 	// Accumulated simulated time; drives the curl-noise field's 4th (time) axis.
 	float simTime_ = 0.0f;
 	FlameSolidCoupler* solidCoupler_ = nullptr;
+	std::optional<SphereBoundary> sphere_;
+	float sphereDamping_ = 0.25f;
+	ThermalBoundary thermal_;
+	void applyThermalBoundary(float dt);
 
 	void addBoundaryForce(std::vector<FlameParticle>& particles, const float dt);
 };

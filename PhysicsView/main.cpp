@@ -1,10 +1,13 @@
 ﻿#include "pch.h"
 #include "FluidApp.h"
+#include <fstream>
+#include <iterator>
 
 int main(int argc, char* argv[])
 {
     std::string scenarioPath;
     bool        noExitOnComplete = false;
+    bool        useInteractiveLayout = false;
 
     for (int i = 1; i < argc; ++i) {
         std::string_view arg = argv[i];
@@ -12,6 +15,8 @@ int main(int argc, char* argv[])
             scenarioPath = argv[++i];
         } else if (arg == "--no-exit-on-complete") {
             noExitOnComplete = true;
+        } else if (arg == "--use-interactive-layout") {
+            useInteractiveLayout = true;
         }
     }
 
@@ -21,7 +26,11 @@ int main(int argc, char* argv[])
         // Command-line scenario runs are non-interactive and must not read or
         // write the GUI layout file. Scenario Browser runs remain interactive
         // and therefore keep layout persistence enabled.
-        app.disableInteractiveLayoutPersistence();
+        if (!useInteractiveLayout) app.disableInteractiveLayoutPersistence();
+        else {
+            std::ifstream ini("imgui.ini");
+            app.useVerificationLayout(std::string(std::istreambuf_iterator<char>(ini),{}));
+        }
         if (!app.loadScenario(scenarioPath)) {
             fprintf(stderr, "[Scenario] Failed to load: %s\n", scenarioPath.c_str());
             return 1;

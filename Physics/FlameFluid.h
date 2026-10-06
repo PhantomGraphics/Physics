@@ -118,6 +118,15 @@ public:
 
 	FlameFluid();
 
+	/** Fixed carriers remain after burnout; no emitter, pilot or lifetime recycling. */
+	bool fixedCarriers = false;
+	// Heat accounting in carrier-mass * kelvin (constant specific heat = 1).
+	double initialFuelMass = 0, initialOxygenMass = 0;
+	double initialHeat = 0, sourceHeat = 0, wallHeat = 0;
+	double reactionHeat = 0, coolingHeat = 0, clampHeat = 0, consumedOxygen = 0;
+	double boundaryEnergyLoss = 0;
+	float maxAttemptedWallPenetration = 0;
+
 	~FlameFluid() {}
 
 	/** @brief Creates and adds a new (initially unignited, ambient-temperature) particle. */

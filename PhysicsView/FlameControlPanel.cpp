@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 #include "FlameControlPanel.h"
 #include "RigidBodyWorld.h"
+#include "../Physics/FlameStats.h"
 
 namespace Phantom {
 
@@ -10,10 +11,37 @@ void FlameControlPanel::drawContents()
 {
     if (!world_) return;
 
+    Im::sliderFloat("New Sphere Radius",sphereRadius_,0.2f,1.2f);
+    Im::sliderFloat("New Spacing",sphereSpacing_,0.04f,0.15f);
+    if (Im::button("Spherical Convection")) { sphereSetupFailed_=!world_->sphericalPreset(false,sphereRadius_,sphereSpacing_); notifyWorldChanged(); return; }
+    Im::sameLine();
+    if (Im::button("Spherical Closed Flame")) { sphereSetupFailed_=!world_->sphericalPreset(true,sphereRadius_,sphereSpacing_); notifyWorldChanged(); return; }
+    if(sphereSetupFailed_) Im::text("Invalid sphere setup: increase spacing (limit 12000 carriers).");
+    if (Im::button("Emitter Flame")) { world_->reset(); notifyWorldChanged(); return; }
+
     auto& fluid  = world_->fluid();
     auto& render = world_->render();
 
     Im::text("Particles: %d / %d", fluid.getNumParticles(), fluid.getMaxParticles());
+	if (fluid.fixedCarriers) {
+		if (const auto& sphere=world_->solver().getBoundarySphere())
+			Im::text("Active sphere radius: %.3f",sphere->getRadius());
+		const char* debugModes[]={"Radiance","Temperature","Velocity"};
+		Im::combo("Carrier Debug",render.carrierDebug,debugModes,3);
+		Im::checkbox("Sphere Wire",render.sphereWire);
+		Im::textDisabled("Fixed carriers / closed sphere.\nPresets stop and rebuild the scene.");
+		auto thermal = world_->solver().getThermalBoundary();
+		bool changed = Im::sliderFloat("Source Power", thermal.sourcePower, 0, 100);
+		changed |= Im::sliderFloat("Heat Time", thermal.sourceDuration, 0, 10);
+		Im::textDisabled("Heat Time 0 = continuous heating.");
+		changed |= Im::sliderFloat("Wall Temperature", thermal.wallTemperature, 250, 600);
+		changed |= Im::sliderFloat("Wall Cooling Rate", thermal.wallRate, 0, 10);
+		if (changed) world_->solver().setThermalBoundary(thermal);
+		const auto st = Physics::computeFlameStats(fluid, nullptr, &world_->solver());
+		Im::text("Mean %.1f K / mass %.5f", st.allAvgT, st.carrierMass);
+		Im::text("Core vy %.4f / outer vy %.4f", st.coreVelocityY, st.outerVelocityY);
+		Im::text("Heat error %.6f / fuel error %.6f", st.heatBalanceError, st.fuelBalanceError);
+	}
 
     bool running = world_->isRunning();
     if (Im::checkbox("Running", running)) world_->setRunning(running);
@@ -26,12 +54,13 @@ void FlameControlPanel::drawContents()
     if (Im::button("Reset")) {
         world_->reset();
         notifyWorldChanged();
+        return;
     }
 
     Im::sliderFloat("Particle Size", render.particleSize, 0.01f, 0.6f);
 
     if (Im::collapsingHeader("Object Combustion", true)) {
-        if (Im::button("Spread / Burnout Preset")) { world_->combustionPreset(); selectedBody_=0; notifyWorldChanged(); }
+        if (Im::button("Spread / Burnout Preset")) { world_->combustionPreset(); selectedBody_=0; notifyWorldChanged(); return; }
         Im::sameLine();
         if (Im::button("Stop Ignition Source")) { world_->stopSource(); notifyWorldChanged(); }
         Im::textDisabled("Visual material presets; positions / sizes in simulation units.");
@@ -216,7 +245,8 @@ void FlameControlPanel::drawContents()
             if (Im::sliderFloat("Max Temperature (K)", tmax, 1000.0f, 4000.0f)) fluid.setMaxTemperature(tmax);
         }
 
-        Im::textDisabled("SPH diffusion (length^2/s; clamped to kappa*dt/h^2 <= 0.1)");
+        Im::textDisabled(fluid.fixedCarriers ? "SPH diffusion (length^2/s; stable substeps)" :
+            "SPH diffusion (length^2/s; clamped to kappa*dt/h^2 <= 0.1)");
         float kT = fluid.getThermalDiffusivity();
         if (Im::sliderFloat("Thermal Diffusivity", kT, 0.0f, 0.1f)) fluid.setThermalDiffusivity(kT);
         float kF = fluid.getFuelDiffusivity();
