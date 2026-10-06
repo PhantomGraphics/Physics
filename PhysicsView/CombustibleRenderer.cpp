@@ -43,7 +43,7 @@ void CombustibleRenderer::onUpdate(uint32_t frame)
         changed=changed || center!=inst.center || b->orientation()!=inst.orientation; inst.center=center; inst.orientation=b->orientation();
         inst.renderer.setModelMatrix(glm::scale(glm::translate(glm::mat4(1),center)*glm::mat4_cast(b->orientation()),glm::vec3(physical.scale)));
         inst.renderer.setCamera(view_,proj_,eye_);
-        inst.renderer.setLight(glm::vec4(glm::normalize(glm::vec3(-0.3f,-1,-0.25f)),0),glm::vec4(1,1,1,3));
+        inst.renderer.setLight(lightDirection_,lightColor_);
         inst.renderer.onUpdate(frame);
     }
     if(changed && onChanged_) onChanged_();
@@ -52,3 +52,9 @@ void CombustibleRenderer::onRender(VkCommandBuffer cmd,uint32_t frame)
 { if(world_ && world_->isPopulated()) for(auto& [id,inst]:instances_) inst->renderer.onRender(cmd,frame); }
 void CombustibleRenderer::onCleanup(VkDevice device)
 { for(auto& [id,inst]:instances_) inst->renderer.onCleanup(device); instances_.clear(); ctx_=nullptr; }
+
+void CombustibleRenderer::renderSampledLight(VkCommandBuffer cmd,uint32_t frame,VkDescriptorSet shadows,const Gltf::GltfSampledLight& light)
+{
+    if(world_ && world_->isPopulated())
+        for(auto& [id,inst]:instances_) inst->renderer.renderSampledLight(cmd,frame,shadows,light);
+}

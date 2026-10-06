@@ -83,6 +83,7 @@ public:
 		glm::vec3 smokeLightDirection{ -0.5f, -1.0f, -0.3f }; ///< direction of light travel
 		glm::vec3 smokeLightRadiance{ 1.0f };
 		float smokeFlameLight = 1.0f; ///< PBVR flame illumination gain, 0=off
+		float objectFlameLight = 1.0f; ///< PBVR diffuse illumination of opaque objects
 		bool operator==(const Shading& o) const;
 	};
 
@@ -117,7 +118,7 @@ public:
 	void notifySimulationAdvanced(bool discontinuous) { animating_ = true; jumped_ = jumped_ || discontinuous; }
 
 	FlamePBVRPass::Settings& pbvrSettings() { return pbvr_.settings(); }
-	void setOpaqueDraw(std::function<void(VkCommandBuffer,uint32_t)> draw) { pbvr_.setOpaqueDraw(std::move(draw)); }
+	void setOpaqueDraw(FlamePBVRPass::OpaqueDraw draw) { pbvr_.setOpaqueDraw(std::move(draw)); }
 	const FlamePBVRPass::Stats& pbvrStats() const { return pbvr_.stats(); }
 
 	/** @brief (Re)sizes the PBVR targets to the HDR target; call with the device idle. */

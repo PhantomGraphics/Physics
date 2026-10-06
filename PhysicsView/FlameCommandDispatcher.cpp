@@ -200,6 +200,7 @@ const std::vector<ParamDef>& renderParams()
 		{ "smokeAlbedo", FLAME_R(smokeAlbedo) },
 		{ "smokeShadowStrength", FLAME_R(smokeShadowStrength) },
 		{ "smokeFlameLight", FLAME_R(smokeFlameLight) },
+		{ "objectFlameLight", FLAME_R(objectFlameLight) },
 		{ "smokeShadowAmbient", [](FlameWorld& w) { return w.render().smokeShadowAmbient; },
 			[](FlameWorld& w, float v) { if (v < 0 || v > 1) return false; w.render().smokeShadowAmbient = v; return true; } },
 		{ "pbvrAdaptive", FLAME_R(pbvrAdaptive) },

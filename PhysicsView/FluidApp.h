@@ -181,6 +181,7 @@ private:
     FlameWorld        flameWorld_;
     CombustibleRenderer combustibleRenderer_;
     FlameRenderer     flameRenderer_;
+    std::string pbvrSceneState_;
     FlameControlPanel flameControlPanel_;
     // Cloud (moist-air SPH, docs/todo/PLAN_cloud_sph_pbvr.md). Same peer-domain
     // pattern as Flame. Phase 2 shows the air particles through the shared

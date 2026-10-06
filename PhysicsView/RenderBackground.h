@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 
 #include <array>
+#include <cstdint>
 #include <string>
 
 namespace Phantom {
@@ -62,7 +63,8 @@ public:
     // Phase 4: whether the glTF passes cast the shared light's shadow map.
     // FluidApp owns the ShadowMapPass and reads this; RenderBackground just
     // holds the flag (like useIBL) so the command + panel have one home.
-    void setCastShadows(bool v) { castShadows_ = v; }
+    void setCastShadows(bool v) { if (v!=castShadows_) ++revision_; castShadows_ = v; }
+    uint64_t revision() const { return revision_; }
     bool castShadows() const    { return castShadows_; }
 
     std::string sceneStateJson() const;
@@ -96,6 +98,7 @@ private:
     bool hasEnv_       = false;
     bool useIBL_       = false;
     bool castShadows_  = true;
+    uint64_t revision_ = 0;
 
     glm::vec3 xfPos_{0.f};
     glm::vec3 xfRotDeg_{0.f};

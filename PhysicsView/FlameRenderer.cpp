@@ -21,7 +21,8 @@ bool FlameRenderer::Shading::operator==(const Shading& o) const
 		smokeAlbedo == o.smokeAlbedo && pbvrSubdivision == o.pbvrSubdivision &&
 		pbvrMinSubPixels == o.pbvrMinSubPixels && pbvrDensityScale == o.pbvrDensityScale &&
 		smokeShadowStrength == o.smokeShadowStrength && smokeShadowAmbient == o.smokeShadowAmbient &&
-		smokeLightDirection == o.smokeLightDirection && smokeLightRadiance == o.smokeLightRadiance && smokeFlameLight == o.smokeFlameLight;
+		smokeLightDirection == o.smokeLightDirection && smokeLightRadiance == o.smokeLightRadiance &&
+		smokeFlameLight == o.smokeFlameLight && objectFlameLight == o.objectFlameLight;
 }
 
 void FlameRenderer::setEmitters(std::vector<float> positions, std::vector<float> temperatures, std::vector<float> sizes)
@@ -104,6 +105,7 @@ FlamePointUBO FlameRenderer::makeUBO()
 	ubo.smokeShadow = glm::vec4(toLight, shading_.smokeShadowStrength);
 	ubo.smokeShadowLight = glm::vec4(shading_.smokeLightRadiance, shading_.smokeShadowAmbient);
 	ubo.flameLightPosition.w = shading_.smokeFlameLight;
+	ubo.surfaceLight.x = shading_.objectFlameLight;
 	ubo.lutRange = glm::vec4(FlameBlackbody::kLutMinT, FlameBlackbody::kLutMaxT, 0.0f, 0.0f);
 	if (shading_.whiteBalanceTemperature != lutWhite_ || shading_.whiteBalanceDegree != lutDegree_) {
 		lut_ = FlameBlackbody::makeLut(shading_.whiteBalanceTemperature, shading_.whiteBalanceDegree);

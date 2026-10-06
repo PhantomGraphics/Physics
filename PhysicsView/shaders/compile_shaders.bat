@@ -26,6 +26,8 @@ rem See docs/todo/PLAN_physicsview_gltf_rendering.md Phase 0/3/4.
 "%VULKAN_SDK%\Bin\glslc.exe" gltf.frag -o gltf.frag.spv
 "%VULKAN_SDK%\Bin\glslc.exe" combustible.vert -o combustible.vert.spv || exit /b 1
 "%VULKAN_SDK%\Bin\glslc.exe" combustible.frag -o combustible.frag.spv || exit /b 1
+"%VULKAN_SDK%\Bin\glslc.exe" gltf_flame.frag -o gltf_flame.frag.spv || exit /b 1
+"%VULKAN_SDK%\Bin\glslc.exe" combustible_flame.frag -o combustible_flame.frag.spv || exit /b 1
 "%VULKAN_SDK%\Bin\glslc.exe" shadow.vert -o shadow.vert.spv
 "%VULKAN_SDK%\Bin\glslc.exe" shadow.frag -o shadow.frag.spv
 

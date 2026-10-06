@@ -4,6 +4,7 @@
 #include "FlamePointPipeline.h"
 #include "FlameStreamBuffer.h"
 #include "FlameLightSampler.h"
+#include "CGLib/GltfRenderer/Renderer/GltfSampledLight.h"
 
 #include "CGLib/Graphics/EnsembleLodController.h"
 #include "CGLib/VulkanGraphics/VulkanBuffer.h"
@@ -60,6 +61,9 @@ namespace Phantom {
  * is camera-independent; finite particle size and map resolution approximate
  * the medium. This is single scattering; solid-object light shadows and multiple
  * scattering are not included. Smoke Flame Light controls the artistic gain.
+ * The opaque scene callback receives the same sampled emitter and smoke maps
+ * for diffuse surface illumination (Object Flame Light), so smoke visibility,
+ * surface radiance and camera visibility are averaged in the same ensemble.
  *
  * History: while the frame is static (paused sim, same camera and params) the
  * average is the exact progressive mean 1/(n+1) and stops at
@@ -75,7 +79,8 @@ namespace Phantom {
  */
 class FlamePBVRPass {
 public:
-	void setOpaqueDraw(std::function<void(VkCommandBuffer,uint32_t)> draw) { opaqueDraw_=std::move(draw); }
+	using OpaqueDraw = std::function<void(VkCommandBuffer,uint32_t,VkDescriptorSet,const Gltf::GltfSampledLight&)>;
+	void setOpaqueDraw(OpaqueDraw draw) { opaqueDraw_=std::move(draw); }
 	static constexpr uint32_t kMaxEnsembles = 8;
 	static constexpr uint32_t kCapacityPerEnsemble = 1u << 17; // sub-particles per ensemble segment
 
@@ -140,7 +145,7 @@ public:
 	const Stats& stats() const { return stats_; }
 
 private:
-	std::function<void(VkCommandBuffer,uint32_t)> opaqueDraw_;
+	OpaqueDraw opaqueDraw_;
 	bool createTargets(const Phantom::VKG::VulkanContext& ctx, uint32_t width, uint32_t height);
 	void destroyTargets(const Phantom::VKG::VulkanContext& ctx);
 	void writeImageDescriptors(VkDevice device);
@@ -163,6 +168,10 @@ private:
 	std::array<FlamePointUBO,kMaxEnsembles> ensembleUbo_;
 	bool lightShadowNeedsInit_ = true;
 	bool flameLightActive_ = false;
+	float objectLightGain_ = 0;
+	Phantom::VKG::VulkanDescriptorSetLayout objectLightLayout_;
+	Phantom::VKG::VulkanDescriptorPool objectLightPool_;
+	VkDescriptorSet objectLightSet_ = VK_NULL_HANDLE;
 	FlameFullscreenPass blend_;
 	FlameFullscreenPass composite_;
 

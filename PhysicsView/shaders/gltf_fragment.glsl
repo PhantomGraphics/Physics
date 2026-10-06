@@ -98,6 +98,10 @@ float computeShadow(vec4 posLightSpace, float NdotL) {
     return (shadow / 9.0) * cam.shadowStrength;
 }
 
+#ifdef SAMPLED_FLAME_LIGHT
+#include "gltf_sampled_light.glsl"
+#endif
+
 void main() {
     // Base color
     vec4 baseColor = mat.baseColorFactor;
@@ -196,6 +200,9 @@ void main() {
         emissive *= texture(emissiveTex, fragTexCoord).rgb;
 
     vec3 color = ambient + Lo + emissive;
+#ifdef SAMPLED_FLAME_LIGHT
+    color += sampledDiffuseLight(fragPos,N,V,albedo,metallic);
+#endif
 
     // Phase 5: keep the FluidApp HDR scene target linear -- ACES + exposure are
     // applied exactly once, together with the fluid, by SSFluidRenderer's

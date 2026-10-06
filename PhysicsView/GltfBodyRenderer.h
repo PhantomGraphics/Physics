@@ -94,6 +94,8 @@ public:
                 VkRenderPass renderPass, uint32_t framesInFlight) override;
     void onUpdate(uint32_t frameIndex) override;
     void onRender(VkCommandBuffer cmd, uint32_t frameIndex) override;
+    void renderSampledLight(VkCommandBuffer cmd,uint32_t frame,VkDescriptorSet shadows,const Gltf::GltfSampledLight& light);
+    void setSampledLightShader(std::vector<uint32_t> shader) { sampledLightFragSpv_=std::move(shader); }
     void onCleanup(VkDevice device) override;
 
 private:
@@ -108,6 +110,7 @@ private:
 
     RigidBodyWorld* world_ = nullptr;
     std::vector<uint32_t> vertSpv_;
+    std::vector<uint32_t> sampledLightFragSpv_;
     std::vector<uint32_t> fragSpv_;
     std::vector<uint32_t> shadowVertSpv_;
     std::vector<uint32_t> shadowFragSpv_;

@@ -42,6 +42,7 @@ struct FlamePointUBO {
 	glm::vec4 flameLightPosition{ 0.0f }; ///< xyz=sampled fire light, w=illumination gain (0=off)
 	glm::vec4 flameLightFlux{ 0.0f }; ///< rgb=flux/probability, w=finite source radius
 	glm::vec4 flameShadow{ 1.0f, 256.0f, 1.0f, 4.0f }; ///< far distance, map size, hemisphere sign, shadow subdivision
+	glm::vec4 surfaceLight{0}; ///< x = object illumination gain
 };
 
 /**
