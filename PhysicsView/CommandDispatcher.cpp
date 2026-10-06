@@ -99,19 +99,200 @@ std::vector<std::string> CommandDispatcher::collectResponses() {
     return out;
 }
 
+// Command catalog (help / completion). Built from the command names the PhysicsView
+// scenarios exercise, so every entry is known to exist; the arguments are shown as an
+// example taken from a scenario rather than a formal grammar (the sub-dispatchers --
+// rigid, soft, flame, cloud -- each parse their own).
+std::vector<CommandInfo> CommandDispatcher::commandCatalog() const {
+    return {
+        {"AddBox", "", "e.g. AddBox:0:8:0:0.5:0.5:0.5:1"},
+        {"AddCloudSource", "", "e.g. AddCloudSource:150,250,300,150,0.1,3000,0,30"},
+        {"AddEmitter", "", "e.g. AddEmitter:0,10,0,1.0,5,0,-1,0,10"},
+        {"AddFlameBody", "", "e.g. AddFlameBody:box,0,0.5,0,0.08,0.06,0.08,0.006,1"},
+        {"AddFloor", "", "e.g. AddFloor:-10"},
+        {"AddOutflowRegion", "", "e.g. AddOutflowRegion:-8,-8,-8,8,-6,8"},
+        {"AddSphere", "", "e.g. AddSphere:0:5:0:0.5:1"},
+        {"BindFlameBody", "", "e.g. BindFlameBody:1,99"},
+        {"ClearCloudSources", "", ""},
+        {"ClearEmitters", "", ""},
+        {"ClearMeshBoundary", "", ""},
+        {"ClearOutflowRegions", "", ""},
+        {"ClearRenderBackground", "", ""},
+        {"ClearRenderEnvironment", "", ""},
+        {"CloudAdvance", "", "e.g. CloudAdvance:60"},
+        {"CloudReset", "", "e.g. CloudReset:7"},
+        {"CloudStep", "", ""},
+        {"ConvertToMesh", "", ""},
+        {"ConvertToVolume", "", ""},
+        {"FlameCombustionPreset", "", ""},
+        {"FlameReset", "", ""},
+        {"FlameSpherePreset", "", "e.g. FlameSpherePreset:convection,0.3,0.06"},
+        {"FlameStep", "", "e.g. FlameStep:240"},
+        {"GetActiveCouplingMode", "", ""},
+        {"GetAvgParticlePositionY", "", ""},
+        {"GetBodyCount", "", ""},
+        {"GetBodyPositionY", "", "e.g. GetBodyPositionY:1"},
+        {"GetBodyVelocityY", "", "e.g. GetBodyVelocityY:1"},
+        {"GetCloudCsvHeader", "", ""},
+        {"GetCloudParam", "", "e.g. GetCloudParam:viscosity"},
+        {"GetCloudParticleCount", "", ""},
+        {"GetCloudPbvrStat", "", "e.g. GetCloudPbvrStat:accumulated"},
+        {"GetCloudSimTime", "", ""},
+        {"GetCloudSourceCount", "", ""},
+        {"GetCloudStat", "", "e.g. GetCloudStat:simTime"},
+        {"GetCloudStats", "", ""},
+        {"GetContactCount", "", ""},
+        {"GetEmitterCount", "", ""},
+        {"GetFlameBodyCount", "", ""},
+        {"GetFlameBodyStat", "", "e.g. GetFlameBodyStat:0,state"},
+        {"GetFlameFuelBudget", "", ""},
+        {"GetFlamePBVRStat", "", "e.g. GetFlamePBVRStat:displayedEnsembles"},
+        {"GetFlamePBVRStats", "", ""},
+        {"GetFlameParam", "", "e.g. GetFlameParam:fixedCarriers"},
+        {"GetFlameParticleCount", "", ""},
+        {"GetFlameRenderMode", "", ""},
+        {"GetFlameRenderParam", "", "e.g. GetFlameRenderParam:carrierDebug"},
+        {"GetFlameSecondaryCount", "", ""},
+        {"GetFlameSimTime", "", ""},
+        {"GetFlameStat", "", "e.g. GetFlameStat:count"},
+        {"GetFlameStats", "", ""},
+        {"GetMaxParticlePositionY", "", ""},
+        {"GetMaxParticleSpeed", "", ""},
+        {"GetMaxSpeed", "", ""},
+        {"GetMeshBoundaryTriangleCount", "", ""},
+        {"GetMeshTriangleCount", "", ""},
+        {"GetMinParticlePositionY", "", ""},
+        {"GetOutflowRegionCount", "", ""},
+        {"GetParticleCount", "", ""},
+        {"GetRenderSceneState", "", ""},
+        {"GetRigidRenderMode", "", ""},
+        {"GetSSFRAnisotropicKernel", "", ""},
+        {"GetSSFRKernelParam", "", "e.g. GetSSFRKernelParam:maxRatio"},
+        {"GetSSFRKernelStat", "", "e.g. GetSSFRKernelStat:active"},
+        {"GetShadowEnabled", "", ""},
+        {"GetSimulationType", "", ""},
+        {"GetSoftBodyCount", "", ""},
+        {"GetSoftMaxPositionY", "", ""},
+        {"GetSoftMinInterBodyDistance", "", "e.g. GetSoftMinInterBodyDistance:0:1"},
+        {"GetSoftMinNonEdgeDistance", "", "e.g. GetSoftMinNonEdgeDistance:0"},
+        {"GetSoftMinPositionY", "", ""},
+        {"GetSoftParticleCount", "", ""},
+        {"GetSoftParticlePositionY", "", "e.g. GetSoftParticlePositionY:0:0"},
+        {"GetSoftRenderMode", "", ""},
+        {"GetSoftTotalVolume", "", "e.g. GetSoftTotalVolume:0"},
+        {"GetStatus", "", ""},
+        {"GetVolumeVoxelCount", "", ""},
+        {"IsCloudPage", "", ""},
+        {"IsCloudRunning", "", ""},
+        {"IsCouplingEnabled", "", ""},
+        {"IsFlamePage", "", ""},
+        {"IsFlameRunning", "", ""},
+        {"IsMeshRenderEnabled", "", ""},
+        {"IsRunning", "", ""},
+        {"IsSSFREnabled", "", ""},
+        {"IsSoftFluidCouplingEnabled", "", ""},
+        {"IsUIVisible", "", ""},
+        {"IsVolumeRenderEnabled", "", ""},
+        {"LoadMeshBoundary", "", "e.g. LoadMeshBoundary:${repo_root}/Physics/PhysicsView/scenarios/models/..."},
+        {"LoadRenderBackground", "", "e.g. LoadRenderBackground:${repo_root}/Physics/PhysicsView/scenarios/mod..."},
+        {"New", "", ""},
+        {"NewScene", "", ""},
+        {"RemoveCloudSource", "", "e.g. RemoveCloudSource:4"},
+        {"RemoveFlameBody", "", "e.g. RemoveFlameBody:999999"},
+        {"Reset", "", ""},
+        {"SaveMeshToObj", "", "e.g. SaveMeshToObj:testdata/fluid_to_mesh/isotropic.obj"},
+        {"SaveScreenshot", "", "e.g. SaveScreenshot:testdata/screenshots/47_flame_normal.png"},
+        {"SetCameraOrbit", "", "e.g. SetCameraOrbit:110,0,0.15"},
+        {"SetCameraTarget", "", "e.g. SetCameraTarget:0,4,0"},
+        {"SetCloudHumidity", "", "e.g. SetCloudHumidity:0.15"},
+        {"SetCloudPage", "", "e.g. SetCloudPage:true"},
+        {"SetCloudParam", "", "e.g. SetCloudParam:domainX,500"},
+        {"SetCloudRunning", "", "e.g. SetCloudRunning:false"},
+        {"SetCloudSource", "", "e.g. SetCloudSource:0,250,250,200,100,1.0,200,0,10"},
+        {"SetCloudWind", "", "e.g. SetCloudWind:2,0,0"},
+        {"SetCouplingEnabled", "", "e.g. SetCouplingEnabled:true"},
+        {"SetCouplingMode", "", "e.g. SetCouplingMode:OneWay"},
+        {"SetCrossBodyCollisionEnabled", "", "e.g. SetCrossBodyCollisionEnabled:false"},
+        {"SetEnvironment", "", "e.g. SetEnvironment:${repo_root}/Physics/PhysicsView/scenarios/models/env"},
+        {"SetFlameBodyParam", "", "e.g. SetFlameBodyParam:0,pyrolysisTemperature,700"},
+        {"SetFlameBodyPose", "", "e.g. SetFlameBodyPose:1,0,0,0,1,0,0,0"},
+        {"SetFlamePage", "", "e.g. SetFlamePage:true"},
+        {"SetFlameParam", "", "e.g. SetFlameParam:buoyancyCoe,0"},
+        {"SetFlameRenderMode", "", "e.g. SetFlameRenderMode:Fancy"},
+        {"SetFlameRenderParam", "", "e.g. SetFlameRenderParam:carrierDebug,2"},
+        {"SetFlameRigidVelocity", "", "e.g. SetFlameRigidVelocity:1,nan,0,0,0,0,0"},
+        {"SetFlameRunning", "", "e.g. SetFlameRunning:false"},
+        {"SetFluidBoundary", "", "e.g. SetFluidBoundary:-8:-8:-8:8:14:8"},
+        {"SetFluidBounds", "", "e.g. SetFluidBounds:-2:8:-2:2:12:2"},
+        {"SetFluidDensity", "", "e.g. SetFluidDensity:1.0"},
+        {"SetFluidEffectLength", "", "e.g. SetFluidEffectLength:1.0"},
+        {"SetFluidGravity", "", "e.g. SetFluidGravity:0:0:0"},
+        {"SetFluidPressureCoeScale", "", "e.g. SetFluidPressureCoeScale:1960.0"},
+        {"SetFluidRadius", "", "e.g. SetFluidRadius:0.15"},
+        {"SetFluidStiffness", "", "e.g. SetFluidStiffness:0.001"},
+        {"SetFluidTension", "", "e.g. SetFluidTension:0.0"},
+        {"SetFluidTimeStep", "", "e.g. SetFluidTimeStep:0.005"},
+        {"SetFluidViscosity", "", "e.g. SetFluidViscosity:0.0"},
+        {"SetGravity", "", "e.g. SetGravity:0:0:0"},
+        {"SetLight", "", "e.g. SetLight:-0.3,-1,-0.25,1,1,1,3"},
+        {"SetMeshRenderEnabled", "", "e.g. SetMeshRenderEnabled:true"},
+        {"SetPreset", "", "e.g. SetPreset:SphereDrop"},
+        {"SetRenderBackgroundTransform", "", "e.g. SetRenderBackgroundTransform:0,0,0,0,0,0,1"},
+        {"SetRenderUseIBL", "", "e.g. SetRenderUseIBL:1"},
+        {"SetRigidRenderMode", "", "e.g. SetRigidRenderMode:shaded"},
+        {"SetRunning", "", "e.g. SetRunning:true"},
+        {"SetSSFRAnisotropicKernel", "", "e.g. SetSSFRAnisotropicKernel:1"},
+        {"SetSSFREnabled", "", "e.g. SetSSFREnabled:true"},
+        {"SetSSFRKernelParam", "", "e.g. SetSSFRKernelParam:maxRatio=1"},
+        {"SetSSFRMode", "", "e.g. SetSSFRMode:3"},
+        {"SetSelfCollision", "", "e.g. SetSelfCollision:false"},
+        {"SetShadowEnabled", "", "e.g. SetShadowEnabled:0"},
+        {"SetSimulationType", "", "e.g. SetSimulationType:DFSPH"},
+        {"SetSoftFluidCouplingEnabled", "", "e.g. SetSoftFluidCouplingEnabled:false"},
+        {"SetSoftRenderMode", "", "e.g. SetSoftRenderMode:shaded"},
+        {"SetSolverIter", "", "e.g. SetSolverIter:2"},
+        {"SetTimeStep", "", "e.g. SetTimeStep:0.02"},
+        {"SetUIVisible", "", "e.g. SetUIVisible:false"},
+        {"SetVolumeCellLength", "", "e.g. SetVolumeCellLength:0.05"},
+        {"SetVolumeIsoLevel", "", "e.g. SetVolumeIsoLevel:0.5"},
+        {"SetVolumeKernel", "", "e.g. SetVolumeKernel:Isotropic"},
+        {"SetVolumeParticleRadius", "", "e.g. SetVolumeParticleRadius:0.025"},
+        {"SetVolumeRenderEnabled", "", "e.g. SetVolumeRenderEnabled:true"},
+        {"Step", "", ""},
+        {"StopFlameSource", "", ""},
+        {"UnbindFlameBody", "", "e.g. UnbindFlameBody:1"},
+    };
+}
+
 // ---- processQueue (render thread) ---------------------------------------
 
 void CommandDispatcher::processQueue() {
+    // A FlameStep:<n> is spread over frames (see FlameCommandDispatcher::tick); its
+    // answer is pushed here when the last step is done.
+    flameDispatcher_.setDeferredDone([this](const std::string& r) {
+        std::lock_guard<std::mutex> lk(mutex_);
+        outputQueue_.push(r);
+    });
+    flameDispatcher_.tick(8.0);
+
     std::queue<std::string> local;
     {
         std::lock_guard<std::mutex> lk(mutex_);
         std::swap(local, inputQueue_);
     }
     while (!local.empty()) {
+        if (flameDispatcher_.busy()) {
+            // Keep command order: hold back everything behind the running FlameStep.
+            std::lock_guard<std::mutex> lk(mutex_);
+            while (!inputQueue_.empty()) { local.push(std::move(inputQueue_.front())); inputQueue_.pop(); }
+            std::swap(local, inputQueue_);
+            break;
+        }
         const std::string cmd = std::move(local.front());
         local.pop();
 
         auto resp = route(cmd);
+        if (resp && resp->empty()) continue;   // deferred answer (FlameStep:<n>)
         if (!resp) {
             // Not a fluid command: delegate to the rigid-body command surface
             // (SetPreset, AddSphere, GetBodyCount, SaveScreenshot, ...).

@@ -1,5 +1,7 @@
 #include "pch.h"
 #include "FlameCommandDispatcher.h"
+
+#include <chrono>
 #include "FlameWorld.h"
 #include "RigidBodyWorld.h"
 
@@ -264,6 +266,19 @@ std::optional<std::string> handleParam(FlameWorld& w, const std::vector<ParamDef
 
 } // namespace
 
+void FlameCommandDispatcher::tick(double budgetMs)
+{
+	if (stepsRemaining_ <= 0 || !world_) return;
+	const auto start = std::chrono::steady_clock::now();
+	do {
+		world_->stepOnce();
+		--stepsRemaining_;
+	} while (stepsRemaining_ > 0 &&
+	         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() < budgetMs);
+	notifyChanged();
+	if (stepsRemaining_ == 0 && deferredDone_) deferredDone_("OK");
+}
+
 std::optional<std::string> FlameCommandDispatcher::route(const std::string& cmd)
 {
 	const std::string_view sv(cmd);
@@ -397,9 +412,9 @@ std::optional<std::string> FlameCommandDispatcher::route(const std::string& cmd)
 		if (cmd != "FlameStep" && (!parseInt(sv.substr(10), n) || n < 0)) {
 			return std::string("Error:bad step count");
 		}
-		for (int i = 0; i < n; ++i) w.stepOnce();
-		notifyChanged();
-		return std::string("OK");
+		if (n == 0) return std::string("OK");
+		stepsRemaining_ = n;   // advanced by tick(); the answer is sent when it finishes
+		return std::string();
 	}
 	if (cmd == "SetFlameRunning:true" || cmd == "SetFlameRunning:false") {
 		w.setRunning(cmd == "SetFlameRunning:true");
