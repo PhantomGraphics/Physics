@@ -1,12 +1,15 @@
 {
   "name": "49_flame_object_occlusion",
-  "tags": ["flame-object"],
+  "tags": ["flame-object", "debug-slow"],
   "steps": [
     { "command": "FlameCombustionPreset", "expect": "OK" },
+    { "command": "SetFlameRunning:false", "expect": "OK" },
     { "command": "GetFlameBodyStat:1,pyrolyzed", "expect_range": "0,0" },
     { "command": "AddFlameBody:box,0,0.29,0,0.5,0.005,0.5,0.001,3", "expect_prefix": "Id:" },
     { "command": "FlameStep:60", "expect": "OK" },
     { "command": "StopFlameSource", "expect": "OK" },
+    { "label": "Use background oxygen only after the ignition source stops", "command": "SetFlameParam:emitterAirRate,0", "expect": "OK" },
+    { "command": "SetFlameParam:lifeMax,1", "expect": "OK" },
     { "command": "FlameStep:360", "expect": "OK" },
     { "command": "GetFlameBodyStat:0,pyrolyzed", "expect_range": "0.0001,0.006" },
     { "command": "GetFlameBodyStat:1,pyrolyzed", "expect_range": "0,0" },

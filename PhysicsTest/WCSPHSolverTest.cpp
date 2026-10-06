@@ -1245,6 +1245,27 @@ TEST(WCSPHSolverTest, WallDensityOnlyFillsTheDeficitOfAnAlreadyDenseParticle)
 // particles: two of them collapsed onto the same corner point at t = 0.277 s
 // and went NaN on the following step.
 
+TEST(SPHKernelTest, HotLoopKernelsMatchAnalyticDefinitionsAcrossScales)
+{
+  constexpr double pi=3.14159265358979323846;
+  for(float h:{0.02f,0.12f,1.0f,2.25f}) {
+    SPHKernel kernel(h);
+    for(float fraction:{0.0f,0.1f,0.5f,0.9f,1.0f,1.1f}) {
+      const float r=fraction*h;
+      const double a=static_cast<double>(h)*h-static_cast<double>(r)*r;
+      const double b=static_cast<double>(h)-r;
+      const double poly6=r<h?315/(64*pi*std::pow(h,9))*a*a*a:0;
+      const double spiky=r>0 && r<h?45/(pi*std::pow(h,6))*b*b/r:0;
+      const double viscosity=r<h?45/(pi*std::pow(h,6))*b:0;
+      SCOPED_TRACE(::testing::Message()<<"h="<<h<<" r="<<r);
+      EXPECT_NEAR(kernel.getPoly6Kernel(r),poly6,1e-5/std::pow(h,3));
+      EXPECT_NEAR(kernel.getSpikyKernelGradientWeight(r),spiky,1e-4/std::pow(h,5));
+      EXPECT_NEAR(kernel.getSpikyKernelGradient(Vector3df(r,0,0)).x,spiky*r,1e-5/std::pow(h,4));
+      EXPECT_NEAR(kernel.getViscosityKernelLaplacian(r),viscosity,1e-5/std::pow(h,5));
+    }
+  }
+}
+
 TEST(SPHKernelTest, SpikyGradientOfACoincidentPairIsZeroNotNaN)
 {
   SPHKernel kernel(0.1f);

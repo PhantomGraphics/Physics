@@ -1,0 +1,22 @@
+{
+  "name": "19_fluid_step_batch",
+  "steps": [
+    { "command": "SetSimulationType:PBSPH", "expect": "OK" },
+    { "command": "SetFluidBounds:-2:8:-2:2:12:2", "expect": "OK" },
+    { "command": "SetFluidBoundary:-8:-8:-8:8:14:8", "expect": "OK" },
+    { "command": "Reset", "expect": "OK" },
+    { "command": "Step", "expect": "OK", "repeat": 25 },
+    { "command": "GetMinParticlePositionY", "store_as": "reference_y" },
+    { "command": "GetMaxParticleSpeed", "store_as": "reference_speed" },
+    { "command": "GetParticleCount", "store_as": "reference_count" },
+    { "command": "Reset", "expect": "OK" },
+    { "command": "StepSimulation:-1", "expect_prefix": "Error:" },
+    { "command": "StepSimulation:3junk", "expect_prefix": "Error:" },
+    { "command": "StepSimulation:0", "expect": "OK" },
+    { "command": "GetMinParticlePositionY", "expect_range": "7.9,8.1" },
+    { "command": "StepSimulation:25", "expect": "OK" },
+    { "command": "GetMinParticlePositionY", "expect": "${reference_y}" },
+    { "command": "GetMaxParticleSpeed", "expect": "${reference_speed}" },
+    { "command": "GetParticleCount", "expect": "${reference_count}" }
+  ]
+}

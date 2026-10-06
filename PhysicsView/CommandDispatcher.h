@@ -43,6 +43,10 @@ namespace Phantom {
     // GetBodyCount, ...) falls through to the embedded
     // RigidBodyCommandDispatcher unmodified, so existing RigidBodyView
     // scenario command strings keep working too.
+    // "StepSimulation:N" repeats the plain "Step" physics (including fluid
+    // and soft coupling), spread over a bounded per-frame work budget. Its
+    // deferred OK is returned only after all N steps; legacy "Step:N" keeps
+    // its rigid/soft-only meaning.
     //
     // "SetCoupling*" commands drive FluidWorld's Rigid-Fluid coupling
     // (internal design notes Phase 8) -- see FluidWorld's
@@ -195,6 +199,10 @@ namespace Phantom {
         // Call from the render thread (onUpdate) every frame.
         void processQueue();
 
+        // Automated runs can advance more physics between rendered frames.
+        // Interactive commands retain the short budget for UI responsiveness.
+        void setAutomatedScenario(bool enabled) { simulationBudgetMs_ = enabled ? 100.0 : 8.0; }
+
         // IScenarioDispatcher
         void dispatch(const std::string& command) override;
         std::vector<std::string> collectResponses() override;
@@ -220,6 +228,7 @@ namespace Phantom {
         // Returns nullopt for commands not handled here, so processQueue()
         // can fall back to rigidDispatcher_.
         std::optional<std::string> route(const std::string& cmd);
+        void stepSimulation();
 
         FluidWorld* world_ = nullptr;
         RigidBodyWorld* rigidWorld_ = nullptr;
@@ -228,6 +237,8 @@ namespace Phantom {
         SoftBodyCommandDispatcher softDispatcher_;
         FlameCommandDispatcher flameDispatcher_;
         CloudCommandDispatcher cloudDispatcher_;
+        double simulationBudgetMs_ = 8.0;
+        int simulationStepsRemaining_ = 0;
         FluidVolumeConverter* volumeConverter_ = nullptr;
         FluidMeshConverter* meshConverter_ = nullptr;
         VolumeRenderer* volumeRenderer_ = nullptr;

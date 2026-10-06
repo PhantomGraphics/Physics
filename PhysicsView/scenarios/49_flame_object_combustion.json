@@ -1,7 +1,7 @@
 {
   "name": "49_flame_object_combustion",
   "_comment": "Finite volume solid-SPH fuel: source heats A for one second, then switches off. B cannot pyrolyze before source removal; inert-A unit-test control proves B is heated by A. Capture heating, spread and exhausted particle residue in Normal/PBVR.",
-  "tags": ["flame-object"],
+  "tags": ["flame-object", "debug-slow"],
   "steps": [
     { "command": "SetFlamePage:true", "expect": "OK" },
     { "command": "SetFlameRunning:false", "expect": "OK" },
@@ -33,6 +33,10 @@
     { "command": "SetFlameRenderMode:PBVR", "expect": "OK" },
     { "command": "GetStatus", "expect": "OK", "repeat": 32 },
     { "command": "SaveScreenshot:testdata/screenshots/49_object_spread_pbvr.png", "expect": "OK" },
+    { "label": "Advance burnout in Normal mode; PBVR ensembles are only needed for the paused captures", "command": "SetFlameRenderMode:Normal", "expect": "OK" },
+    { "label": "Disable the extinguished ignition emitter's air; the separate background air emitter continues supplying oxygen", "command": "SetFlameParam:emitterAirRate,0", "expect": "OK" },
+    { "command": "GetFlameParam:emitterAirRate", "expect_range": "0,0" },
+    { "label": "Keep one second of gas carriers during the burnout tail", "command": "SetFlameParam:lifeMax,1", "expect": "OK" },
     { "command": "FlameStep:600", "expect": "OK" },
     { "command": "GetFlameBodyStat:0,state", "expect_range": "4,4" },
     { "command": "GetFlameBodyStat:1,state", "expect_range": "4,4" },

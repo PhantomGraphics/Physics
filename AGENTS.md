@@ -78,7 +78,8 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 
 **タグ:** JSON トップレベルの `"tags": [...]` を `run_physics_scenarios.ps1` が読み、`-Tag`/`-ExcludeTag` で絞り込む
 （C++ 側 `ScenarioRunner` は未知キーとして無視するのでシミュレーション自体には影響しない）。既定実行は
-`known-fail` を除外する（`-ExcludeTag` の既定値）。
+`known-fail` を除外する（`-ExcludeTag` の既定値）。Debugでは `debug-slow` も通常実行から除外する。
+Releaseでは実行し、Debugで明示実行するには `-IncludeSlowDebug` を付ける（`-Filter`/`-Tag` と併用可能）。
 
 - `known-fail`: 2026-08-14 時点で該当シナリオは無し（`00`/`14`/`26`/`80`/`90`/`51`/`52`/`54` はいずれも
   実バグ修正済みで既定スイートに復帰している。詳細は 内部設計メモ 1 節の git 履歴参照）。
@@ -89,8 +90,14 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
   恒等的にゼロになっていた（`RigidBoundary::getBoundaryForce()` は SDF < 0 の粒子にしか作用しない）。
   また `GetMaxParticlePositionY` は箱が触れない縁の粒子で決まるため結合の有無を検出できない。
   結合の効き具合は `GetMaxParticleSpeed` で見ること。
-- `slow`: 600 step 級の重いシナリオ（`17_fluid_pbsph_small_scale_regression` のみ）。日常のイテレーションで
-  除外したい場合は `-ExcludeTag slow`。
+- `slow`: 実測で重いシナリオに付ける任意タグ。`17_fluid_pbsph_small_scale_regression` は
+  `StepSimulation:600` による描画待ちの削減で高速化したため、このタグを外している。
+- `debug-slow`: `49_flame_object_combustion` と `49_flame_object_occlusion`。長時間の燃焼・遮蔽検証は通常Releaseで実行する。
+
+物理の反復だけを検証する区間は `StepSimulation:N`（従来の `Step` をN回）を使う。
+`Step:N` は既存の剛体・軟体用コマンドであり流体を進めないため、代用しない。
+CLI自動終了実行は100 ms、手動/Scenario Browserは8 ms単位で処理し、完了時に一度 `OK` を返す。
+描画フレームそのものを検証する `GetStatus` のrepeatや撮影前の待機はまとめない。
 
 **コマンド網羅チェック:** `CommandDispatcher`/`RigidBodyCommandDispatcher`/`SoftBodyCommandDispatcher` の
 全コマンドが最低 1 本のシナリオから叩かれているかは、各ディスパッチャの `route()` 内のコマンド名リテラル

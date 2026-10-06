@@ -418,8 +418,8 @@ void FluidApp::onInit()
     }
     {
         Gltf::GltfSceneRenderer::Shaders s;
-        s.vertSpv=::VKG::loadSPVRepo("shaders/gltf.vert.spv");
-        s.fragSpv=::VKG::loadSPVRepo("shaders/gltf.frag.spv");
+        s.vertSpv=::VKG::loadSPVRepo("shaders/combustible.vert.spv");
+        s.fragSpv=::VKG::loadSPVRepo("shaders/combustible.frag.spv");
         combustibleRenderer_.setShaders(std::move(s));
         combustibleRenderer_.bind(&flameWorld_);
         combustibleRenderer_.setOnChanged([this] { if(!flameWorld_.isRunning()) flameRenderer_.notifySimulationAdvanced(true); });

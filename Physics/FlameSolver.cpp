@@ -4,6 +4,9 @@
 #include "FlameParticle.h"
 #include "FlameFluid.h"
 #include "FlameSolidCoupler.h"
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #include "CGLib/Space/Space/NeighborList.h"
 #include "CGLib/ThirdParty/glm-0.9.9.8/glm/gtc/noise.hpp"
@@ -13,6 +16,27 @@ using namespace Phantom::Space;
 using namespace Phantom::Physics;
 
 namespace {
+// Small scenes pay more for OpenMP team synchronization than they gain from
+// parallel work. Include neighbor search in this policy, and restore the
+// calling thread's configuration when the substep ends.
+class FlameThreadBudget {
+public:
+    explicit FlameThreadBudget(size_t count) {
+#ifdef _OPENMP
+        previous_ = omp_get_max_threads();
+        if (count < 4096) omp_set_num_threads(1);
+#endif
+    }
+    ~FlameThreadBudget() {
+#ifdef _OPENMP
+        omp_set_num_threads(previous_);
+#endif
+    }
+private:
+#ifdef _OPENMP
+    int previous_ = 1;
+#endif
+};
 
 // Upper bound on kappa*dt/h^2 for the explicit scalar diffusion pass.
 constexpr float kMaxDiffusionNumber = 0.1f;
@@ -121,6 +145,7 @@ void FlameSolver::simulate(const float dt)
 	// writes to particles[i]; this is the same fix WCSPHSolver/PBSPHSolver
 	// already carry, which FlameSolver had not picked up.
 	const int particleCount = static_cast<int>(particles.size());
+	const FlameThreadBudget threadBudget(particles.size());
 	CSRNeighborList neighbors;
 	neighbors.build(positions, effectLength);
 	// Mirror samples across each near-wall particle's local tangent plane.

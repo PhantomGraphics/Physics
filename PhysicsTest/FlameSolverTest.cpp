@@ -11,6 +11,9 @@
 #include <cmath>
 #include <cstdio>
 #include <vector>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 using namespace Phantom::Math;
 using namespace Phantom::Physics;
@@ -34,6 +37,28 @@ void seedClosedSphere(FlameFluid& fluid, FlameSolver& solver)
     fluid.initialOxygenMass+=p.getMass(); fluid.initialHeat+=p.getMass()*p.getTemperature();
   }
 }
+}
+
+TEST(FlameParticleTest, MassMatchesDensityTimesDiameterCubedAcrossScales)
+{
+  for(float radius:{0.001f,0.0125f,0.02f,1.0f}) {
+    FlameFluid fluid; fluid.setDensity(1.25f); fluid.createParticle({0,0,0},radius);
+    FlameParticle particle(fluid.getParticles(),0,&fluid);
+    const double expected=1.25*std::pow(static_cast<double>(radius)*2,3);
+    EXPECT_NEAR(particle.getMass(),expected,expected*1e-6);
+  }
+}
+
+TEST(FlameSolverTest, SmallSceneRestoresCallingThreadsOpenMPConfiguration)
+{
+#ifdef _OPENMP
+  const int previous=omp_get_max_threads();
+  omp_set_num_threads(2);
+  FlameFluid fluid; FlameSolver solver; seedClosedSphere(fluid,solver);
+  solver.simulate(1.0f/60);
+  EXPECT_EQ(omp_get_max_threads(),2);
+  omp_set_num_threads(previous);
+#endif
 }
 
 TEST(FlameSolverTest, FixedSphereRetainsColdCarriersAndDisablesSources)

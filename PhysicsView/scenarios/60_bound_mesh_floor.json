@@ -21,14 +21,14 @@
     { "label": "Rebuild fluid (also re-registers the mesh boundary on the fresh solver)", "command": "Reset", "expect": "OK" },
     { "label": "Precondition: exactly one particle seeded", "command": "GetParticleCount", "expect": "Count:1" },
     { "label": "Precondition: starts penetrating the floor", "command": "GetMinParticlePositionY", "expect_range": "-1.06,-1.04" },
-    { "label": "Change: mesh boundary's SDF penalty pushes the penetrating particle back out", "command": "Step", "expect": "OK", "repeat": 5 },
+    { "label": "Change: mesh boundary's SDF penalty pushes the penetrating particle back out", "command": "StepSimulation:5", "expect": "OK" },
     { "label": "Pushed back above its start depth, without exploding", "command": "GetMaxParticlePositionY", "expect_range": "-1.03,0.5", "store_as": "y_with_boundary" },
 
     { "label": "Clear the mesh boundary", "command": "ClearMeshBoundary", "expect": "OK" },
     { "label": "Triangle count drops to 0", "command": "GetMeshBoundaryTriangleCount", "expect": "0" },
     { "label": "Rebuild fluid (reregisterMeshBoundary() is a no-op once the boundary shape is cleared -- see FluidWorld.h)", "command": "Reset", "expect": "OK" },
     { "label": "Precondition: re-seeded at the same penetrating depth", "command": "GetMinParticlePositionY", "expect_range": "-1.06,-1.04" },
-    { "label": "Same duration, but with no boundary left to push back", "command": "Step", "expect": "OK", "repeat": 5 },
+    { "label": "Same duration, but with no boundary left to push back", "command": "StepSimulation:5", "expect": "OK" },
     { "label": "Invariant: with zero gravity and no boundary, an isolated particle has no force acting on it at all -- it does not move", "command": "GetMaxParticlePositionY", "expect_range": "-1.06,-1.04", "store_as": "y_without_boundary" }
   ],
   "post_assert": "y_with_boundary > y_without_boundary"

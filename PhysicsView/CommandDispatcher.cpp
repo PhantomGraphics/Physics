@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <chrono>
 #include <cmath>
 #include <unordered_set>
 
@@ -259,12 +260,19 @@ std::vector<CommandInfo> CommandDispatcher::commandCatalog() const {
         {"SetVolumeParticleRadius", "", "e.g. SetVolumeParticleRadius:0.025"},
         {"SetVolumeRenderEnabled", "", "e.g. SetVolumeRenderEnabled:true"},
         {"Step", "", ""},
+        {"StepSimulation", "", "e.g. StepSimulation:300 (same physics as repeated Step)"},
         {"StopFlameSource", "", ""},
         {"UnbindFlameBody", "", "e.g. UnbindFlameBody:1"},
     };
 }
 
 // ---- processQueue (render thread) ---------------------------------------
+
+void CommandDispatcher::stepSimulation() {
+    world_->stepOnce();
+    // Coupled fluid stepping already advances the soft world exactly once.
+    if (softWorld_ && !world_->isSoftCouplingEnabled()) softWorld_->stepForced();
+}
 
 void CommandDispatcher::processQueue() {
     // A FlameStep:<n> is spread over frames (see FlameCommandDispatcher::tick); its
@@ -273,7 +281,20 @@ void CommandDispatcher::processQueue() {
         std::lock_guard<std::mutex> lk(mutex_);
         outputQueue_.push(r);
     });
-    flameDispatcher_.tick(8.0);
+    flameDispatcher_.tick(simulationBudgetMs_);
+    if (simulationStepsRemaining_ > 0) {
+        const auto start = std::chrono::steady_clock::now();
+        do {
+            stepSimulation();
+            --simulationStepsRemaining_;
+        } while (simulationStepsRemaining_ > 0 &&
+            std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count() < simulationBudgetMs_);
+        if (onWorldChanged_) onWorldChanged_();
+        if (simulationStepsRemaining_ == 0) {
+            std::lock_guard<std::mutex> lk(mutex_);
+            outputQueue_.push("OK");
+        }
+    }
 
     std::queue<std::string> local;
     {
@@ -281,7 +302,7 @@ void CommandDispatcher::processQueue() {
         std::swap(local, inputQueue_);
     }
     while (!local.empty()) {
-        if (flameDispatcher_.busy()) {
+        if (flameDispatcher_.busy() || simulationStepsRemaining_ > 0) {
             // Keep command order: hold back everything behind the running FlameStep.
             std::lock_guard<std::mutex> lk(mutex_);
             while (!inputQueue_.empty()) { local.push(std::move(inputQueue_.front())); inputQueue_.pop(); }
@@ -373,12 +394,17 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
         if (onWorldChanged_) onWorldChanged_();
         return std::string("OK");
     }
+    if (sv.rfind("StepSimulation:", 0) == 0) {
+        int n;
+        const auto count = sv.substr(15);
+        const auto [end, error] = std::from_chars(count.data(), count.data()+count.size(), n);
+        if (error != std::errc{} || end != count.data()+count.size() || n < 0) return "Error:bad step count";
+        if (n == 0) return "OK";
+        simulationStepsRemaining_ = n;
+        return std::string(); // deferred response, after every requested step
+    }
     if (cmd == "Step") {
-        world_->stepOnce();
-        // When SoftBody-Fluid coupling is enabled, stepOnce() above already
-        // advanced softWorld_ (see FluidWorld::stepOnce()) -- stepping it
-        // again here would double-step it.
-        if (softWorld_ && !world_->isSoftCouplingEnabled()) softWorld_->stepForced();
+        stepSimulation();
         if (onWorldChanged_) onWorldChanged_();
         return std::string("OK");
     }

@@ -13,6 +13,7 @@
 #   .\run_physics_scenarios.ps1 -Tag slow              # only scenarios tagged "slow"
 #   .\run_physics_scenarios.ps1 -ExcludeTag slow        # everything except "slow" (still excludes known-fail too)
 #   .\run_physics_scenarios.ps1 -List                  # list matching scenarios (with tags) without running them
+#   .\run_physics_scenarios.ps1 -IncludeSlowDebug      # also run debug-slow scenarios in Debug
 #   .\run_physics_scenarios.ps1 -FailFast              # stop at the first failure
 
 param(
@@ -22,6 +23,7 @@ param(
     [string[]]$ExcludeTag = @("known-fail"),
     [switch]$List,
     [switch]$FailFast,
+    [switch]$IncludeSlowDebug,
     [ValidateRange(1, 2147483)]
     [int]$TimeoutSeconds = 120
 )
@@ -70,6 +72,7 @@ foreach ($f in $allFiles) {
     if ($f.BaseName -notlike $Filter) { continue }
 
     $tags = Get-ScenarioTags $f.FullName
+    if ($Configuration -ieq "Debug" -and -not $IncludeSlowDebug -and $tags -contains "debug-slow") { continue }
 
     if ($Tag.Count -gt 0) {
         $included = $false
