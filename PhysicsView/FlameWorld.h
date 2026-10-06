@@ -129,6 +129,8 @@ public:
         // overlap count to match, hence > 1.
         float smokeGlow         = 4.0f;
         float smokeAlbedo       = 0.03f;         ///< grey albedo x ambient light
+        float smokeShadowStrength = 1.0f;       ///< PBVR self-shadow; 0 = off
+        float smokeShadowAmbient = 0.25f;       ///< unoccluded fill fraction, 0..1
 
         // PBVR (plan Phase 4, FlamePBVRPass).
         bool  pbvrAdaptive       = true;  ///< EnsembleLodController picks R from GPU time

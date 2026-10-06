@@ -186,9 +186,10 @@ void FlameSolver::simulate(const float dt)
 	// by the pass. Gathered per particle (writes only rates[i]), per the
 	// neighbor-search convention in Physics/CLAUDE.md.
 	std::vector<FlameScalarRates> rates(particleCount);
+	std::vector<FlameScalarRates> diffusionNumbers(particleCount);
 	const float eta2 = 0.01f * effectLength * effectLength;
-	// Explicit diffusion is stable for kappa*dt/h^2 below ~0.1 (plan section 6);
-	// clamp instead of letting a UI slider blow the step up.
+	// Coarse regular-support bound (plan section 6); the discrete row-sum
+	// stability check below is also required for sparse/close particles.
 	const float kappaMax = (dt > 0.0f) ? kMaxDiffusionNumber * effectLength * effectLength / dt : 0.0f;
 	const auto clampKappa = [kappaMax](const float k) { return std::clamp(k, 0.0f, kappaMax); };
 #pragma omp parallel for
@@ -203,6 +204,7 @@ void FlameSolver::simulate(const float dt)
 			continue;
 		}
 		FlameScalarRates r;
+		float weightSum = 0.0f;
 		const auto posI = pi.getPosition();
 		for (const int j : neighbors[i]) {
 			const auto& pj = particles[j];
@@ -211,12 +213,38 @@ void FlameSolver::simulate(const float dt)
 			const float d2 = dist * dist;
 			const float F = d2 * kernel.getSpikyKernelGradientWeight(dist) / (d2 + eta2);
 			const float coef = 2.0f * pj.getMass() / (0.5f * (pi.getDensity() + pj.getDensity())) * F;
+			weightSum += coef;
 			r.temperature += kT * coef * (pj.getTemperature() - pi.getTemperature());
 			r.fuel += kF * coef * (pj.getFuel() - pi.getFuel());
 			r.oxygen += kO * coef * (pj.getOxygen() - pi.getOxygen());
 			r.soot += kS * coef * (pj.getSoot() - pi.getSoot());
 		}
 		rates[i] = r;
+		diffusionNumbers[i].temperature = dt * kT * weightSum;
+		diffusionNumbers[i].fuel = dt * kF * weightSum;
+		diffusionNumbers[i].oxygen = dt * kO * weightSum;
+		diffusionNumbers[i].soot = dt * kS * weightSum;
+	}
+
+	// The h-based cap assumes regular kernel support. Sparse/close particles
+	// can have a much larger discrete row sum and otherwise exchange more
+	// than their full temperature difference, amplifying a checkerboard mode
+	// until react() clips it to 0/maxTemperature (isolated white particles).
+	// Bound the actual outgoing weight to 1/2: every update is a damped convex
+	// combination. Use one scale per scalar for the whole pass, preserving
+	// antisymmetric pair fluxes rather than clamping temperatures individually.
+	FlameScalarRates scale;
+	scale.temperature = scale.fuel = scale.oxygen = scale.soot = 1.0f;
+	const auto stableScale = [](float number) { return number > 0.5f ? 0.5f / number : 1.0f; };
+	for (const auto& number : diffusionNumbers) {
+		scale.temperature = std::min(scale.temperature, stableScale(number.temperature));
+		scale.fuel = std::min(scale.fuel, stableScale(number.fuel));
+		scale.oxygen = std::min(scale.oxygen, stableScale(number.oxygen));
+		scale.soot = std::min(scale.soot, stableScale(number.soot));
+	}
+	for (auto& r : rates) {
+		r.temperature *= scale.temperature; r.fuel *= scale.fuel;
+		r.oxygen *= scale.oxygen; r.soot *= scale.soot;
 	}
 
 	bool conservative = solidCoupler_ != nullptr;

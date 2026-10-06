@@ -37,6 +37,8 @@ struct FlamePointUBO {
 	glm::vec4 smokeAlbedo{ 0.02f, 0.02f, 0.02f, 0.0f };
 	glm::vec4 lutRange{ 500.0f, 4000.0f, 0.0f, 0.0f };
 	glm::vec4 lut[kLutSize]{};
+	glm::vec4 smokeShadow{ 0.0f, 1.0f, 0.0f, 0.0f }; ///< to light, strength (0 = off)
+	glm::vec4 smokeShadowLight{ 1.0f, 1.0f, 1.0f, 0.25f }; ///< radiance, ambient fill fraction
 };
 
 /**

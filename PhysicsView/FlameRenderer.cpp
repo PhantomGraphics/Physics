@@ -1,6 +1,7 @@
 #include "FlameRenderer.h"
 
 #include "FlameBlackbody.h"
+#include "FlameSmokeShadow.h"
 
 #include "CGLib/VulkanGraphics/VulkanCommandPool.h"
 #include "CGLib/VulkanGraphics/VulkanContext.h"
@@ -18,7 +19,9 @@ bool FlameRenderer::Shading::operator==(const Shading& o) const
 		exposure == o.exposure && whiteBalanceTemperature == o.whiteBalanceTemperature &&
 		whiteBalanceDegree == o.whiteBalanceDegree && smokeExtinction == o.smokeExtinction && smokeGlow == o.smokeGlow &&
 		smokeAlbedo == o.smokeAlbedo && pbvrSubdivision == o.pbvrSubdivision &&
-		pbvrMinSubPixels == o.pbvrMinSubPixels && pbvrDensityScale == o.pbvrDensityScale;
+		pbvrMinSubPixels == o.pbvrMinSubPixels && pbvrDensityScale == o.pbvrDensityScale &&
+		smokeShadowStrength == o.smokeShadowStrength && smokeShadowAmbient == o.smokeShadowAmbient &&
+		smokeLightDirection == o.smokeLightDirection && smokeLightRadiance == o.smokeLightRadiance;
 }
 
 void FlameRenderer::setEmitters(std::vector<float> positions, std::vector<float> temperatures, std::vector<float> sizes)
@@ -31,6 +34,7 @@ void FlameRenderer::setEmitters(std::vector<float> positions, std::vector<float>
 void FlameRenderer::setAbsorbers(std::vector<float> positions, std::vector<float> densities, std::vector<float> sizes,
 	std::vector<float> temperatures)
 {
+	if (absPositions_ != positions || absDensities_ != densities || absSizes_ != sizes) smokeShadowDirty_ = true;
 	absPositions_ = std::move(positions);
 	absDensities_ = std::move(densities);
 	absSizes_ = std::move(sizes);
@@ -95,6 +99,10 @@ FlamePointUBO FlameRenderer::makeUBO()
 	ubo.thermal = glm::vec4(shading_.ambientTemperature, shading_.referenceTemperature, shading_.exposure, 0.0f);
 	ubo.smoke = glm::vec4(shading_.smokeExtinction, shading_.smokeGlow, shading_.pbvrSubdivision, 0.0f);
 	ubo.smokeAlbedo = glm::vec4(shading_.smokeAlbedo, 0.0f);
+	const float lightLength = glm::length(shading_.smokeLightDirection);
+	const glm::vec3 toLight = lightLength > 1.0e-6f ? -shading_.smokeLightDirection / lightLength : glm::vec3(0, 1, 0);
+	ubo.smokeShadow = glm::vec4(toLight, shading_.smokeShadowStrength);
+	ubo.smokeShadowLight = glm::vec4(shading_.smokeLightRadiance, shading_.smokeShadowAmbient);
 	ubo.lutRange = glm::vec4(FlameBlackbody::kLutMinT, FlameBlackbody::kLutMaxT, 0.0f, 0.0f);
 	if (shading_.whiteBalanceTemperature != lutWhite_ || shading_.whiteBalanceDegree != lutDegree_) {
 		lut_ = FlameBlackbody::makeLut(shading_.whiteBalanceTemperature, shading_.whiteBalanceDegree);
@@ -127,6 +135,21 @@ void FlameRenderer::onUpdate(uint32_t frameIndex)
 
 	if (renderMode_ == RenderMode::PBVR) {
 		const auto nAbs = absPositions_.size() / 3;
+		if (smokeShadowDirty_) {
+			smokeShadowDepth_.assign(nAbs, 0.0f);
+			if (shading_.smokeShadowStrength > 0.0f) {
+				std::vector<FlameSmokeShadow::Puff> puffs;
+				puffs.reserve(nAbs);
+				for (size_t i = 0; i < nAbs; ++i) {
+					puffs.push_back({glm::vec3(absPositions_[i*3], absPositions_[i*3+1], absPositions_[i*3+2]),
+						absSizes_[i], shading_.smokeExtinction * absDensities_[i] * shading_.pbvrDensityScale});
+				}
+				FlameSmokeShadow shadow;
+				shadow.build(std::move(puffs));
+				for (size_t i = 0; i < nAbs; ++i) smokeShadowDepth_[i] = shadow.opticalDepth(static_cast<unsigned>(i), glm::vec3(ubo.smokeShadow));
+			}
+			smokeShadowDirty_ = false;
+		}
 		absPacked_.resize(nAbs * 8);
 		for (size_t i = 0; i < nAbs; ++i) {
 			float* d = &absPacked_[i * 8];
@@ -136,7 +159,7 @@ void FlameRenderer::onUpdate(uint32_t frameIndex)
 			d[3] = absSizes_[i];
 			d[4] = absDensities_[i];
 			d[5] = absTemperatures_[i];
-			d[6] = 0.0f;
+			d[6] = smokeShadowDepth_[i]; // external light-ray optical depth, excluding this puff
 			d[7] = 0.0f;
 		}
 

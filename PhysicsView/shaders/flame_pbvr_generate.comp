@@ -25,7 +25,7 @@ layout(local_size_x = 64) in;
 
 struct Source {
     vec4 posSize; // xyz = world position, w = world diameter
-    vec4 attr;    // x = soot optical density, y = temperature
+    vec4 attr;    // x = soot optical density, y = temperature, z = external shadow optical depth
 };
 layout(std430, set = 0, binding = 1) readonly buffer Sources { Source src[]; };
 layout(std430, set = 0, binding = 2) writeonly buffer OutPos { vec4 outPos[]; };   // xyz, w = diameter
@@ -112,10 +112,27 @@ void main() {
         float sz = sqrt(max(0.0, 1.0 - cz * cz));
         vec3 p = s.posSize.xyz + r * vec3(sz * cos(phi), sz * sin(phi), cz);
 
+        vec4 shadedColor = color;
+        if (ubo.smokeShadow.w > 0.0) {
+            // Analytic exit distance within the receiving puff at this PBVR sample.
+            // Other puffs are BVH-traced at the source centre on the CPU. No
+            // density volume, shadow layers, or camera-dependent shadow sampling.
+            vec3 offset = p - s.posSize.xyz;
+            float along = dot(offset, ubo.smokeShadow.xyz);
+            float exitDistance = max(0.0, -along + sqrt(max(0.0,
+                along * along + radius * radius - dot(offset, offset))));
+            float tau = max(0.0, s.attr.z) + tau0 * ubo.view.w * exitDistance / S;
+            float transmission = exp(-ubo.smokeShadow.w * tau);
+            float fill = clamp(ubo.smokeShadowLight.w, 0.0, 1.0);
+            vec3 illumination = vec3(fill) + (1.0 - fill) * ubo.smokeShadowLight.rgb * transmission;
+            // Shadows affect scattered illumination, never the soot's own emission.
+            shadedColor.rgb = ubo.smokeAlbedo.rgb * illumination + flameEmission(s.attr.y) * ubo.smoke.y;
+        }
+
         uint idx = atomicAdd(counts[e], 1u);
         if (idx < pc.capacity) {
             outPos[base + idx] = vec4(p, sub);
-            outCol[base + idx] = color;
+            outCol[base + idx] = shadedColor;
         }
     }
 }

@@ -104,7 +104,7 @@ public:
 
 	/**
 	 * @brief Per-frame CPU side, called from the owner's onUpdate(frameIndex).
-	 * @param absorbing   8 floats per smoke source: x,y,z,diameter, density,temperature,0,0.
+	 * @param absorbing   8 floats per smoke source: x,y,z,diameter, density,temperature,externalShadowDepth,0.
 	 * @param emissive*   Emitter streams (xyz / temperature / diameter), `emissiveCount` long.
 	 * @param resetHistory Camera/params/viewport changed: restart the average.
 	 * @param animating   The simulation advanced since the previous frame.

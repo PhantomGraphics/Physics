@@ -1219,6 +1219,10 @@ void FluidApp::syncFlameRenderer()
     shading.smokeExtinction = render.smokeExtinction;
     shading.smokeGlow = render.smokeGlow;
     shading.smokeAlbedo = glm::vec3(render.smokeAlbedo);
+    shading.smokeShadowStrength = render.smokeShadowStrength;
+    shading.smokeShadowAmbient = render.smokeShadowAmbient;
+    shading.smokeLightDirection = renderBackground_.lightDirection();
+    shading.smokeLightRadiance = renderBackground_.lightColor() * renderBackground_.lightIntensity();
     shading.pbvrSubdivision = render.pbvrSubdivision;
     shading.pbvrMinSubPixels = render.pbvrMinSubPixels;
     shading.pbvrDensityScale = render.pbvrDensityScale;

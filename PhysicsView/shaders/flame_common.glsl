@@ -15,6 +15,8 @@ layout(set = 0, binding = 0) uniform FlameUBO {
     vec4 smokeAlbedo; // rgb = soot albedo * ambient light
     vec4 lutRange;    // x = LUT min T, y = LUT max T
     vec4 lut[64];     // blackbody chromaticity (unit luminance, linear sRGB), see FlameBlackbody.h
+    vec4 smokeShadow; // xyz = direction to light, w = self-shadow strength (PBVR only)
+    vec4 smokeShadowLight; // rgb = directional radiance, w = unoccluded fill fraction
 } ubo;
 
 vec3 flameBlackbody(float T) {

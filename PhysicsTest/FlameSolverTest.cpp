@@ -894,3 +894,34 @@ TEST(FlameSolverTest, ScalarDiffusionConservesMassWeightedTotals)
   EXPECT_LT(hotMean / 64.0f, 1800.0f - 1.0f);
   EXPECT_GT(coldMean / 64.0f, 400.0f + 1.0f);
 }
+
+TEST(FlameSolverTest, SparsePairDiffusionPreservesExtremaAndTotals)
+{
+  // The h-based diffusion-number cap alone is insufficient for sparse SPH
+  // support. This pair used to alternate between negative T and the ceiling.
+  FlameFluid fluid;
+  configureQuietPhysical(fluid);
+  fluid.setBurnRate(0); fluid.setCoolRate(0); fluid.setVicosityCoe(0);
+  fluid.setThermalDiffusivity(0.03f); fluid.setFuelDiffusivity(0.03f);
+  fluid.setOxygenDiffusivity(0.03f); fluid.setSootDiffusivity(0.03f);
+  addBlock(fluid, {0,0,0}, 1, 0.04f, 400, 0.2f, 0.9f, 0.05f);
+  addBlock(fluid, {0.02f,0,0}, 1, 0.04f, 700, 0.9f, 0.1f, 0.6f);
+  FlameSolver solver;
+  solver.add(&fluid); solver.setEffectLength(fluid.getEffectLength());
+  solver.setGravity({0,0,0});
+  const std::array<float,4> lower{400,0.2f,0.1f,0.05f}, upper{700,0.9f,0.9f,0.6f};
+  for (int step=0;step<32;++step) {
+    solver.simulate(1.0f/60);
+    ASSERT_EQ(fluid.getNumParticles(),2);
+    const auto& soa=fluid.getParticles();
+    const std::array<const std::vector<float>*,4> values{&soa.temperatures,&soa.fuels,&soa.oxygens,&soa.soots};
+    for (int channel=0;channel<4;++channel) {
+      for (float value:*values[channel]) {
+        EXPECT_GE(value,lower[channel]-1.0e-5f) << "step " << step << " channel " << channel;
+        EXPECT_LE(value,upper[channel]+1.0e-5f) << "step " << step << " channel " << channel;
+      }
+      EXPECT_NEAR((*values[channel])[0]+(*values[channel])[1],lower[channel]+upper[channel],
+          channel==0?1.0e-3f:1.0e-5f) << "step " << step << " channel " << channel;
+    }
+  }
+}
