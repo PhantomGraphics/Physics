@@ -25,6 +25,14 @@ class FlameWorld;
  *       Rebuild the default flame scene. Resets every SetFlameParam value to
  *       its default too (the fluid object is rebuilt) -- set params AFTER it.
  *       The world-level time step and the render params survive.
+ *   FlameSpherePreset:{convection|combustion}[,<radius>,<spacing>]
+ *       Stops/rebuilds a fixed-carrier sphere (defaults 0.6 / 0.08).
+ *       Valid radius 0.05..10, spacing >=0.005, at most 12000 carriers.
+ *       Fixed mode rejects solid fuel release and live density changes.
+ *       sourcePower/sourceDuration/sourceRadius/wallTemperature/wallRate/wallThickness
+ *       are exposed by SetFlameParam. StopFlameSource stops spherical heating too.
+ *       carrierDebug (0 radiance, 1 temperature, 2 velocity) and sphereWire
+ *       are exposed by SetFlameRenderParam.
  *   FlameStep / FlameStep:<n>
  *       Advance <n> fixed steps synchronously (independent of the Running flag).
  *   SetFlameRunning:{true|false} / IsFlameRunning

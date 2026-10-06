@@ -1,0 +1,28 @@
+{
+  "name": "49_flame_spherical_combustion",
+  "_comment": "Finite ignition and fuel, fixed gas carriers. Fuel and heat budgets include source, cooling and temperature clamp. Solid release is rejected because it would append carriers.",
+  "steps": [
+    { "command": "SetFlamePage:true", "expect": "OK" },
+    { "command": "FlameSpherePreset:combustion,0.3,0.06", "expect": "OK" },
+    { "command": "GetFlameStat:count", "store_as": "before_count", "expect_range": "100,1000" },
+    { "command": "GetFlameStat:burnedFuel", "expect_range": "0,0" },
+    { "command": "GetFlameStat:gasFuel", "store_as": "before_fuel", "expect_range": "0.00001,1" },
+    { "command": "GetFlameStat:oxygenMass", "store_as": "before_oxygen" },
+    { "command": "FlameStep:120", "expect": "OK" },
+    { "command": "GetFlameStats", "expect_prefix": "count=" },
+    { "command": "GetFlameStat:burnedFuel", "expect_range": "0.000001,1" },
+    { "command": "GetFlameStat:gasFuel", "store_as": "after_fuel" },
+    { "command": "GetFlameStat:oxygenMass", "expect_not": "${before_oxygen}" },
+    { "command": "GetFlameStat:count", "expect": "${before_count}" },
+    { "command": "GetFlameStat:nanCount", "expect_range": "0,0" },
+    { "command": "GetFlameStat:fuelBalanceError", "expect_range": "-0.000001,0.000001" },
+    { "command": "GetFlameStat:oxygenBalanceError", "expect_range": "-0.000001,0.000001" },
+    { "command": "GetFlameStat:heatBalanceError", "expect_range": "-0.001,0.001" },
+    { "command": "AddFlameBody:sphere,0,0.3,0,0.05,0.05,0.05,0.001,1", "expect_prefix": "Error:" },
+    { "command": "FlameReset", "expect": "OK" },
+    { "command": "GetFlameParam:fixedCarriers", "expect_range": "0,0" },
+    { "command": "GetFlameParticleCount", "expect": "Count:0" },
+    { "command": "SetFlameRenderParam:carrierDebug,0", "expect": "OK" }
+  ],
+  "post_assert": "after_fuel < before_fuel"
+}

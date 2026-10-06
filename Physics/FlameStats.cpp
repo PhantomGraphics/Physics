@@ -3,6 +3,7 @@
 #include "FlameStats.h"
 #include "FlameFluid.h"
 #include "FlameSolidCoupler.h"
+#include "FlameSolver.h"
 
 #include <algorithm>
 #include <cmath>
@@ -25,9 +26,10 @@ constexpr float kBurningRateEps = 1.0e-3f;
 
 }
 
-FlameStats Phantom::Physics::computeFlameStats(const FlameFluid& fluid, const FlameSolidCoupler* coupler)
+FlameStats Phantom::Physics::computeFlameStats(const FlameFluid& fluid, const FlameSolidCoupler* coupler, const FlameSolver* solver)
 {
 	FlameStats st;
+	st.boundaryEnergyLoss=fluid.boundaryEnergyLoss; st.maxAttemptedWallPenetration=fluid.maxAttemptedWallPenetration;
 	st.burnedFuel=fluid.burnedFuelMass; st.outflowFuel=fluid.outflowFuelMass; st.sourceFuel=fluid.sourceFuelMass;
 	const auto& gas=fluid.getParticles();
 	for(size_t i=0;i<gas.size();++i) st.gasFuel+=gas.fuels[i]*fluid.getDensity()*std::pow(2*gas.radii[i],3.0f);
@@ -38,9 +40,40 @@ FlameStats Phantom::Physics::computeFlameStats(const FlameFluid& fluid, const Fl
 			st.pyrolyzedMass+=s.pyrolyzed; st.solidHeatExchange+=s.heatExchange;
 		}
 	}
-	st.fuelBalanceError=st.initialSolidFuel+st.sourceFuel-st.solidFuel-st.pendingFuel-st.residueMass-
+	st.fuelBalanceError=st.initialSolidFuel+fluid.initialFuelMass+st.sourceFuel-st.solidFuel-st.pendingFuel-st.residueMass-
 		st.gasFuel-st.burnedFuel-st.outflowFuel-st.removedSolidMass;
 	const auto& soa = fluid.getParticles();
+	double sumVy = 0, sumTVy = 0;
+	int capped = 0;
+	for (size_t i = 0; i < soa.size(); ++i) {
+		if (!isFinite(soa.positions[i]) || !isFinite(soa.velocities[i]) || !std::isfinite(soa.temperatures[i])) continue;
+		const double mass = fluid.getDensity()*std::pow(2*soa.radii[i],3.0f);
+		st.carrierMass += mass; st.totalHeat += mass*soa.temperatures[i];
+		st.oxygenMass += mass*soa.oxygens[i];
+		st.kineticEnergy += 0.5*mass*getLengthSquared(soa.velocities[i]);
+		sumVy += mass*soa.velocities[i].y; sumTVy += mass*soa.temperatures[i]*soa.velocities[i].y;
+		st.densityError = std::max(st.densityError, std::abs(soa.densities[i]/fluid.getDensity()-1));
+		if (getLength(soa.velocities[i]) >= fluid.getMaxSpeed()*0.999f) ++capped;
+		if (solver && solver->getBoundarySphere()) {
+			const auto& wall = *solver->getBoundarySphere();
+			const auto offset = soa.positions[i]-wall.getCenter();
+			const float radial = std::sqrt(offset.x*offset.x+offset.z*offset.z)/wall.getRadius();
+			if (radial < 0.3f) { ++st.coreCount; st.coreVelocityY += soa.velocities[i].y; }
+			if (radial > 0.65f) { ++st.outerCount; st.outerVelocityY += soa.velocities[i].y; }
+			st.maxWallPenetration = std::max(st.maxWallPenetration, soa.radii[i]-wall.getSignedDistance(soa.positions[i]));
+		}
+	}
+	if (st.carrierMass > 0) {
+		st.allAvgT = static_cast<float>(st.totalHeat/st.carrierMass);
+		st.thermalVelocityCovariance = static_cast<float>(sumTVy/st.carrierMass-st.allAvgT*sumVy/st.carrierMass);
+	}
+	if (st.coreCount) st.coreVelocityY /= st.coreCount;
+	if (st.outerCount) st.outerVelocityY /= st.outerCount;
+	if (!soa.empty()) st.speedCapFraction = static_cast<float>(capped)/soa.size();
+	st.sourceHeat=fluid.sourceHeat; st.wallHeat=fluid.wallHeat; st.clampHeat=fluid.clampHeat;
+	st.heatBalanceError=fluid.initialHeat+fluid.sourceHeat+fluid.reactionHeat-fluid.wallHeat-
+		fluid.coolingHeat-fluid.clampHeat-st.totalHeat;
+	st.oxygenBalanceError=fluid.initialOxygenMass-fluid.consumedOxygen-st.oxygenMass;
 	st.count = static_cast<int>(soa.size());
 	st.secondaryCount = static_cast<int>(fluid.getSecondaryParticles().size());
 	st.histMinT = fluid.getAmbientTemperature();
@@ -135,6 +168,9 @@ FlameStats Phantom::Physics::computeFlameStats(const FlameFluid& fluid, const Fl
 const char* FlameStats::names()
 {
 	return "count,airCount,secondaryCount,nanCount,avgY,maxY,airAvgY,avgSpeed,maxSpeed,"
+		"boundaryEnergyLoss,maxAttemptedWallPenetration,"
+		"carrierMass,totalHeat,oxygenMass,kineticEnergy,heatBalanceError,oxygenBalanceError,sourceHeat,wallHeat,clampHeat,"
+		"allAvgT,coreVelocityY,outerVelocityY,thermalVelocityCovariance,maxWallPenetration,densityError,speedCapFraction,coreCount,outerCount,"
 		"avgT,maxT,hotY,avgFuel,avgSoot,avgOxygen,burningFraction,gasFuel,burnedFuel,outflowFuel,sourceFuel,"
 		"solidFuel,pendingFuel,residueMass,pyrolyzedMass,solidHeatExchange,initialSolidFuel,removedSolidMass,fuelBalanceError";
 }
@@ -142,6 +178,10 @@ const char* FlameStats::names()
 bool FlameStats::get(const std::string& name, float& out) const
 {
 #define MASS(n) if(name==#n) { out=static_cast<float>(n); return true; }
+	MASS(boundaryEnergyLoss) MASS(maxAttemptedWallPenetration)
+	MASS(carrierMass) MASS(totalHeat) MASS(oxygenMass) MASS(kineticEnergy) MASS(heatBalanceError) MASS(oxygenBalanceError)
+	MASS(sourceHeat) MASS(wallHeat) MASS(clampHeat) MASS(allAvgT) MASS(coreVelocityY) MASS(outerVelocityY)
+	MASS(thermalVelocityCovariance) MASS(maxWallPenetration) MASS(densityError) MASS(speedCapFraction) MASS(coreCount) MASS(outerCount)
 	MASS(gasFuel) MASS(burnedFuel) MASS(outflowFuel) MASS(sourceFuel) MASS(solidFuel) MASS(pendingFuel)
 	MASS(residueMass) MASS(pyrolyzedMass) MASS(solidHeatExchange) MASS(initialSolidFuel) MASS(removedSolidMass) MASS(fuelBalanceError)
 #undef MASS
@@ -173,6 +213,10 @@ std::string FlameStats::toString() const
 		count, airCount, secondaryCount, nanCount, avgY, maxY, airAvgY, avgSpeed, maxSpeed,
 		avgT, maxT, hotY, avgFuel, avgSoot, avgOxygen, burningFraction, histMinT, histMaxT);
 	std::string s(buf);
+	for (const char* name : {"carrierMass", "totalHeat", "allAvgT", "coreVelocityY", "outerVelocityY",
+		"thermalVelocityCovariance", "maxWallPenetration", "heatBalanceError", "oxygenBalanceError", "sourceHeat", "wallHeat"}) {
+		float value; get(name,value); s += std::string(";")+name+"="+std::to_string(value);
+	}
 	s += ";h=";
 	for (int b = 0; b < kHistogramBins; ++b) {
 		if (b > 0) {

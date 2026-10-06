@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "FlameCommandDispatcher.h"
 #include "FlameWorld.h"
 #include "RigidBodyWorld.h"
@@ -76,6 +76,17 @@ const std::vector<ParamDef>& simParams()
 {
 	static const std::vector<ParamDef> defs = {
 		{ "density", FLAME_F(density, getDensity), positive([](FlameWorld& w, float v) { w.fluid().setDensity(v); }) },
+		{ "fixedCarriers", [](FlameWorld& w) { return w.fluid().fixedCarriers ? 1.0f : 0.0f; },
+		  [](FlameWorld&, float) { return false; } },
+#define THERMAL_PARAM(name, member) { name, [](FlameWorld& w) { return w.solver().getThermalBoundary().member; }, \
+		[](FlameWorld& w, float v) { auto t=w.solver().getThermalBoundary(); t.member=v; return w.solver().setThermalBoundary(t); } }
+		THERMAL_PARAM("sourcePower", sourcePower),
+		THERMAL_PARAM("sourceDuration", sourceDuration),
+		THERMAL_PARAM("sourceRadius", sourceRadius),
+		THERMAL_PARAM("wallTemperature", wallTemperature),
+		THERMAL_PARAM("wallRate", wallRate),
+		THERMAL_PARAM("wallThickness", wallThickness),
+#undef THERMAL_PARAM
 		{ "pressureCoe", FLAME_F(pressureCoe, getPressureCoe), nonNeg([](FlameWorld& w, float v) { w.fluid().setPressureCoe(v); }) },
 		{ "viscosityCoe", FLAME_F(viscosityCoe, getViscosityCoe), nonNeg([](FlameWorld& w, float v) { w.fluid().setVicosityCoe(v); }) },
 		{ "effectLength", FLAME_F(effectLength, getEffectLength), positive([](FlameWorld& w, float v) {
@@ -157,6 +168,10 @@ const std::vector<ParamDef>& renderParams()
 {
 	static const std::vector<ParamDef> defs = {
 		{ "particleSize", FLAME_R(particleSize) },
+		{ "carrierDebug", [](FlameWorld& w) { return static_cast<float>(w.render().carrierDebug); },
+		  [](FlameWorld& w, float v) { if(v<0 || v>2 || v!=std::floor(v)) return false; w.render().carrierDebug=static_cast<int>(v); return true; } },
+		{ "sphereWire", [](FlameWorld& w) { return w.render().sphereWire?1.0f:0.0f; },
+		  [](FlameWorld& w, float v) { if(v!=0 && v!=1) return false; w.render().sphereWire=v!=0; return true; } },
 		{ "smokeParticleSize", FLAME_R(smokeParticleSize) },
 		{ "renderScale", FLAME_R(renderScale) },
 		// Offsets may be negative, so they bypass FLAME_R's v >= 0 check.
@@ -257,6 +272,19 @@ std::optional<std::string> FlameCommandDispatcher::route(const std::string& cmd)
 	}
 	if (!world_) return std::string("Error:flame world not set");
 	auto& w = *world_;
+	if (startsWith(sv, "FlameSpherePreset:")) {
+		auto args=sv.substr(18); const auto comma=args.find(',');
+		const auto mode=args.substr(0,comma);
+		float radius=0.6f, spacing=0.08f;
+		if (comma!=std::string_view::npos) {
+			args.remove_prefix(comma+1); const auto split=args.find(',');
+			if (split==std::string_view::npos || !parseFloat(args.substr(0,split),radius) ||
+				!parseFloat(args.substr(split+1),spacing)) return "Error:expected mode[,radius,spacing]";
+		}
+		if ((mode!="convection" && mode!="combustion") || !w.sphericalPreset(mode=="combustion",radius,spacing))
+			return "Error:invalid sphere preset";
+		notifyChanged(); return "OK";
+	}
     if (startsWith(sv,"BindFlameBody:")) {
         const auto args=sv.substr(14); const auto comma=args.find(','); int id,index;
         if(comma==std::string_view::npos || !parseInt(args.substr(0,comma),id) || id<=0 ||
@@ -292,7 +320,7 @@ std::optional<std::string> FlameCommandDispatcher::route(const std::string& cmd)
 	if (cmd == "StopFlameSource") { w.stopSource(); notifyChanged(); return "OK"; }
 	if (cmd == "GetFlameBodyCount") return std::to_string(w.bodies().size());
 	if (cmd == "GetFlameFuelBudget") {
-		const auto stats=computeFlameStats(w.fluid(),&w.coupler());
+		const auto stats=computeFlameStats(w.fluid(),&w.coupler(),&w.solver());
 		return "initial="+std::to_string(stats.initialSolidFuel)+";solid="+std::to_string(stats.solidFuel)+";pending="+std::to_string(stats.pendingFuel)+
 			";residue="+std::to_string(stats.residueMass)+";gas="+std::to_string(stats.gasFuel)+
 			";burned="+std::to_string(w.fluid().burnedFuelMass)+";outflow="+std::to_string(w.fluid().outflowFuelMass)+
@@ -427,18 +455,20 @@ std::optional<std::string> FlameCommandDispatcher::route(const std::string& cmd)
 		return "Error:unknown PBVR stat '" + std::string(name) + "'";
 	}
 	if (cmd == "GetFlameStats") {
-		return computeFlameStats(w.fluid(),&w.coupler()).toString();
+		return computeFlameStats(w.fluid(),&w.coupler(),&w.solver()).toString();
 	}
 	if (startsWith(sv, "GetFlameStat:")) {
 		const std::string name(sv.substr(13));
 		float v = 0.0f;
-		if (!computeFlameStats(w.fluid(),&w.coupler()).get(name, v)) {
+		if (!computeFlameStats(w.fluid(),&w.coupler(),&w.solver()).get(name, v)) {
 			return "Error:unknown stat '" + name + "' (known: " + FlameStats::names() + ")";
 		}
 		return formatFloat(v);
 	}
 
 	bool changed = false;
+	if (w.fluid().fixedCarriers && startsWith(sv,"SetFlameParam:density,"))
+		return "Error:fixed carrier mass requires rebuilding the preset";
 	if (!w.bodies().empty() && cmd=="SetFlameParam:combustionModel,0") return "Error:solid combustion requires Physical mode";
 	if (auto r = handleParam(w, simParams(), sv, "SetFlameParam:", "GetFlameParam:", changed)) {
 		return r;

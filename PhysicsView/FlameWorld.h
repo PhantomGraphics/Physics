@@ -44,6 +44,9 @@ public:
     /** @brief Rebuilds the fluid/solver and re-seeds the initial scene. */
     void reset();
 
+    /** Rebuilds a deterministic fixed-carrier sphere. False leaves the scene intact. */
+    bool sphericalPreset(bool combustion, float radius = 0.6f, float spacing = 0.08f);
+
     /**
      * @brief Whether the flame is part of the shared scene (drawn together with
      * the fluid / rigid / soft / glTF background). False at startup and after
@@ -94,6 +97,8 @@ public:
 
     /** @brief Display-only parameters (were FlameApp members); never affect the sim. */
     struct RenderParams {
+        int carrierDebug = 0; // 0 radiance, 1 temperature dots, 2 velocity vectors
+        bool sphereWire = true;
         // Sprite diameters in *simulation* units (multiplied by renderScale
         // for display). Projected with each particle's own depth (plan A7);
         // the defaults reproduce the former fixed 14 px / 20 px sprites at

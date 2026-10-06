@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include "imgui.h"
 
 namespace Phantom {
 
@@ -144,7 +145,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     hdrRenderers_ = { &bgGltfRenderer_, &fluidRenderer_,
                       &rigidGltfRenderer_, &rigidRenderer_,
                       &softGltfRenderer_, &softRenderer_,
-                      &volumeRenderer_, &meshRenderer_, &combustibleRenderer_, &flameRenderer_,
+                      &volumeRenderer_, &meshRenderer_, &combustibleRenderer_, &flameRenderer_, &flameDebugRenderer_,
                       &cloudVolumeRenderer_ };
     add(&ssfrRenderer_);
 
@@ -269,6 +270,11 @@ void FluidApp::onInit()
         s.vertSpv = ::VKG::loadSPVRepo("shaders/line.vert.spv");
         s.fragSpv = ::VKG::loadSPVRepo("shaders/line.frag.spv");
         rigidRenderer_.setShaders(std::move(s));
+        RigidBodyWireRenderer::Shaders debug;
+        debug.vertSpv = ::VKG::loadSPVRepo("shaders/line.vert.spv");
+        debug.fragSpv = ::VKG::loadSPVRepo("shaders/line.frag.spv");
+        flameDebugRenderer_.setShaders(std::move(debug));
+        flameDebugRenderer_.setExtent(getExtent());
     }
     {
         SoftBodyWireRenderer::Shaders s;
@@ -516,6 +522,7 @@ void FluidApp::onSwapChainCreated()
     fluidRenderer_.setExtent(ext);
     ssfrRenderer_.setExtent(ext);
     rigidRenderer_.setExtent(ext);
+    flameDebugRenderer_.setExtent(ext);
     softRenderer_.setExtent(ext);
     bgGltfRenderer_.setExtent(ext);
 
@@ -544,6 +551,12 @@ void FluidApp::onSwapChainCreated()
 
 void FluidApp::onUpdate(uint32_t frameIndex)
 {
+    // Initial ImGuiCond_Once hints have run by frame 2. Verification can then
+    // restore the edited ini without changing the shipped window defaults.
+    if (!verificationLayout_.empty() && ImGui::GetFrameCount()>=2) {
+        ImGui::LoadIniSettingsFromMemory(verificationLayout_.data(),verificationLayout_.size());
+        verificationLayout_.clear();
+    }
     dispatcher_.processQueue();
 
     // Keep the Scenario Browser's GUI run-queue advancing every frame, even
@@ -660,6 +673,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         if(flameWorld_.hasRigidBindings()) syncRigidRenderer();
     }
     flameRenderer_.setEnabled(flameInScene && !cloudActive);
+    flameDebugRenderer_.setEnabled(flameInScene && !cloudActive && flameWorld_.fluid().fixedCarriers);
     // Cloud page: the air particles replace the fluid display in the shared
     // FluidRenderer (Phase 2 diagnostic view); every other scene renderer is off.
     if (cloudActive) {
@@ -706,6 +720,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
 
     ssfrRenderer_.setCamera(fluidRenderer_.getProjMatrix(), fluidRenderer_.getViewMatrix());
     rigidRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
+    flameDebugRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
     softRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
     volumeRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
     meshRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
@@ -1013,6 +1028,13 @@ void FluidApp::syncFlameRenderer()
     const auto& particles   = fluid.getParticles();
     const auto& secondaries = fluid.getSecondaryParticles();
 
+    const auto& sphere = flameWorld_.solver().getBoundarySphere();
+    if (sphere && fluid.fixedCarriers && !flameWasSpherical_) {
+        fluidRenderer_.setCameraTarget(glm::vec3(sphere->getCenter())*render.renderScale+render.renderOffset);
+        fluidRenderer_.setCameraOrbit(sphere->getRadius()*render.renderScale*3.3f,1.1f,1.35f);
+    }
+    flameWasSpherical_=sphere.has_value() && fluid.fixedCarriers;
+
     const bool coupled=!flameWorld_.bodies().empty();
     if(coupled && !flameWasCoupled_) {
         glm::vec3 center(0);
@@ -1029,6 +1051,29 @@ void FluidApp::syncFlameRenderer()
     };
     const float flameSize = render.particleSize * scale;
     const float smokeSize = render.smokeParticleSize * scale;
+
+    if (fluid.fixedCarriers && sphere) {
+        std::vector<float> points, colors; std::vector<uint32_t> indices;
+        const auto line = [&](glm::vec3 a,glm::vec3 b,glm::vec3 color) {
+            const uint32_t index=static_cast<uint32_t>(points.size()/3);
+            for (auto p : {a,b}) { points.insert(points.end(),{p.x,p.y,p.z}); colors.insert(colors.end(),{color.x,color.y,color.z,1.0f}); }
+            indices.insert(indices.end(),{index,index+1});
+        };
+        if (render.sphereWire) for(int axis=0;axis<3;++axis) for(int j=0;j<96;++j) {
+            const float a=j*6.2831853f/96, b=(j+1)*6.2831853f/96;
+            glm::vec3 p(0),q(0); p[(axis+1)%3]=std::cos(a); p[(axis+2)%3]=std::sin(a);
+            q[(axis+1)%3]=std::cos(b); q[(axis+2)%3]=std::sin(b);
+            line(xf(sphere->getCenter()+p*sphere->getRadius()),xf(sphere->getCenter()+q*sphere->getRadius()),{0.2f,0.5f,0.7f});
+        }
+        if(render.carrierDebug) for(size_t i=0;i<particles.size();i+=render.carrierDebug==2?4:1) {
+            const auto p=xf(particles.positions[i]);
+            const float t=std::clamp((particles.temperatures[i]-fluid.getAmbientTemperature())/1000,0.0f,1.0f);
+            const glm::vec3 color(t,0.2f,1-t);
+            const auto delta=render.carrierDebug==2?glm::vec3(particles.velocities[i])*scale*0.1f:glm::vec3(0,scale*0.01f,0);
+            line(p,p+delta,color);
+        }
+        flameDebugRenderer_.update(points,colors,indices,fluidRenderer_.getProjMatrix()*fluidRenderer_.getViewMatrix());
+    }
 
     std::vector<float> positions, temperatures, sizes;
     positions.reserve((particles.size() + secondaries.size()) * 3);
@@ -1049,7 +1094,7 @@ void FluidApp::syncFlameRenderer()
         const float t = particles.temperatures[i];
         if (!std::isfinite(t)) continue;
         maxT = std::max(maxT, t);
-        pushEmitter(xf(particles.positions[i]), t, flameSize);
+        if (!fluid.fixedCarriers || render.carrierDebug==0) pushEmitter(xf(particles.positions[i]), t, flameSize);
     }
     for (const auto& sp : secondaries) {
         if (sp.kind == Phantom::Physics::FlameFluid::SecondaryKind::Spark) {
