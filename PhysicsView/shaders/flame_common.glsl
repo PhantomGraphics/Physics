@@ -20,6 +20,7 @@ layout(set = 0, binding = 0) uniform FlameUBO {
     vec4 flameLightPosition; // xyz=importance-sampled emitter, w=illumination gain
     vec4 flameLightFlux; // rgb=emitted flux / selection probability, w=source radius
     vec4 flameShadow; // far distance, shadow image size, hemisphere sign, shadow subdivision
+    vec4 surfaceLight; // x = object illumination gain
 } ubo;
 
 vec3 flameBlackbody(float T) {

@@ -132,6 +132,7 @@ public:
         float smokeShadowStrength = 1.0f;       ///< PBVR self-shadow; 0 = off
         float smokeShadowAmbient = 0.25f;       ///< unoccluded fill fraction, 0..1
         float smokeFlameLight = 1.0f;           ///< PBVR flame illumination gain, 0=off
+        float objectFlameLight = 1.0f;          ///< PBVR diffuse illumination of opaque objects
 
         // PBVR (plan Phase 4, FlamePBVRPass).
         bool  pbvrAdaptive       = true;  ///< EnsembleLodController picks R from GPU time

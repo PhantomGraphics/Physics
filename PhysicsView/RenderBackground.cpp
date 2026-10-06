@@ -73,6 +73,7 @@ std::array<std::string, 6> RenderBackground::cubeFacePaths(const std::string& di
 }
 
 void RenderBackground::applyLight() {
+    ++revision_;
     // GltfSceneRenderer: pos.w == 0 -> directional; color.w == intensity.
     if (gltf_)
         gltf_->setLight(glm::vec4(glm::normalize(lightDir_), 0.0f),
@@ -84,6 +85,7 @@ void RenderBackground::applyLight() {
 }
 
 void RenderBackground::applyTransform() {
+    ++revision_;
     if (!gltf_) return;
     glm::mat4 m(1.f);
     m = glm::translate(m, xfPos_);
@@ -111,6 +113,7 @@ bool RenderBackground::loadBackground(const std::string& path) {
 }
 
 void RenderBackground::clearBackground() {
+    ++revision_;
     bgPath_.clear();
     doc_ = Phantom::Gltf::GltfDocument{};
     if (gltf_) gltf_->loadDocument(emptyDoc_); // frees GPU resources, 0 primitives
@@ -157,6 +160,7 @@ void RenderBackground::setLight(const glm::vec3& direction, const glm::vec3& col
 }
 
 void RenderBackground::setUseIBL(bool v) {
+    if (useIBL_!=v) ++revision_;
     useIBL_ = v;
     if (gltf_) gltf_->setUseIBL(v);
 }

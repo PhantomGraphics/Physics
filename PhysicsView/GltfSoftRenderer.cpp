@@ -18,6 +18,7 @@ Phantom::Gltf::GltfSceneRenderer::Shaders GltfSoftRenderer::makeShaders() const 
     Phantom::Gltf::GltfSceneRenderer::Shaders s;
     s.vertSpv = vertSpv_;
     s.fragSpv = fragSpv_;
+    s.sampledLightFragSpv=sampledLightFragSpv_;
     s.shadowVertSpv = shadowVertSpv_;
     s.shadowFragSpv = shadowFragSpv_;
     return s;
@@ -146,6 +147,11 @@ void GltfSoftRenderer::onCleanup(VkDevice device) {
     }
     instances_.clear();
     ready_ = false;
+}
+
+void GltfSoftRenderer::renderSampledLight(VkCommandBuffer cmd,uint32_t frame,VkDescriptorSet shadows,const Gltf::GltfSampledLight& light) {
+    if (!ready_ || !enabled_ || mode_==Mode::Wireframe) return;
+    for (auto& [body,inst]:instances_) inst.renderer->renderSampledLight(cmd,frame,shadows,light);
 }
 
 } // namespace Phantom

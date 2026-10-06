@@ -418,6 +418,7 @@ void FluidApp::onInit()
         Phantom::Gltf::GltfSceneRenderer::Shaders s;
         s.vertSpv = ::VKG::loadSPVRepo("shaders/gltf.vert.spv");
         s.fragSpv = ::VKG::loadSPVRepo("shaders/gltf.frag.spv");
+        s.sampledLightFragSpv = ::VKG::loadSPVRepo("shaders/gltf_flame.frag.spv");
         s.shadowVertSpv = ::VKG::loadSPVRepo("shaders/shadow.vert.spv");
         s.shadowFragSpv = ::VKG::loadSPVRepo("shaders/shadow.frag.spv");
         bgGltfRenderer_.setShaders(std::move(s));
@@ -426,20 +427,28 @@ void FluidApp::onInit()
         Gltf::GltfSceneRenderer::Shaders s;
         s.vertSpv=::VKG::loadSPVRepo("shaders/combustible.vert.spv");
         s.fragSpv=::VKG::loadSPVRepo("shaders/combustible.frag.spv");
+        s.sampledLightFragSpv=::VKG::loadSPVRepo("shaders/combustible_flame.frag.spv");
         combustibleRenderer_.setShaders(std::move(s));
         combustibleRenderer_.bind(&flameWorld_);
         combustibleRenderer_.setOnChanged([this] { if(!flameWorld_.isRunning()) flameRenderer_.notifySimulationAdvanced(true); });
-        flameRenderer_.setOpaqueDraw([this](VkCommandBuffer cmd,uint32_t frame) { combustibleRenderer_.onRender(cmd,frame); });
+        flameRenderer_.setOpaqueDraw([this](VkCommandBuffer cmd,uint32_t frame,VkDescriptorSet shadows,const Gltf::GltfSampledLight& light) {
+            bgGltfRenderer_.renderSampledLight(cmd,frame,shadows,light);
+            rigidGltfRenderer_.renderSampledLight(cmd,frame,shadows,light);
+            softGltfRenderer_.renderSampledLight(cmd,frame,shadows,light);
+            combustibleRenderer_.renderSampledLight(cmd,frame,shadows,light);
+        });
     }
     // Rigid-/soft-body shaded pass: same gltf.{vert,frag} + shadow.{vert,frag};
     // each per-body GltfSceneRenderer instance gets its own copy (see
     // GltfBodyRenderer / GltfSoftRenderer).
     rigidGltfRenderer_.setShaders(::VKG::loadSPVRepo("shaders/gltf.vert.spv"),
                                   ::VKG::loadSPVRepo("shaders/gltf.frag.spv"));
+    rigidGltfRenderer_.setSampledLightShader(::VKG::loadSPVRepo("shaders/gltf_flame.frag.spv"));
     rigidGltfRenderer_.setShadowShaders(::VKG::loadSPVRepo("shaders/shadow.vert.spv"),
                                         ::VKG::loadSPVRepo("shaders/shadow.frag.spv"));
     softGltfRenderer_.setShaders(::VKG::loadSPVRepo("shaders/gltf.vert.spv"),
-                                 ::VKG::loadSPVRepo("shaders/gltf.frag.spv"));
+                                  ::VKG::loadSPVRepo("shaders/gltf.frag.spv"));
+    softGltfRenderer_.setSampledLightShader(::VKG::loadSPVRepo("shaders/gltf_flame.frag.spv"));
     softGltfRenderer_.setShadowShaders(::VKG::loadSPVRepo("shaders/shadow.vert.spv"),
                                        ::VKG::loadSPVRepo("shaders/shadow.frag.spv"));
 
@@ -795,6 +804,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         const glm::vec4 lightCol(renderBackground_.lightColor(), renderBackground_.lightIntensity());
         rigidGltfRenderer_.setCamera(view, proj, eye);
         combustibleRenderer_.setCamera(view,proj,eye);
+        combustibleRenderer_.setLight(lightDir,lightCol);
         rigidGltfRenderer_.setLight(lightDir, lightCol);
         softGltfRenderer_.setCamera(view, proj, eye);
         softGltfRenderer_.setLight(lightDir, lightCol);
@@ -840,6 +850,21 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     }
 
     ::VKG::VkAppBase::onUpdate(frameIndex);   // ssfrRenderer_ + UI panels
+    // Scene surfaces are part of the PBVR average too. Restart a paused mean
+    // after edits; use temporal averaging while rigid/soft geometry is moving.
+    const std::string sceneState=renderBackground_.sceneStateJson()+":"+
+        std::to_string(renderBackground_.revision())+":"+
+        std::to_string(static_cast<int>(rigidGltfRenderer_.mode()))+":"+
+        std::to_string(static_cast<int>(softGltfRenderer_.mode()))+":"+
+        std::to_string(rigidGltfRenderer_.isEnabled())+":"+
+        std::to_string(softGltfRenderer_.isEnabled());
+    if (sceneState!=pbvrSceneState_) {
+        pbvrSceneState_=sceneState;
+        flameRenderer_.notifySimulationAdvanced(true);
+    } else if ((rigidGltfRenderer_.isEnabled() && world_.rigid().isRunning()) ||
+               (softGltfRenderer_.isEnabled() && softWorld_.isRunning())) {
+        flameRenderer_.notifySimulationAdvanced(false);
+    }
     // Phase 5: the opaque scene renderers are no longer VkAppBase sub-renderers.
     for (auto* r : hdrRenderers_) r->onUpdate(frameIndex);
 }
@@ -1011,6 +1036,7 @@ void FluidApp::syncBackgroundCamera()
 
 void FluidApp::syncRigidRenderer()
 {
+    flameRenderer_.notifySimulationAdvanced(!world_.rigid().isRunning() && !flameWorld_.isRunning());
     auto wd = world_.rigid().buildWireData();
     rigidRenderer_.update(wd.positions, wd.colors, wd.indices,
                            fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
@@ -1022,6 +1048,7 @@ void FluidApp::syncRigidRenderer()
 
 void FluidApp::syncSoftRenderer()
 {
+    flameRenderer_.notifySimulationAdvanced(!softWorld_.isRunning());
     auto wd = softWorld_.buildWireData();
     softRenderer_.update(wd.positions, wd.colors, wd.indices,
                           fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
@@ -1224,6 +1251,7 @@ void FluidApp::syncFlameRenderer()
     shading.smokeShadowStrength = render.smokeShadowStrength;
     shading.smokeShadowAmbient = render.smokeShadowAmbient;
     shading.smokeFlameLight = render.smokeFlameLight;
+    shading.objectFlameLight = render.objectFlameLight;
     shading.smokeLightDirection = renderBackground_.lightDirection();
     shading.smokeLightRadiance = renderBackground_.lightColor() * renderBackground_.lightIntensity();
     shading.pbvrSubdivision = render.pbvrSubdivision;

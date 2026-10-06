@@ -91,6 +91,21 @@ bool FlamePBVRPass::create(const VulkanContext& ctx, const VulkanCommandPool& po
 	for (auto& target:lightShadow_) {
 		if (!target.create(ctx,256,256,VK_FORMAT_R32G32B32A32_SFLOAT,depthFormat_)) return false;
 	}
+	const std::vector<VkDescriptorSetLayoutBinding> lightBindings{
+		{0,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_FRAGMENT_BIT,nullptr},
+		{1,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_FRAGMENT_BIT,nullptr}};
+	objectLightLayout_.create(device,lightBindings);
+	objectLightPool_.create(device,{{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,2}},1);
+	const auto lightSets=objectLightPool_.allocateSets(device,{objectLightLayout_.get()});
+	if (lightSets.empty()) return false;
+	objectLightSet_=lightSets[0];
+	for (uint32_t h=0;h<2;++h) {
+		VkDescriptorImageInfo info{sampler_.get(),lightShadow_[h].getColorImageView(),VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+		VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+		write.dstSet=objectLightSet_; write.dstBinding=h; write.descriptorCount=1;
+		write.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; write.pImageInfo=&info;
+		vkUpdateDescriptorSets(device,1,&write,0,nullptr);
+	}
 
 	// ---- Graphics pipelines ---------------------------------------------------
 	FlamePointPipeline::Config pointCfg;
@@ -338,6 +353,7 @@ void FlamePBVRPass::destroy(const VulkanContext& ctx)
 	if (pointPipeline_) { pointPipeline_->destroy(device); pointPipeline_.reset(); }
 	if (emissivePipeline_) { emissivePipeline_->destroy(device); emissivePipeline_.reset(); }
 	if (shadowPipeline_) { shadowPipeline_->destroy(device); shadowPipeline_.reset(); }
+	objectLightPool_.destroy(device); objectLightLayout_.destroy(device); objectLightSet_=VK_NULL_HANDLE;
 	for (auto& target:lightShadow_) target.destroy(ctx);
 	blend_.destroy(device);
 	composite_.destroy(device);
@@ -400,7 +416,8 @@ void FlamePBVRPass::update(const VulkanContext& ctx, uint32_t frameIndex, const 
 	}
 	computeUbo_[frameIndex].write(&ubo, sizeof(ubo));
 	FlameLightSampler lights;
-	if (ubo.flameLightPosition.w>0.0f) {
+	objectLightGain_=ubo.surfaceLight.x;
+	if (ubo.flameLightPosition.w>0.0f || objectLightGain_>0.0f) {
 		for (uint32_t i=0;i<emissiveCount;++i) {
 			const float temperature=emissiveTemperature[i], radius=0.5f*emissiveSize[i];
 			const float radiance=FlameBlackbody::relativeRadiance(temperature,ubo.thermal.x,ubo.thermal.y)*ubo.thermal.z;
@@ -577,7 +594,12 @@ void FlamePBVRPass::record(VkCommandBuffer cmd, uint32_t frameIndex)
 				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 		}
 		ensemble_.beginRenderPass(cmd, { 0.0f, 0.0f, 0.0f, 0.0f }, 1.0f);
-		if (opaqueDraw_) opaqueDraw_(cmd,frameIndex);
+		if (opaqueDraw_) {
+			Gltf::GltfSampledLight light;
+			light.positionGain=glm::vec4(glm::vec3(ensembleUbo_[e].flameLightPosition),flameLightActive_?objectLightGain_:0.0f);
+			light.fluxRadius=ensembleUbo_[e].flameLightFlux;
+			opaqueDraw_(cmd,frameIndex,objectLightSet_,light);
+		}
 		pointPipeline_->renderIndirect(cmd, frameIndex*kMaxEnsembles+e, vbufs, args_.getBuffer(), e * sizeof(VkDrawIndirectCommand));
 		emissivePipeline_->render(cmd, frameIndex);
 		ensemble_.endRenderPass(cmd);
