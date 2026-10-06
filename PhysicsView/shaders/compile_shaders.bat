@@ -37,6 +37,8 @@ rem alpha-blended smoke, and the unified opaque PBVR pass. See FlameRenderer.
 "%VULKAN_SDK%\Bin\glslc.exe" flame_smoke.frag -o flame_smoke.frag.spv
 "%VULKAN_SDK%\Bin\glslc.exe" flame_pbvr_point.vert -o flame_pbvr_point.vert.spv
 "%VULKAN_SDK%\Bin\glslc.exe" flame_pbvr_point.frag -o flame_pbvr_point.frag.spv
+"%VULKAN_SDK%\Bin\glslc.exe" flame_pbvr_shadow.vert -o flame_pbvr_shadow.vert.spv || exit /b 1
+"%VULKAN_SDK%\Bin\glslc.exe" flame_pbvr_shadow.frag -o flame_pbvr_shadow.frag.spv || exit /b 1
 "%VULKAN_SDK%\Bin\glslc.exe" flame_pbvr_generate.comp -o flame_pbvr_generate.comp.spv
 "%VULKAN_SDK%\Bin\glslc.exe" flame_pbvr_finalize.comp -o flame_pbvr_finalize.comp.spv
 "%VULKAN_SDK%\Bin\glslc.exe" flame_fullscreen.vert -o flame_fullscreen.vert.spv

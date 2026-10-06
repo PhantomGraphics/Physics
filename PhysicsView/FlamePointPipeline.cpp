@@ -31,10 +31,16 @@ bool FlamePointPipeline::create(const VulkanContext& ctx, VkRenderPass renderPas
 	uboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	uboBinding.descriptorCount = 1;
 	uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-	descriptorSetLayout_.create(device, { uboBinding });
+	std::vector<VkDescriptorSetLayoutBinding> descriptorBindings{uboBinding};
+	if (config_.lightShadowImages) {
+		for (uint32_t b=1;b<=2;++b) descriptorBindings.push_back({b,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_FRAGMENT_BIT,nullptr});
+	}
+	descriptorSetLayout_.create(device, descriptorBindings);
 
 	VkDescriptorPoolSize poolSize{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, framesInFlight };
-	descriptorPool_.create(device, { poolSize }, framesInFlight);
+	std::vector<VkDescriptorPoolSize> poolSizes{poolSize};
+	if (config_.lightShadowImages) poolSizes.push_back({VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,framesInFlight*2});
+	descriptorPool_.create(device, poolSizes, framesInFlight);
 
 	std::vector<VkDescriptorSetLayout> layouts(framesInFlight, descriptorSetLayout_.get());
 	descriptorSets_ = descriptorPool_.allocateSets(device, layouts);
@@ -122,6 +128,22 @@ void FlamePointPipeline::uploadUniforms(uint32_t frameIndex, const FlamePointUBO
 {
 	if (frameIndex < uniformBuffers_.size()) {
 		uniformBuffers_[frameIndex].write(&ubo, sizeof(ubo));
+	}
+}
+
+void FlamePointPipeline::setLightShadowImages(VkDevice device, VkImageView front, VkImageView back, VkSampler sampler)
+{
+	if (!config_.lightShadowImages) return;
+	const VkDescriptorImageInfo images[]={{sampler,front,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+		{sampler,back,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
+	for (VkDescriptorSet set:descriptorSets_) {
+		VkWriteDescriptorSet writes[2]{};
+		for (uint32_t i=0;i<2;++i) {
+			writes[i].sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[i].dstSet=set; writes[i].dstBinding=i+1; writes[i].descriptorCount=1;
+			writes[i].descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; writes[i].pImageInfo=&images[i];
+		}
+		vkUpdateDescriptorSets(device,2,writes,0,nullptr);
 	}
 }
 

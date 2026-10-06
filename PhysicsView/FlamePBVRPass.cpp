@@ -1,4 +1,6 @@
 #include "FlamePBVRPass.h"
+#include "FlameBlackbody.h"
+#include <cfloat>
 
 #include "CGLib/VulkanGraphics/VulkanCommandPool.h"
 #include "CGLib/VulkanGraphics/VulkanContext.h"
@@ -31,6 +33,7 @@ struct GeneratePush {
 	uint32_t seedBase;
 	uint32_t capacity;
 	uint32_t maxPerSource;
+	uint32_t shadowMode;
 };
 
 struct FinalizePush {
@@ -85,6 +88,9 @@ bool FlamePBVRPass::create(const VulkanContext& ctx, const VulkanCommandPool& po
 	if (!createTargets(ctx, std::max(1u, width), std::max(1u, height))) {
 		return false;
 	}
+	for (auto& target:lightShadow_) {
+		if (!target.create(ctx,256,256,VK_FORMAT_R32G32B32A32_SFLOAT,depthFormat_)) return false;
+	}
 
 	// ---- Graphics pipelines ---------------------------------------------------
 	FlamePointPipeline::Config pointCfg;
@@ -93,10 +99,18 @@ bool FlamePBVRPass::create(const VulkanContext& ctx, const VulkanCommandPool& po
 	pointCfg.streamComponents = { 4, 4 }; // posSize, color (GPU-written)
 	pointCfg.blend = FlamePointPipeline::Blend::Opaque;
 	pointCfg.depthWrite = true;
+	pointCfg.lightShadowImages = true;
 	pointPipeline_.emplace(std::move(pointCfg));
-	if (!pointPipeline_->create(ctx, ensemble_.getRenderPass(), framesInFlight)) {
+	if (!pointPipeline_->create(ctx, ensemble_.getRenderPass(), framesInFlight*kMaxEnsembles)) {
 		return false;
 	}
+	pointPipeline_->setLightShadowImages(device,lightShadow_[0].getColorImageView(),lightShadow_[1].getColorImageView(),sampler_.get());
+	FlamePointPipeline::Config shadowCfg;
+	shadowCfg.vertSpv=shaders.shadowVert; shadowCfg.fragSpv=shaders.shadowFrag;
+	shadowCfg.streamComponents={4}; shadowCfg.blend=FlamePointPipeline::Blend::Opaque;
+	shadowCfg.depthWrite=true;
+	shadowPipeline_.emplace(std::move(shadowCfg));
+	if (!shadowPipeline_->create(ctx,lightShadow_[0].getRenderPass(),framesInFlight*kMaxEnsembles*2)) return false;
 
 	FlamePointPipeline::Config emitCfg;
 	emitCfg.vertSpv = shaders.emissiveVert;
@@ -135,7 +149,8 @@ bool FlamePBVRPass::create(const VulkanContext& ctx, const VulkanCommandPool& po
 	// ---- Buffers ----------------------------------------------------------------
 	const VkDeviceSize outBytes = VkDeviceSize(kMaxEnsembles) * kCapacityPerEnsemble * sizeof(float) * 4;
 	if (!outPos_.create(ctx, pool, outBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT) ||
-		!outColor_.create(ctx, pool, outBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)) {
+		!outColor_.create(ctx, pool, outBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT) ||
+		!shadowPos_.create(ctx,pool,outBytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)) {
 		return false;
 	}
 	const std::vector<uint32_t> zeros(kMaxEnsembles * 4, 0u);
@@ -144,15 +159,20 @@ bool FlamePBVRPass::create(const VulkanContext& ctx, const VulkanCommandPool& po
 			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, zeros.data())) {
 		return false;
 	}
+	if (!shadowArgs_.create(ctx,pool,kMaxEnsembles*sizeof(VkDrawIndirectCommand),
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,zeros.data())) return false;
 	sources_.init(framesInFlight, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 	computeUbo_.resize(framesInFlight);
 	genStats_.resize(framesInFlight);
+	shadowStats_.resize(framesInFlight);
 	for (uint32_t f = 0; f < framesInFlight; ++f) {
 		if (!computeUbo_[f].createMapped(ctx, sizeof(FlamePointUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) ||
-			!genStats_[f].createMapped(ctx, kMaxEnsembles * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)) {
+			!genStats_[f].createMapped(ctx, kMaxEnsembles * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) ||
+			!shadowStats_[f].createMapped(ctx,kMaxEnsembles*sizeof(uint32_t),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)) {
 			return false;
 		}
 		std::memset(genStats_[f].getMapped(), 0, kMaxEnsembles * sizeof(uint32_t));
+		std::memset(shadowStats_[f].getMapped(),0,kMaxEnsembles*sizeof(uint32_t));
 	}
 
 	// ---- Compute: generate ----------------------------------------------------
@@ -163,10 +183,11 @@ bool FlamePBVRPass::create(const VulkanContext& ctx, const VulkanCommandPool& po
 		binding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER),
 		binding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) });
 	genPool_.create(device, {
-		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, framesInFlight },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, framesInFlight * 4 } }, framesInFlight);
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, framesInFlight*2 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, framesInFlight * 8 } }, framesInFlight*2);
 	genSets_ = genPool_.allocateSets(device, std::vector<VkDescriptorSetLayout>(framesInFlight, genLayout_.get()));
-	if (genSets_.size() != framesInFlight) {
+	shadowGenSets_=genPool_.allocateSets(device,std::vector<VkDescriptorSetLayout>(framesInFlight,genLayout_.get()));
+	if (genSets_.size() != framesInFlight || shadowGenSets_.size()!=framesInFlight) {
 		return false;
 	}
 	genBoundSources_.assign(framesInFlight, VK_NULL_HANDLE);
@@ -176,6 +197,10 @@ bool FlamePBVRPass::create(const VulkanContext& ctx, const VulkanCommandPool& po
 		writeBuffer(device, genSets_[f], 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, outPos_.getBuffer());
 		writeBuffer(device, genSets_[f], 3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, outColor_.getBuffer());
 		writeBuffer(device, genSets_[f], 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, counters_.getBuffer());
+		writeBuffer(device,shadowGenSets_[f],0,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,computeUbo_[f].getBuffer());
+		writeBuffer(device,shadowGenSets_[f],2,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,shadowPos_.getBuffer());
+		writeBuffer(device,shadowGenSets_[f],3,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,outColor_.getBuffer()); // unused by shadow mode
+		writeBuffer(device,shadowGenSets_[f],4,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,counters_.getBuffer());
 	}
 	ComputePipelineConfig genCfg;
 	genCfg.compSpv = shaders.generateComp;
@@ -190,15 +215,19 @@ bool FlamePBVRPass::create(const VulkanContext& ctx, const VulkanCommandPool& po
 		binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER),
 		binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER),
 		binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) });
-	finPool_.create(device, { { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, framesInFlight * 3 } }, framesInFlight);
+	finPool_.create(device, { { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, framesInFlight * 6 } }, framesInFlight*2);
 	finSets_ = finPool_.allocateSets(device, std::vector<VkDescriptorSetLayout>(framesInFlight, finLayout_.get()));
-	if (finSets_.size() != framesInFlight) {
+	shadowFinSets_=finPool_.allocateSets(device,std::vector<VkDescriptorSetLayout>(framesInFlight,finLayout_.get()));
+	if (finSets_.size() != framesInFlight || shadowFinSets_.size()!=framesInFlight) {
 		return false;
 	}
 	for (uint32_t f = 0; f < framesInFlight; ++f) {
 		writeBuffer(device, finSets_[f], 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, counters_.getBuffer());
 		writeBuffer(device, finSets_[f], 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, args_.getBuffer());
 		writeBuffer(device, finSets_[f], 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, genStats_[f].getBuffer());
+		writeBuffer(device,shadowFinSets_[f],0,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,counters_.getBuffer());
+		writeBuffer(device,shadowFinSets_[f],1,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,shadowArgs_.getBuffer());
+		writeBuffer(device,shadowFinSets_[f],2,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,shadowStats_[f].getBuffer());
 	}
 	ComputePipelineConfig finCfg;
 	finCfg.compSpv = shaders.finalizeComp;
@@ -293,17 +322,23 @@ void FlamePBVRPass::destroy(const VulkanContext& ctx)
 	finLayout_.destroy(device);
 	genSets_.clear();
 	finSets_.clear();
+	shadowGenSets_.clear(); shadowFinSets_.clear();
 	for (auto& b : computeUbo_) b.destroy(device);
 	for (auto& b : genStats_) b.destroy(device);
+	for (auto& b:shadowStats_) b.destroy(device);
 	computeUbo_.clear();
 	genStats_.clear();
+	shadowStats_.clear();
 	sources_.destroy();
 	outPos_.destroy(device);
 	outColor_.destroy(device);
 	counters_.destroy(device);
 	args_.destroy(device);
+	shadowPos_.destroy(device); shadowArgs_.destroy(device);
 	if (pointPipeline_) { pointPipeline_->destroy(device); pointPipeline_.reset(); }
 	if (emissivePipeline_) { emissivePipeline_->destroy(device); emissivePipeline_.reset(); }
+	if (shadowPipeline_) { shadowPipeline_->destroy(device); shadowPipeline_.reset(); }
+	for (auto& target:lightShadow_) target.destroy(ctx);
 	blend_.destroy(device);
 	composite_.destroy(device);
 	destroyTargets(ctx);
@@ -340,6 +375,13 @@ void FlamePBVRPass::update(const VulkanContext& ctx, uint32_t frameIndex, const 
 		}
 		stats_.generated = total;
 		stats_.overflowed = over;
+		vmaInvalidateAllocation(ctx.getAllocator(),shadowStats_[frameIndex].getVmaAllocation(),0,VK_WHOLE_SIZE);
+		const auto* shadowGen=static_cast<const uint32_t*>(shadowStats_[frameIndex].getMapped());
+		total=0; over=0;
+		for (uint32_t e=0;e<ensemblesRecorded_[frameIndex];++e) {
+			total+=shadowGen[e]; over+=shadowGen[e]>kCapacityPerEnsemble?shadowGen[e]-kCapacityPerEnsemble:0;
+		}
+		stats_.shadowGenerated=total; stats_.shadowOverflowed=over;
 	}
 
 	// ---- Upload this frame's inputs --------------------------------------------
@@ -353,10 +395,40 @@ void FlamePBVRPass::update(const VulkanContext& ctx, uint32_t frameIndex, const 
 			genBoundSources_[frameIndex] = sources_.get(frameIndex);
 			writeBuffer(ctx.getDevice(), genSets_[frameIndex], 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 				genBoundSources_[frameIndex]);
+			writeBuffer(ctx.getDevice(),shadowGenSets_[frameIndex],1,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,genBoundSources_[frameIndex]);
 		}
 	}
 	computeUbo_[frameIndex].write(&ubo, sizeof(ubo));
-	pointPipeline_->uploadUniforms(frameIndex, ubo);
+	FlameLightSampler lights;
+	if (ubo.flameLightPosition.w>0.0f) {
+		for (uint32_t i=0;i<emissiveCount;++i) {
+			const float temperature=emissiveTemperature[i], radius=0.5f*emissiveSize[i];
+			const float radiance=FlameBlackbody::relativeRadiance(temperature,ubo.thermal.x,ubo.thermal.y)*ubo.thermal.z;
+			const float u=std::clamp((temperature-ubo.lutRange.x)/(ubo.lutRange.y-ubo.lutRange.x),0.0f,1.0f)*(FlamePointUBO::kLutSize-1);
+			const int first=static_cast<int>(u),second=std::min(first+1,FlamePointUBO::kLutSize-1);
+			const glm::vec3 color=glm::mix(glm::vec3(ubo.lut[first]),glm::vec3(ubo.lut[second]),u-first);
+			lights.add({glm::vec3(emissivePos[i*3],emissivePos[i*3+1],emissivePos[i*3+2]),
+				color*radiance*(3.14159265f*radius*radius),radius});
+		}
+	}
+	flameLightActive_=!lights.empty();
+	for (uint32_t e=0;e<kMaxEnsembles;++e) {
+		auto& lightUbo=ensembleUbo_[e]; lightUbo=ubo;
+		const auto light=lights.sample(FlameLightSampler::uniform(seed_^0x63D83595u^(e*0x9E3779B9u)));
+		lightUbo.flameLightPosition=glm::vec4(light.position,flameLightActive_?ubo.flameLightPosition.w:0.0f);
+		lightUbo.flameLightFlux=glm::vec4(light.flux,light.radius);
+		float farDistance=1.0f;
+		for (size_t i=0;i<sourceCount_;++i) {
+			const float* source=&absorbing[i*8];
+			farDistance=std::max(farDistance,glm::length(glm::vec3(source[0],source[1],source[2])-light.position)+source[3]);
+		}
+		lightUbo.flameShadow.x=farDistance;
+		pointPipeline_->uploadUniforms(frameIndex*kMaxEnsembles+e,lightUbo);
+		for (uint32_t h=0;h<2;++h) {
+			FlamePointUBO shadowUbo=lightUbo; shadowUbo.flameShadow.z=h==0?1.0f:-1.0f;
+			shadowPipeline_->uploadUniforms((frameIndex*kMaxEnsembles+e)*2+h,shadowUbo);
+		}
+	}
 	emissivePipeline_->upload(ctx, frameIndex, emissiveCount, { emissivePos, emissiveTemperature, emissiveSize }, ubo);
 
 	// ---- History / ensemble-count policy ---------------------------------------
@@ -413,6 +485,12 @@ void FlamePBVRPass::record(VkCommandBuffer cmd, uint32_t frameIndex)
 		}
 		historyNeedsInit_ = false;
 	}
+	if (lightShadowNeedsInit_) {
+		for (auto& target:lightShadow_) {
+			target.beginRenderPass(cmd,{FLT_MAX,0,0,1},1.0f); target.endRenderPass(cmd);
+		}
+		lightShadowNeedsInit_=false;
+	}
 	ensemblesRecorded_[frameIndex] = pendingR_;
 	if (pendingR_ == 0) {
 		stats_.displayedEnsembles = std::min(samples_, sampleCap_);
@@ -436,13 +514,12 @@ void FlamePBVRPass::record(VkCommandBuffer cmd, uint32_t frameIndex)
 		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, genPipeline_.getPipeline());
 		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, genPipeline_.getLayout(), 0, 1,
 			&genSets_[frameIndex], 0, nullptr);
-		const GeneratePush push{ sourceCount_, r, seed_, kCapacityPerEnsemble, std::max(1u, settings_.maxPerSource) };
+		const GeneratePush push{ sourceCount_, r, seed_, kCapacityPerEnsemble, std::max(1u, settings_.maxPerSource),0 };
 		vkCmdPushConstants(cmd, genPipeline_.getLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(push), &push);
 		vkCmdDispatch(cmd, (sourceCount_ + kGenerateLocalSize - 1) / kGenerateLocalSize, r, 1);
 		memoryBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 	}
-	seed_ += kMaxEnsembles; // every frame draws fresh, independent ensembles
 
 	// Always finalize (zero-count args when there were no sources) -- it also
 	// resets the counters for the next frame.
@@ -456,8 +533,41 @@ void FlamePBVRPass::record(VkCommandBuffer cmd, uint32_t frameIndex)
 		VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_HOST_BIT,
 		VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_HOST_READ_BIT);
 
+	// A second, independent Poisson realization for illumination. It does not
+	// cull behind the viewer or use camera-dependent subdivision. Camera colours
+	// stay untouched; only the light-space position buffer and indirect args differ.
+	memoryBarrier(cmd,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_ACCESS_SHADER_WRITE_BIT,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+	if (flameLightActive_ && sourceCount_>0 && genBoundSources_[frameIndex]!=VK_NULL_HANDLE) {
+		vkCmdBindPipeline(cmd,VK_PIPELINE_BIND_POINT_COMPUTE,genPipeline_.getPipeline());
+		vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_COMPUTE,genPipeline_.getLayout(),0,1,&shadowGenSets_[frameIndex],0,nullptr);
+		const GeneratePush push{sourceCount_,r,seed_,kCapacityPerEnsemble,std::max(1u,settings_.maxPerSource),1};
+		vkCmdPushConstants(cmd,genPipeline_.getLayout(),VK_SHADER_STAGE_COMPUTE_BIT,0,sizeof(push),&push);
+		vkCmdDispatch(cmd,(sourceCount_+kGenerateLocalSize-1)/kGenerateLocalSize,r,1);
+		memoryBarrier(cmd,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_ACCESS_SHADER_WRITE_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+	}
+	vkCmdBindPipeline(cmd,VK_PIPELINE_BIND_POINT_COMPUTE,finPipeline_.getPipeline());
+	vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_COMPUTE,finPipeline_.getLayout(),0,1,&shadowFinSets_[frameIndex],0,nullptr);
+	vkCmdPushConstants(cmd,finPipeline_.getLayout(),VK_SHADER_STAGE_COMPUTE_BIT,0,sizeof(fpush),&fpush);
+	vkCmdDispatch(cmd,1,1,1);
+	memoryBarrier(cmd,VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,VK_ACCESS_SHADER_WRITE_BIT,
+		VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_HOST_BIT,
+		VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_HOST_READ_BIT);
+	seed_ += kMaxEnsembles;
+
 	const std::vector<VkBuffer> vbufs = { outPos_.getBuffer(), outColor_.getBuffer() };
 	for (uint32_t e = 0; e < r; ++e) {
+		if (flameLightActive_) {
+			for (uint32_t h=0;h<2;++h) {
+				memoryBarrier(cmd,VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+					VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+				lightShadow_[h].beginRenderPass(cmd,{FLT_MAX,0,0,1},1.0f);
+				shadowPipeline_->renderIndirect(cmd,(frameIndex*kMaxEnsembles+e)*2+h,{shadowPos_.getBuffer()},
+					shadowArgs_.getBuffer(),e*sizeof(VkDrawIndirectCommand));
+				lightShadow_[h].endRenderPass(cmd);
+			}
+		}
 		if (e > 0) {
 			// The render passes' external dependencies order colour attachment
 			// vs. sampling; this adds the depth WAW between consecutive clears.
@@ -468,7 +578,7 @@ void FlamePBVRPass::record(VkCommandBuffer cmd, uint32_t frameIndex)
 		}
 		ensemble_.beginRenderPass(cmd, { 0.0f, 0.0f, 0.0f, 0.0f }, 1.0f);
 		if (opaqueDraw_) opaqueDraw_(cmd,frameIndex);
-		pointPipeline_->renderIndirect(cmd, frameIndex, vbufs, args_.getBuffer(), e * sizeof(VkDrawIndirectCommand));
+		pointPipeline_->renderIndirect(cmd, frameIndex*kMaxEnsembles+e, vbufs, args_.getBuffer(), e * sizeof(VkDrawIndirectCommand));
 		emissivePipeline_->render(cmd, frameIndex);
 		ensemble_.endRenderPass(cmd);
 

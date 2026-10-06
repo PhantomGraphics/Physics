@@ -54,6 +54,10 @@
                       "command":  "SetFlameRenderParam:smokeGlow,0"
                   },
                   {
+                      "command":  "SetFlameRenderParam:smokeFlameLight,0",
+                      "expect":  "OK"
+                  },
+                  {
                       "expect":  "OK",
                       "command":  "SetFlameRenderParam:smokeAlbedo,0.2"
                   },

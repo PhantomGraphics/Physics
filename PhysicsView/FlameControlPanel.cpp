@@ -149,10 +149,12 @@ void FlameControlPanel::drawContents()
         if (render.pbvrMode) {
             Im::sliderFloat("Smoke Self Shadow", render.smokeShadowStrength, 0.0f, 4.0f);
             Im::sliderFloat("Smoke Shadow Fill", render.smokeShadowAmbient, 0.0f, 1.0f);
+            Im::sliderFloat("Smoke Flame Light", render.smokeFlameLight, 0.0f, 20.0f);
             const auto& st = pbvrStats_ ? pbvrStats_() : FlamePBVRPass::Stats{};
             Im::text("Ensembles: %u shown, %u this frame, %.2f ms GPU",
                      st.displayedEnsembles, st.ensemblesThisFrame, st.gpuMs);
             Im::text("Sub-particles: %u (%u dropped)", st.generated, st.overflowed);
+            Im::text("Light-space particles: %u (%u dropped)", st.shadowGenerated, st.shadowOverflowed);
             Im::checkbox("Adaptive R (GPU budget)", render.pbvrAdaptive);
             if (render.pbvrAdaptive) {
                 Im::sliderFloat("GPU Budget (ms)", render.pbvrBudgetMs, 1.0f, 33.0f);

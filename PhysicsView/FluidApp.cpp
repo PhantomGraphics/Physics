@@ -365,6 +365,8 @@ void FluidApp::onInit()
         fs.pbvr.compositeFrag  = ::VKG::loadSPVRepo("shaders/flame_pbvr_composite.frag.spv");
         fs.pbvr.generateComp   = ::VKG::loadSPVRepo("shaders/flame_pbvr_generate.comp.spv");
         fs.pbvr.finalizeComp   = ::VKG::loadSPVRepo("shaders/flame_pbvr_finalize.comp.spv");
+        fs.pbvr.shadowVert     = ::VKG::loadSPVRepo("shaders/flame_pbvr_shadow.vert.spv");
+        fs.pbvr.shadowFrag     = ::VKG::loadSPVRepo("shaders/flame_pbvr_shadow.frag.spv");
         fs.haze.fieldVert      = ::VKG::loadSPVRepo("shaders/flame_haze_field.vert.spv");
         fs.haze.fieldFrag      = ::VKG::loadSPVRepo("shaders/flame_haze_field.frag.spv");
         fs.haze.fullscreenVert = fs.pbvr.fullscreenVert;
@@ -1221,6 +1223,7 @@ void FluidApp::syncFlameRenderer()
     shading.smokeAlbedo = glm::vec3(render.smokeAlbedo);
     shading.smokeShadowStrength = render.smokeShadowStrength;
     shading.smokeShadowAmbient = render.smokeShadowAmbient;
+    shading.smokeFlameLight = render.smokeFlameLight;
     shading.smokeLightDirection = renderBackground_.lightDirection();
     shading.smokeLightRadiance = renderBackground_.lightColor() * renderBackground_.lightIntensity();
     shading.pbvrSubdivision = render.pbvrSubdivision;

@@ -39,6 +39,9 @@ struct FlamePointUBO {
 	glm::vec4 lut[kLutSize]{};
 	glm::vec4 smokeShadow{ 0.0f, 1.0f, 0.0f, 0.0f }; ///< to light, strength (0 = off)
 	glm::vec4 smokeShadowLight{ 1.0f, 1.0f, 1.0f, 0.25f }; ///< radiance, ambient fill fraction
+	glm::vec4 flameLightPosition{ 0.0f }; ///< xyz=sampled fire light, w=illumination gain (0=off)
+	glm::vec4 flameLightFlux{ 0.0f }; ///< rgb=flux/probability, w=finite source radius
+	glm::vec4 flameShadow{ 1.0f, 256.0f, 1.0f, 4.0f }; ///< far distance, map size, hemisphere sign, shadow subdivision
 };
 
 /**
@@ -69,6 +72,7 @@ public:
 		bool depthTest = true;
 		bool depthWrite = false;
 		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+		bool lightShadowImages = false; ///< two sampled paraboloid shadow images (PBVR receiver only)
 	};
 
 	explicit FlamePointPipeline(Config config) : config_(std::move(config)) {}
@@ -88,6 +92,7 @@ public:
 
 	/** @brief Writes only frame slot frameIndex's UBO (for renderIndirect() users). */
 	void uploadUniforms(uint32_t frameIndex, const FlamePointUBO& ubo);
+	void setLightShadowImages(VkDevice device, VkImageView front, VkImageView back, VkSampler sampler);
 
 	/**
 	 * @brief Draws from caller-owned vertex buffers (one per stream binding)
