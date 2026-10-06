@@ -37,6 +37,8 @@ public:
     explicit RigidBodyControlPanel(RigidBodyWorld* w);
 
     void setOnWorldChanged(std::function<void()> fn) { onWorldChanged_ = std::move(fn); }
+    // Parameter edits are issued as commands when a sink is set (see ControlPanel::setCommandSink).
+    void setCommandSink(std::function<void(const std::string&)> fn) { sink_ = std::move(fn); }
     void setVisible(bool visible) { visible_ = visible; }
     bool isVisible() const { return visible_; }
 
@@ -46,6 +48,8 @@ public:
 private:
     RigidBodyWorld*  world_ = nullptr;
     std::function<void()> onWorldChanged_;
+    std::function<void(const std::string&)> sink_;
+    void issue(const std::string& cmd, const std::function<void()>& direct) { if (sink_) sink_(cmd); else direct(); }
     bool visible_ = true;
 
     bool uiBuilt_ = false;

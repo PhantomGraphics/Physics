@@ -10,6 +10,17 @@ namespace Phantom {
 // Math::Vector3df is glm::vec<3,float> (CGLib/Math/Vector3d.h), so
 // Vector3dView values interoperate with glm::vec3 directly.
 
+namespace {
+std::string fmtF(float v) {
+    char buf[40];
+    std::snprintf(buf, sizeof(buf), "%.9g", v);
+    return buf;
+}
+const char* modeName(BodyRenderMode m) {
+    return m == BodyRenderMode::Shaded ? "shaded" : m == BodyRenderMode::Both ? "both" : "wire";
+}
+}
+
 void RenderingPanel::init() { buildUi(); }
 
 std::string RenderingPanel::backgroundStatusText() const {
@@ -40,10 +51,12 @@ void RenderingPanel::buildUi() {
     uiBuilt_ = true;
 
     loadBtn_.setFunction([this] {
-        if (bg_) bg_->loadBackground(bgPathInput_.getValue());
+        if (sink_) emit("LoadRenderBackground:" + bgPathInput_.getValue());
+        else if (bg_) bg_->loadBackground(bgPathInput_.getValue());
     });
     clearBtn_.setFunction([this] {
-        if (bg_) bg_->clearBackground();
+        if (sink_) emit("ClearRenderBackground");
+        else if (bg_) bg_->clearBackground();
     });
 
     // pos/rot/scale are pushed together in drawContents(); the slider still needs
@@ -52,15 +65,23 @@ void RenderingPanel::buildUi() {
                   [](float) {});
 
     setEnvBtn_.setFunction([this] {
-        if (bg_) bg_->setEnvironment(envDirInput_.getValue());
+        if (sink_) emit("SetEnvironment:" + envDirInput_.getValue());
+        else if (bg_) bg_->setEnvironment(envDirInput_.getValue());
     });
     clearEnvBtn_.setFunction([this] {
-        if (bg_) bg_->clearEnvironment();
+        if (sink_) emit("ClearRenderEnvironment");
+        else if (bg_) bg_->clearEnvironment();
     });
     useIblCheck_.bind([this] { return bg_ && bg_->useIBL(); },
-                      [this](bool v) { if (bg_) bg_->setUseIBL(v); });
+                      [this](bool v) {
+                          if (sink_) emit(std::string("SetRenderUseIBL:") + (v ? "1" : "0"));
+                          else if (bg_) bg_->setUseIBL(v);
+                      });
     shadowCheck_.bind([this] { return bg_ && bg_->castShadows(); },
-                      [this](bool v) { if (bg_) bg_->setCastShadows(v); });
+                      [this](bool v) {
+                          if (sink_) emit(std::string("SetShadowEnabled:") + (v ? "1" : "0"));
+                          else if (bg_) bg_->setCastShadows(v);
+                      });
 
     lightInt_.bind([this] { return bg_ ? bg_->lightIntensity() : 3.f; },
                    [](float) {}); // pushed with dir/color in drawContents()
@@ -73,14 +94,16 @@ void RenderingPanel::buildUi() {
     rigidModeCombo_.bind(
         [this] { return rigidBody_ ? static_cast<int>(rigidBody_->mode()) : 0; },
         [this](int v) {
-            if (rigidBody_) rigidBody_->setMode(static_cast<BodyRenderMode>(v));
+            if (sink_) emit(std::string("SetRigidRenderMode:") + modeName(static_cast<BodyRenderMode>(v)));
+            else if (rigidBody_) rigidBody_->setMode(static_cast<BodyRenderMode>(v));
         });
     rigidModeCombo_.setVisibleWhen([this] { return rigidBody_ != nullptr; });
     rigidStatus_.setVisibleWhen([this] { return rigidBody_ != nullptr; });
     softModeCombo_.bind(
         [this] { return softBody_ ? static_cast<int>(softBody_->mode()) : 0; },
         [this](int v) {
-            if (softBody_) softBody_->setMode(static_cast<BodyRenderMode>(v));
+            if (sink_) emit(std::string("SetSoftRenderMode:") + modeName(static_cast<BodyRenderMode>(v)));
+            else if (softBody_) softBody_->setMode(static_cast<BodyRenderMode>(v));
         });
     softModeCombo_.setVisibleWhen([this] { return softBody_ != nullptr; });
     softStatus_.setVisibleWhen([this] { return softBody_ != nullptr; });
@@ -123,6 +146,10 @@ void RenderingPanel::drawContents() {
         seeded_ = true;
         bgPathInput_.setValue(bg_->backgroundPath());
         envDirInput_.setValue(bg_->environmentDir());
+    }
+    // Transform / light: the render state is the source of truth. Seed the widgets from it
+    // each frame, then turn an edit (a widget that no longer equals the state) into a command.
+    if (bg_) {
         xfPos_.setValue(bg_->transformPosition());
         xfRot_.setValue(bg_->transformRotationDeg());
         xfScale_.setValue(bg_->transformScale());
@@ -133,10 +160,24 @@ void RenderingPanel::drawContents() {
 
     contents_.show();
 
-    // Push the value-editable knobs every frame (cheap stores, no Vulkan work).
     if (bg_) {
-        bg_->setTransform(xfPos_.getValue(), xfRot_.getValue(), xfScale_.getValue());
-        bg_->setLight(lightDir_.getValue(), lightColor_.getValue(), lightInt_.getValue());
+        const auto pos = xfPos_.getValue();
+        const auto rot = xfRot_.getValue();
+        const float sc = xfScale_.getValue();
+        const auto dir = lightDir_.getValue();
+        const auto col = lightColor_.getValue();
+        const float inten = lightInt_.getValue();
+        if (!sink_) {
+            bg_->setTransform(pos, rot, sc);
+            bg_->setLight(dir, col, inten);
+        } else {
+            if (pos != bg_->transformPosition() || rot != bg_->transformRotationDeg() || sc != bg_->transformScale())
+                emit("SetRenderBackgroundTransform:" + fmtF(pos.x) + "," + fmtF(pos.y) + "," + fmtF(pos.z) + "," +
+                     fmtF(rot.x) + "," + fmtF(rot.y) + "," + fmtF(rot.z) + "," + fmtF(sc));
+            if (dir != bg_->lightDirection() || col != bg_->lightColor() || inten != bg_->lightIntensity())
+                emit("SetLight:" + fmtF(dir.x) + "," + fmtF(dir.y) + "," + fmtF(dir.z) + "," +
+                     fmtF(col.x) + "," + fmtF(col.y) + "," + fmtF(col.z) + "," + fmtF(inten));
+        }
     }
 }
 

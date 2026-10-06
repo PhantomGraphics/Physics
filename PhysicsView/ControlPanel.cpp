@@ -8,6 +8,28 @@ ControlPanel::ControlPanel(FluidWorld* world) : world_(world)
     buildUi();
 }
 
+namespace {
+std::string fmtF(float v)
+{
+    char buf[40];
+    std::snprintf(buf, sizeof(buf), "%.9g", v);
+    return buf;
+}
+}
+
+void ControlPanel::issueFloat(const char* name, float v, const std::function<void()>& direct)
+{
+    issue(std::string(name) + ":" + fmtF(v), direct);
+}
+
+void ControlPanel::issueBox(const char* name, const Math::Box3df& b, const std::function<void()>& direct)
+{
+    const auto mn = b.getMin();
+    const auto mx = b.getMax();
+    issue(std::string(name) + ":" + fmtF(mn.x) + ":" + fmtF(mn.y) + ":" + fmtF(mn.z) + ":"
+              + fmtF(mx.x) + ":" + fmtF(mx.y) + ":" + fmtF(mx.z), direct);
+}
+
 void ControlPanel::buildUi()
 {
     if (uiBuilt_) return;
@@ -30,7 +52,7 @@ void ControlPanel::buildUi()
         });
 
     timeStepView_.bind([this] { return p().timeStep; },
-                       [this](float v) { p().timeStep = v; });
+                       [this](float v) { issueFloat("SetFluidTimeStep", v, [&] { p().timeStep = v; }); });
 
     runButton_.setFunction([this] { world_->setRunning(!world_->isRunning()); });
     stepButton_.setFunction([this] { world_->step(); notifyWorldChanged(); });
@@ -51,18 +73,18 @@ void ControlPanel::buildUi()
 
     // ---- Material -------------------------------------------------
     densityView_.bind([this] { return p().density; },
-                      [this](float v) { p().density = v; });
+                      [this](float v) { issueFloat("SetFluidDensity", v, [&] { p().density = v; }); });
     viscosityView_.bind([this] { return p().viscosity; },
-                        [this](float v) { p().viscosity = v; });
+                        [this](float v) { issueFloat("SetFluidViscosity", v, [&] { p().viscosity = v; }); });
     pressureCoeScaleView_.bind([this] { return p().pressureCoeScale; },
-                               [this](float v) { p().pressureCoeScale = v; });
+                               [this](float v) { issueFloat("SetFluidPressureCoeScale", v, [&] { p().pressureCoeScale = v; }); });
     stiffnessView_.bind([this] { return p().stiffness; },
-                        [this](float v) { p().stiffness = v; });
+                        [this](float v) { issueFloat("SetFluidStiffness", v, [&] { p().stiffness = v; }); });
     pressureCoeScaleView_.setVisibleWhen([this] { return isWCSPH() || isDFSPH(); });
     stiffnessView_.setVisibleWhen([this] { return !(isWCSPH() || isDFSPH()); });
 
     tensionSlider_.bind([this] { return p().tension; },
-                        [this](float v) { p().tension = v; });
+                        [this](float v) { issueFloat("SetFluidTension", v, [&] { p().tension = v; }); });
     tensionScope_.setDisabledWhen([this] { return !isWCSPH(); });
     tensionScope_.setTooltip([this]() -> std::string {
         return isWCSPH() ? std::string{}
@@ -78,11 +100,11 @@ void ControlPanel::buildUi()
 
     // ---- Initial Region ----------------------------------------
     radiusView_.bind([this] { return p().radius; },
-                     [this](float v) { p().radius = v; });
+                     [this](float v) { issueFloat("SetFluidRadius", v, [&] { p().radius = v; }); });
     effectLenView_.bind([this] { return p().effectLength; },
-                        [this](float v) { p().effectLength = v; });
+                        [this](float v) { issueFloat("SetFluidEffectLength", v, [&] { p().effectLength = v; }); });
     fluidBoundsView_.bind([this] { return p().fluidBounds; },
-                          [this](const Math::Box3df& b) { p().fluidBounds = b; });
+                          [this](const Math::Box3df& b) { issueBox("SetFluidBounds", b, [&] { p().fluidBounds = b; }); });
     fluidBoundsScope_.add(&fluidBoundsView_);
 
     initialRegionSection_.add(&appliedOnResetLabel_);
@@ -92,11 +114,11 @@ void ControlPanel::buildUi()
 
     // ---- Boundaries -------------------------------------------
     boundaryView_.bind([this] { return p().boundary; },
-                       [this](const Math::Box3df& b) { p().boundary = b; });
+                       [this](const Math::Box3df& b) { issueBox("SetFluidBoundary", b, [&] { p().boundary = b; }); });
     boundaryScope_.add(&boundaryView_);
 
     boundaryDampingSlider_.bind([this] { return p().boundaryDampingRatio; },
-                                [this](float v) { p().boundaryDampingRatio = v; });
+                                [this](float v) { issueFloat("SetFluidBoundaryDamping", v, [&] { p().boundaryDampingRatio = v; }); });
     boundaryDampingScope_.setDisabledWhen([this] { return !(isWCSPH() || isDFSPH()); });
     boundaryDampingScope_.setTooltip([this]() -> std::string {
         return (isWCSPH() || isDFSPH())
@@ -163,21 +185,21 @@ void ControlPanel::buildUi()
 
     // ---- White Water ------------------------------------
     sprayVelThresholdSlider_.bind([this] { return ww().sprayVelThreshold; },
-                                  [this](float v) { ww().sprayVelThreshold = v; });
+                                  [this](float v) { issue("SetWhiteWaterParam:sprayVelThreshold," + fmtF(v), [&] { ww().sprayVelThreshold = v; }); });
     sprayDensityRatioSlider_.bind([this] { return ww().sprayDensityRatio; },
-                                  [this](float v) { ww().sprayDensityRatio = v; });
+                                  [this](float v) { issue("SetWhiteWaterParam:sprayDensityRatio," + fmtF(v), [&] { ww().sprayDensityRatio = v; }); });
     foamCurvThresholdSlider_.bind([this] { return ww().foamCurvThreshold; },
-                                  [this](float v) { ww().foamCurvThreshold = v; });
+                                  [this](float v) { issue("SetWhiteWaterParam:foamCurvThreshold," + fmtF(v), [&] { ww().foamCurvThreshold = v; }); });
     foamNeighborCountSlider_.bind([this] { return ww().foamNeighborCount; },
-                                  [this](float v) { ww().foamNeighborCount = v; });
+                                  [this](float v) { issue("SetWhiteWaterParam:foamNeighborCount," + fmtF(v), [&] { ww().foamNeighborCount = v; }); });
     maxSprayParticlesSlider_.bind([this] { return ww().maxSprayParticles; },
-                                  [this](int v) { ww().maxSprayParticles = v; });
+                                  [this](int v) { issue("SetWhiteWaterParam:maxSprayParticles," + std::to_string(v), [&] { ww().maxSprayParticles = v; }); });
     maxFoamParticlesSlider_.bind([this] { return ww().maxFoamParticles; },
-                                 [this](int v) { ww().maxFoamParticles = v; });
+                                 [this](int v) { issue("SetWhiteWaterParam:maxFoamParticles," + std::to_string(v), [&] { ww().maxFoamParticles = v; }); });
     foamBuoyancySlider_.bind([this] { return ww().foamBuoyancy; },
-                             [this](float v) { ww().foamBuoyancy = v; });
+                             [this](float v) { issue("SetWhiteWaterParam:foamBuoyancy," + fmtF(v), [&] { ww().foamBuoyancy = v; }); });
     foamDragSlider_.bind([this] { return ww().foamDrag; },
-                         [this](float v) { ww().foamDrag = v; });
+                         [this](float v) { issue("SetWhiteWaterParam:foamDrag," + fmtF(v), [&] { ww().foamDrag = v; }); });
 
     whiteWaterSection_.add(&sprayVelThresholdSlider_);
     whiteWaterSection_.add(&sprayDensityRatioSlider_);

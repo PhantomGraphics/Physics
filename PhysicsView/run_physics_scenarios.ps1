@@ -48,6 +48,12 @@ if (-not $List -and -not (Test-Path $exe)) {
     exit 1
 }
 
+# Static catalog/routing/scenario consistency (the in-app CheckCommandCatalog probe is unsafe here)
+if (-not $List) {
+    & (Join-Path $scriptDir "check_command_catalog.ps1")
+    if ($LASTEXITCODE -ne 0) { Write-Host "ERROR: command catalog is inconsistent"; exit 1 }
+}
+
 $allFiles = Get-ChildItem "$scenDir\*.json" | Sort-Object Name
 if ($allFiles.Count -eq 0) {
     Write-Host "ERROR: No scenario JSON files found in $scenDir"

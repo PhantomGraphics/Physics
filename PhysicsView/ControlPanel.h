@@ -47,6 +47,10 @@ public:
     explicit ControlPanel(FluidWorld* world);
 
     void setOnWorldChanged(std::function<void()> fn) { onWorldChanged_ = std::move(fn); }
+    // Parameter edits are issued as commands (CommandDispatcher::submitUi) when a sink is set,
+    // so the GUI, the Command window and scenarios share one path. Without a sink the
+    // widgets write the world directly.
+    void setCommandSink(std::function<void(const std::string&)> fn) { sink_ = std::move(fn); }
     void setVisible(bool visible) { visible_ = visible; }
     bool isVisible() const { return visible_; }
 
@@ -56,7 +60,11 @@ public:
 private:
     FluidWorld* world_ = nullptr;
     std::function<void()> onWorldChanged_;
+    std::function<void(const std::string&)> sink_;
     bool visible_ = true;
+    void issue(const std::string& cmd, const std::function<void()>& direct) { if (sink_) sink_(cmd); else direct(); }
+    void issueFloat(const char* name, float v, const std::function<void()>& direct);
+    void issueBox(const char* name, const Math::Box3df& b, const std::function<void()>& direct);
 
     bool uiBuilt_ = false;
     void buildUi();

@@ -25,6 +25,15 @@ SoftBodyControlPanel::SoftBodyControlPanel(SoftBodyWorld* w) : world_(w)
     buildUi();
 }
 
+namespace {
+std::string fmtF(float v)
+{
+    char buf[40];
+    std::snprintf(buf, sizeof(buf), "%.9g", v);
+    return buf;
+}
+}
+
 void SoftBodyControlPanel::buildUi()
 {
     if (uiBuilt_) return;
@@ -59,13 +68,13 @@ void SoftBodyControlPanel::buildUi()
 
     // --- Solver (XPBDSolver::Params, applied live per step) ---------
     timeStepView_.bind([this] { return world_->getWorld().solverParams().timeStep; },
-                       [this](float v) { world_->getWorld().solverParams().timeStep = v; });
+                       [this](float v) { issue("SetSoftParam:timeStep," + fmtF(v), [&] { world_->getWorld().solverParams().timeStep = v; }); });
     subStepsView_.bind([this] { return world_->getWorld().solverParams().numSubsteps; },
-                       [this](int v) { world_->getWorld().solverParams().numSubsteps = v; });
+                       [this](int v) { issue("SetSoftParam:numSubsteps," + std::to_string(v), [&] { world_->getWorld().solverParams().numSubsteps = v; }); });
     iterView_.bind([this] { return world_->getWorld().solverParams().numIterations; },
-                   [this](int v) { world_->getWorld().solverParams().numIterations = v; });
+                   [this](int v) { issue("SetSoftParam:numIterations," + std::to_string(v), [&] { world_->getWorld().solverParams().numIterations = v; }); });
     gravYView_.bind([this] { return world_->getWorld().solverParams().gravity.y; },
-                    [this](float v) { world_->getWorld().solverParams().gravity.y = v; });
+                    [this](float v) { issue("SetSoftParam:gravityY," + fmtF(v), [&] { world_->getWorld().solverParams().gravity.y = v; }); });
     solverSection_.add(&timeStepView_);
     solverSection_.add(&subStepsView_);
     solverSection_.add(&iterView_);
@@ -73,15 +82,15 @@ void SoftBodyControlPanel::buildUi()
 
     // --- Sphere Collider (SoftBodySolver::Params) ------------------
     sphereEnabledView_.bind([this] { return world_->getWorld().params().sphereEnabled; },
-                            [this](bool v) { world_->getWorld().params().sphereEnabled = v; });
+                            [this](bool v) { issue(std::string("SetSoftParam:sphereEnabled,") + (v ? "1" : "0"), [&] { world_->getWorld().params().sphereEnabled = v; }); });
     sphereXView_.bind([this] { return world_->getWorld().params().sphereCenter.x; },
-                      [this](float v) { world_->getWorld().params().sphereCenter.x = v; });
+                      [this](float v) { issue("SetSoftParam:sphereX," + fmtF(v), [&] { world_->getWorld().params().sphereCenter.x = v; }); });
     sphereYView_.bind([this] { return world_->getWorld().params().sphereCenter.y; },
-                      [this](float v) { world_->getWorld().params().sphereCenter.y = v; });
+                      [this](float v) { issue("SetSoftParam:sphereY," + fmtF(v), [&] { world_->getWorld().params().sphereCenter.y = v; }); });
     sphereZView_.bind([this] { return world_->getWorld().params().sphereCenter.z; },
-                      [this](float v) { world_->getWorld().params().sphereCenter.z = v; });
+                      [this](float v) { issue("SetSoftParam:sphereZ," + fmtF(v), [&] { world_->getWorld().params().sphereCenter.z = v; }); });
     sphereRView_.bind([this] { return world_->getWorld().params().sphereRadius; },
-                      [this](float v) { world_->getWorld().params().sphereRadius = v; });
+                      [this](float v) { issue("SetSoftParam:sphereRadius," + fmtF(v), [&] { world_->getWorld().params().sphereRadius = v; }); });
     sphereSection_.add(&sphereEnabledView_);
     sphereSection_.add(&sphereXView_);
     sphereSection_.add(&sphereYView_);
@@ -90,9 +99,9 @@ void SoftBodyControlPanel::buildUi()
 
     // --- Self-Collision (XPBDSolver::Params) ---------------------
     selfColEnabledView_.bind([this] { return world_->getWorld().solverParams().selfCollisionEnabled; },
-                             [this](bool v) { world_->getWorld().solverParams().selfCollisionEnabled = v; });
+                             [this](bool v) { issue(std::string("SetSoftParam:selfCollisionEnabled,") + (v ? "1" : "0"), [&] { world_->getWorld().solverParams().selfCollisionEnabled = v; }); });
     selfColThicknessView_.bind([this] { return world_->getWorld().solverParams().selfCollisionThickness; },
-                               [this](float v) { world_->getWorld().solverParams().selfCollisionThickness = v; });
+                               [this](float v) { issue("SetSoftParam:selfCollisionThickness," + fmtF(v), [&] { world_->getWorld().solverParams().selfCollisionThickness = v; }); });
     selfCollisionSection_.add(&selfColEnabledView_);
     selfCollisionSection_.add(&selfColThicknessView_);
 
