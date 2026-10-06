@@ -1,0 +1,187 @@
+{
+    "name":  "48_flame_density_profile",
+    "steps":  [
+                  {
+                      "expect":  "OK",
+                      "command":  "GetStatus"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlamePage:true"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRunning:false"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "FlameReset"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "FlameStep:120"
+                  },
+                  {
+                      "command":  "GetFlameSecondaryCount",
+                      "expect_not":  "Count:0"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetUIVisible:false"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetCameraOrbit:110,0,0.15"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderParam:exposure,0"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderParam:smokeGlow,0"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderParam:smokeAlbedo,0.4"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderParam:smokeShadowStrength,0"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderParam:smokeFlameLight,0"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderParam:objectFlameLight,0"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderParam:smokeDensityProfile,0"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderMode:Normal"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SaveScreenshot:testdata/screenshots/48_flame_profile_normal_uniform.png"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderParam:smokeDensityProfile,1"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SaveScreenshot:testdata/screenshots/48_flame_profile_normal_poly6.png"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderParam:pbvrAdaptive,0"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderParam:pbvrEnsembles,4"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderParam:pbvrTargetEnsembles,256"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderParam:smokeDensityProfile,0"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderMode:PBVR"
+                  },
+                  {
+                      "command":  "GetStatus",
+                      "expect":  "OK",
+                      "repeat":  72
+                  },
+                  {
+                      "command":  "GetFlamePBVRStat:displayedEnsembles",
+                      "expect_range":  "256,256"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SaveScreenshot:testdata/screenshots/48_flame_profile_pbvr_uniform.png"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderParam:smokeDensityProfile,1"
+                  },
+                  {
+                      "command":  "GetStatus",
+                      "expect":  "OK",
+                      "repeat":  2
+                  },
+                  {
+                      "command":  "GetFlamePBVRStat:displayedEnsembles",
+                      "expect_range":  "1,24"
+                  },
+                  {
+                      "command":  "GetStatus",
+                      "expect":  "OK",
+                      "repeat":  72
+                  },
+                  {
+                      "command":  "GetFlamePBVRStat:displayedEnsembles",
+                      "expect_range":  "256,256"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SaveScreenshot:testdata/screenshots/48_flame_profile_pbvr_poly6.png"
+                  },
+                  {
+                      "command":  "GetFlamePBVRStat:overflowed",
+                      "expect_range":  "0,0"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderParam:smokeDensityProfile,0.5"
+                  },
+                  {
+                      "command":  "GetStatus",
+                      "expect":  "OK",
+                      "repeat":  2
+                  },
+                  {
+                      "command":  "GetFlamePBVRStat:displayedEnsembles",
+                      "expect_range":  "1,24"
+                  },
+                  {
+                      "command":  "GetStatus",
+                      "expect":  "OK",
+                      "repeat":  72
+                  },
+                  {
+                      "command":  "GetFlamePBVRStat:displayedEnsembles",
+                      "expect_range":  "256,256"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SaveScreenshot:testdata/screenshots/48_flame_profile_pbvr_mixed.png"
+                  },
+                  {
+                      "command":  "GetFlameRenderParam:smokeDensityProfile",
+                      "expect_range":  "0.5,0.5"
+                  },
+                  {
+                      "expect_prefix":  "Error:",
+                      "command":  "SetFlameRenderParam:smokeDensityProfile,-1"
+                  },
+                  {
+                      "expect_prefix":  "Error:",
+                      "command":  "SetFlameRenderParam:smokeDensityProfile,1.1"
+                  },
+                  {
+                      "expect":  "OK",
+                      "command":  "SetFlameRenderMode:Normal"
+                  }
+              ],
+    "_comment":  "Mass-normalized poly6 density in Normal analytic splats and camera/light PBVR samples. Capture uniform/poly6/mixed profiles with emission and lighting disabled; verify history invalidation, convergence, overflow and parameter bounds."
+}

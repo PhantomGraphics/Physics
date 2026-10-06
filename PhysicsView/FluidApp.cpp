@@ -1246,6 +1246,7 @@ void FluidApp::syncFlameRenderer()
         render.whiteBalance == 2 ? std::max(render.whiteBalanceTemperature, 500.0f) : 0.0f;
     shading.whiteBalanceDegree = std::clamp(render.whiteBalanceDegree, 0.0f, 1.0f);
     shading.smokeExtinction = render.smokeExtinction;
+    shading.smokeDensityProfile = render.smokeDensityProfile;
     shading.smokeGlow = render.smokeGlow;
     shading.smokeAlbedo = glm::vec3(render.smokeAlbedo);
     shading.smokeShadowStrength = render.smokeShadowStrength;

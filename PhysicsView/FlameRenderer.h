@@ -74,6 +74,7 @@ public:
 		float whiteBalanceDegree = 1.0f;      ///< 0..1, CIECAM02-style adaptation degree D
 		float smokeExtinction = 4.0f;          ///< sigma: optical depth per unit density
 		float smokeGlow = 0.2f;
+		float smokeDensityProfile = 1.0f; ///< mass-preserving blend: 0 uniform, 1 compact poly6
 		glm::vec3 smokeAlbedo{ 0.03f };        ///< already multiplied by the ambient light
 		float pbvrSubdivision = 2.0f;
 		float pbvrMinSubPixels = 1.5f;
@@ -105,7 +106,8 @@ public:
 	void setViewportHeight(float h) { viewportHeight_ = h; }
 	void setShading(const Shading& s) {
 		if (shading_.smokeExtinction != s.smokeExtinction || shading_.pbvrDensityScale != s.pbvrDensityScale ||
-			shading_.smokeShadowStrength != s.smokeShadowStrength || shading_.smokeLightDirection != s.smokeLightDirection)
+			shading_.smokeShadowStrength != s.smokeShadowStrength || shading_.smokeLightDirection != s.smokeLightDirection ||
+			shading_.smokeDensityProfile != s.smokeDensityProfile)
 			smokeShadowDirty_ = true;
 		shading_ = s;
 	}

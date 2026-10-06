@@ -145,6 +145,8 @@ void FlameControlPanel::drawContents()
         Im::sliderFloat("Smoke Extinction", render.smokeExtinction, 0.0f, 40.0f);
         Im::sliderFloat("Smoke Glow", render.smokeGlow, 0.0f, 1.0f);
         Im::sliderFloat("Smoke Albedo", render.smokeAlbedo, 0.0f, 0.5f);
+        Im::sliderFloat("Smoke Density Profile", render.smokeDensityProfile, 0.0f, 1.0f);
+        Im::textDisabled("Density: 0 uniform, 1 smooth poly6; soot amount is preserved.");
 
         if (render.pbvrMode) {
             Im::sliderFloat("Smoke Self Shadow", render.smokeShadowStrength, 0.0f, 4.0f);
