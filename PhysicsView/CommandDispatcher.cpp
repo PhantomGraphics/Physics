@@ -246,6 +246,12 @@ std::vector<CommandInfo> CommandDispatcher::commandCatalog() const {
         {"SetSoftRenderMode", "", "e.g. SetSoftRenderMode:shaded"},
         {"SetSolverIter", "", "e.g. SetSolverIter:2"},
         {"SetTimeStep", "", "e.g. SetTimeStep:0.02"},
+        {"SetWhiteWaterParam", "", "e.g. SetWhiteWaterParam:foamDrag,0.9"},
+        {"GetWhiteWaterParam", "", "e.g. GetWhiteWaterParam:foamDrag"},
+        {"SetBaumgarteBeta", "", "e.g. SetBaumgarteBeta:0.2"},
+        {"GetBaumgarteBeta", "", ""},
+        {"GetSoftParam", "", "e.g. GetSoftParam:numIterations"},
+        {"SetSoftParam", "", "e.g. SetSoftParam:numIterations,8"},
         {"SetUIVisible", "", "e.g. SetUIVisible:false"},
         {"SetVolumeCellLength", "", "e.g. SetVolumeCellLength:0.05"},
         {"SetVolumeIsoLevel", "", "e.g. SetVolumeIsoLevel:0.5"},
@@ -290,8 +296,9 @@ void CommandDispatcher::processQueue() {
             queue_.requeueFront(local);
             break;
         }
-        const std::string cmd = std::move(local.front());
+        std::string cmd = std::move(local.front());
         local.pop();
+        const bool uiCmd = takeUiMark(cmd);   // GUI-issued: no one reads the response
 
         auto resp = route(cmd);
         if (resp && resp->empty()) continue;   // deferred answer (FlameStep:<n>)
@@ -312,7 +319,7 @@ void CommandDispatcher::processQueue() {
             }
         }
 
-        queue_.respond(std::move(*resp));
+        if (!uiCmd) queue_.respond(std::move(*resp));
     }
 }
 
@@ -434,6 +441,7 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
         sv.rfind("GetSoftTotalVolume:", 0) == 0 ||
         sv.rfind("GetSoftMinInterBodyDistance:", 0) == 0 ||
         sv.rfind("GetSoftMinNonEdgeDistance:", 0) == 0 ||
+        sv.rfind("SetSoftParam:", 0) == 0 || sv.rfind("GetSoftParam:", 0) == 0 ||
         sv.rfind("SetCrossBodyCollisionEnabled:", 0) == 0) {
         if (!softWorld_) return std::string("Error:soft world not set");
         softDispatcher_.dispatch(cmd);
@@ -610,6 +618,39 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
         if (!parseFlt(sv.substr(18), v)) return std::string("Error:bad float");
         world_->params().viscosity = v;
         return std::string("OK");
+    }
+    // White water (spray / foam) parameters; read live by the simulation.
+    if (sv.rfind("SetWhiteWaterParam:", 0) == 0) {
+        const auto parts = split(sv.substr(19), ',');
+        float v = 0.0f;
+        if (parts.size() != 2 || !parseFlt(parts[1], v)) return std::string("Error:expected name,value");
+        auto& w = world_->whiteWaterParams();
+        const std::string_view n = parts[0];
+        if      (n == "sprayVelThreshold")  w.sprayVelThreshold = v;
+        else if (n == "sprayDensityRatio")  w.sprayDensityRatio = v;
+        else if (n == "foamCurvThreshold")  w.foamCurvThreshold = v;
+        else if (n == "foamNeighborCount")  w.foamNeighborCount = v;
+        else if (n == "maxSprayParticles")  w.maxSprayParticles = static_cast<int>(v);
+        else if (n == "maxFoamParticles")   w.maxFoamParticles = static_cast<int>(v);
+        else if (n == "foamBuoyancy")       w.foamBuoyancy = v;
+        else if (n == "foamDrag")           w.foamDrag = v;
+        else return std::string("Error:unknown white water param '") + std::string(n) + "'";
+        return std::string("OK");
+    }
+    if (sv.rfind("GetWhiteWaterParam:", 0) == 0) {
+        const std::string_view n = sv.substr(19);
+        const auto& w = world_->whiteWaterParams();
+        float v;
+        if      (n == "sprayVelThreshold")  v = w.sprayVelThreshold;
+        else if (n == "sprayDensityRatio")  v = w.sprayDensityRatio;
+        else if (n == "foamCurvThreshold")  v = w.foamCurvThreshold;
+        else if (n == "foamNeighborCount")  v = w.foamNeighborCount;
+        else if (n == "maxSprayParticles")  v = static_cast<float>(w.maxSprayParticles);
+        else if (n == "maxFoamParticles")   v = static_cast<float>(w.maxFoamParticles);
+        else if (n == "foamBuoyancy")       v = w.foamBuoyancy;
+        else if (n == "foamDrag")           v = w.foamDrag;
+        else return std::string("Error:unknown white water param '") + std::string(n) + "'";
+        return std::to_string(v);
     }
     if (sv.rfind("SetFluidTension:", 0) == 0) {
         float v;

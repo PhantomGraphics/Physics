@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 
 #include "../../CGLib/UIWidgets/IView.h"
 #include "../../CGLib/UIWidgets/BoolView.h"
@@ -29,6 +30,9 @@ class GltfSoftRenderer;
  */
 class RenderingPanel : public IEmbeddedPanel {
 public:
+    // Edits are issued as commands (CommandDispatcher::submitUi); the widgets are re-seeded from the
+    // render state every frame, so command-driven changes are shown and never overwritten.
+    void setCommandSink(std::function<void(const std::string&)> f) { sink_ = std::move(f); }
     void bind(RenderBackground* bg) { bg_ = bg; }
     void bindRigidBodyRenderer(GltfBodyRenderer* r) { rigidBody_ = r; }
     void bindSoftBodyRenderer(GltfSoftRenderer* r) { softBody_ = r; }
@@ -43,6 +47,8 @@ private:
     std::string rigidStatusText() const;
     std::string softStatusText() const;
 
+    std::function<void(const std::string&)> sink_;
+    void emit(const std::string& cmd) const { if (sink_) sink_(cmd); }
     RenderBackground* bg_ = nullptr;
     GltfBodyRenderer* rigidBody_ = nullptr;
     GltfSoftRenderer* softBody_ = nullptr;

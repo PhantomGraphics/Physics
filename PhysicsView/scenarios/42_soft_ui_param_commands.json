@@ -1,0 +1,18 @@
+{
+  "name": "42_soft_ui_param_commands",
+  "steps": [
+    { "label": "Set iterations", "command": "SetSoftParam:numIterations,13", "expect": "OK" },
+    { "label": "Change: iterations took effect", "command": "GetSoftParam:numIterations", "expect": "13" },
+    { "label": "Set substeps", "command": "SetSoftParam:numSubsteps,5", "expect": "OK" },
+    { "label": "Change: substeps took effect", "command": "GetSoftParam:numSubsteps", "expect": "5" },
+    { "label": "Set gravity Y", "command": "SetSoftParam:gravityY,-4.5", "expect": "OK" },
+    { "label": "Change: gravity took effect", "command": "GetSoftParam:gravityY", "expect_prefix": "-4.5000" },
+    { "label": "Enable self collision (flag)", "command": "SetSoftParam:selfCollisionEnabled,1", "expect": "OK" },
+    { "label": "Change: self collision enabled", "command": "GetSoftParam:selfCollisionEnabled", "expect": "1" },
+    { "label": "Sphere collider radius", "command": "SetSoftParam:sphereRadius,2.5", "expect": "OK" },
+    { "label": "Change: sphere radius took effect", "command": "GetSoftParam:sphereRadius", "expect_prefix": "2.5000" },
+    { "label": "Negative: unknown param", "command": "SetSoftParam:nope,1", "expect_prefix": "Error:unknown soft param" },
+    { "label": "Negative: malformed", "command": "SetSoftParam:numIterations", "expect_prefix": "Error:" },
+    { "label": "Invariant: app alive", "command": "GetStatus", "expect": "OK" }
+  ]
+}

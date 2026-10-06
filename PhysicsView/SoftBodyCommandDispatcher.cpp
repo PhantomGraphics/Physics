@@ -164,6 +164,50 @@ std::string SoftBodyCommandDispatcher::route(const std::string& cmd) {
         return "OK";
     }
 
+    if (sv.rfind("GetSoftParam:", 0) == 0) {
+        const std::string_view name = sv.substr(13);
+        const auto& sp = world_->getWorld().solverParams();
+        const auto& wp = world_->getWorld().params();
+        if      (name == "timeStep")               return std::to_string(sp.timeStep);
+        else if (name == "numSubsteps")            return std::to_string(sp.numSubsteps);
+        else if (name == "numIterations")          return std::to_string(sp.numIterations);
+        else if (name == "gravityY")               return std::to_string(sp.gravity.y);
+        else if (name == "selfCollisionEnabled")   return sp.selfCollisionEnabled ? "1" : "0";
+        else if (name == "selfCollisionThickness") return std::to_string(sp.selfCollisionThickness);
+        else if (name == "sphereEnabled")          return wp.sphereEnabled ? "1" : "0";
+        else if (name == "sphereX")                return std::to_string(wp.sphereCenter.x);
+        else if (name == "sphereY")                return std::to_string(wp.sphereCenter.y);
+        else if (name == "sphereZ")                return std::to_string(wp.sphereCenter.z);
+        else if (name == "sphereRadius")           return std::to_string(wp.sphereRadius);
+        return "Error:unknown soft param '" + std::string(name) + "'";
+    }
+
+    // Solver / sphere-collider / self-collision parameters edited by the Soft Body panel.
+    if (sv.rfind("SetSoftParam:", 0) == 0) {
+        const std::string_view rest = sv.substr(13);
+        const size_t comma = rest.find(',');
+        if (comma == std::string_view::npos) return "Error:expected name,value";
+        const std::string_view name = rest.substr(0, comma);
+        const std::string_view val  = rest.substr(comma + 1);
+        float f = 0.0f;
+        if (!parseFlt(val.data(), val.data() + val.size(), f)) return "Error:bad value";
+        auto& sp = world_->getWorld().solverParams();
+        auto& wp = world_->getWorld().params();
+        if      (name == "timeStep")                  sp.timeStep = f;
+        else if (name == "numSubsteps")               sp.numSubsteps = static_cast<int>(f);
+        else if (name == "numIterations")             sp.numIterations = static_cast<int>(f);
+        else if (name == "gravityY")                  sp.gravity.y = f;
+        else if (name == "selfCollisionEnabled")      sp.selfCollisionEnabled = f != 0.0f;
+        else if (name == "selfCollisionThickness")    sp.selfCollisionThickness = f;
+        else if (name == "sphereEnabled")             wp.sphereEnabled = f != 0.0f;
+        else if (name == "sphereX")                   wp.sphereCenter.x = f;
+        else if (name == "sphereY")                   wp.sphereCenter.y = f;
+        else if (name == "sphereZ")                   wp.sphereCenter.z = f;
+        else if (name == "sphereRadius")              wp.sphereRadius = f;
+        else return "Error:unknown soft param '" + std::string(name) + "'";
+        return "OK";
+    }
+
     if (sv.rfind("SaveScreenshot:", 0) == 0) {
         pendingScreenshot_ = std::filesystem::path(cmd.substr(15));
         return {};

@@ -1,0 +1,11 @@
+{
+  "name": "28_rigid_ui_param_commands",
+  "steps": [
+    { "label": "Set Baumgarte beta (Rigid panel command)", "command": "SetBaumgarteBeta:0.37", "expect": "OK" },
+    { "label": "Change: beta took effect", "command": "GetBaumgarteBeta", "expect_prefix": "0.3700" },
+    { "label": "Set solver iterations", "command": "SetSolverIter:17", "expect": "OK" },
+    { "label": "Set gravity", "command": "SetGravity:0:-3:0", "expect": "OK" },
+    { "label": "Negative: bad beta", "command": "SetBaumgarteBeta:abc", "expect": "Error:bad float" },
+    { "label": "Invariant: app alive", "command": "GetStatus", "expect": "OK" }
+  ]
+}

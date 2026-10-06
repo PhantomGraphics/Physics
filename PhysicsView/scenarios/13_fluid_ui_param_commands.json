@@ -1,0 +1,15 @@
+{
+  "name": "13_fluid_ui_param_commands",
+  "steps": [
+    { "label": "Precondition: default foam drag", "command": "GetWhiteWaterParam:foamDrag", "expect_prefix": "0.95" },
+    { "label": "Change: set foam drag", "command": "SetWhiteWaterParam:foamDrag,0.9", "expect": "OK" },
+    { "label": "Change: foam drag took effect", "command": "GetWhiteWaterParam:foamDrag", "expect_prefix": "0.9000" },
+    { "label": "Change: integer param", "command": "SetWhiteWaterParam:maxSprayParticles,1234", "expect": "OK" },
+    { "label": "Change: integer param took effect", "command": "GetWhiteWaterParam:maxSprayParticles", "expect_prefix": "1234." },
+    { "label": "Panel fluid setters stay valid", "command": "SetFluidDensity:900", "expect": "OK" },
+    { "label": "Panel fluid setters stay valid (box)", "command": "SetFluidBounds:-1:1:-1:1:3:1", "expect": "OK" },
+    { "label": "Negative: unknown param", "command": "SetWhiteWaterParam:nope,1", "expect_prefix": "Error:unknown white water param" },
+    { "label": "Negative: malformed", "command": "SetWhiteWaterParam:foamDrag", "expect_prefix": "Error:" },
+    { "label": "Invariant: app alive", "command": "GetStatus", "expect": "OK" }
+  ]
+}

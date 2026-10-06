@@ -1,6 +1,7 @@
 #pragma once
 #include "../../CGLib/VkAppBase/ScenarioRunner/IScenarioDispatcher.h"
 #include "../../CGLib/VkAppBase/ScenarioRunner/CommandQueue.h"
+#include "../../CGLib/VkAppBase/ScenarioRunner/UiCommand.h"
 
 #include "RigidBodyCommandDispatcher.h"
 #include "SoftBodyCommandDispatcher.h"
@@ -206,6 +207,8 @@ namespace Phantom {
 
         // IScenarioDispatcher
         void dispatch(const std::string& command) override;
+        // GUI edits take the same queue/route as typed and scenario commands; the response is dropped.
+        void submitUi(const std::string& cmd) { dispatch(markUiCommand(cmd)); }
         std::vector<std::string> collectResponses() override;
         std::vector<CommandInfo> commandCatalog() const override;
 

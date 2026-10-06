@@ -55,6 +55,9 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     scenarioBrowser_.setDefaultFolder("scenarios");
 
     controlPanel_.setOnWorldChanged([this]() { syncParticlesToRenderer(); });
+    controlPanel_.setCommandSink([this](const std::string& cmd) { dispatcher_.submitUi(cmd); });
+    rigidControlPanel_.setCommandSink([this](const std::string& cmd) { dispatcher_.submitUi(cmd); });
+    softControlPanel_.setCommandSink([this](const std::string& cmd) { dispatcher_.submitUi(cmd); });
     rigidControlPanel_.setOnWorldChanged([this]() {
         world_.refreshCoupling();
         syncRigidRenderer();
@@ -111,6 +114,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
         return std::array<double, 3>{ static_cast<double>(s.accumulated), static_cast<double>(s.overflowed),
                                       static_cast<double>(s.generated) };
     });
+    renderingPanel_.setCommandSink([this](const std::string& cmd) { dispatcher_.submitUi(cmd); });
     renderingPanel_.bind(&renderBackground_);
     renderingPanel_.bindRigidBodyRenderer(&rigidGltfRenderer_);
     renderingPanel_.bindSoftBodyRenderer(&softGltfRenderer_);

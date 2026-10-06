@@ -18,6 +18,15 @@ RigidBodyControlPanel::RigidBodyControlPanel(RigidBodyWorld* w) : world_(w) {
     buildUi();
 }
 
+namespace {
+std::string fmtF(float v)
+{
+    char buf[40];
+    std::snprintf(buf, sizeof(buf), "%.9g", v);
+    return buf;
+}
+}
+
 void RigidBodyControlPanel::buildUi() {
     if (uiBuilt_) return;
     uiBuilt_ = true;
@@ -60,16 +69,20 @@ void RigidBodyControlPanel::buildUi() {
     // RigidBodySolver and Params, so these stay valid across a scene switch.
     timeStepView_.bind(
         [this] { return world_->getWorld().timeStep; },
-        [this](float v) { world_->getWorld().timeStep = v; });
+        [this](float v) { issue("SetTimeStep:" + fmtF(v), [&] { world_->getWorld().timeStep = v; }); });
     iterView_.bind(
         [this] { return world_->getWorld().params().solverIterations; },
-        [this](int v) { world_->getWorld().params().solverIterations = v; });
+        [this](int v) { issue("SetSolverIter:" + std::to_string(v), [&] { world_->getWorld().params().solverIterations = v; }); });
     betaView_.bind(
         [this] { return world_->getWorld().params().baumgarteBeta; },
-        [this](float v) { world_->getWorld().params().baumgarteBeta = v; });
+        [this](float v) { issue("SetBaumgarteBeta:" + fmtF(v), [&] { world_->getWorld().params().baumgarteBeta = v; }); });
     gravYView_.bind(
         [this] { return world_->getWorld().params().gravity.y; },
-        [this](float v) { world_->getWorld().params().gravity.y = v; });
+        [this](float v) {
+            const auto g = world_->getWorld().params().gravity;
+            issue("SetGravity:" + fmtF(g.x) + ":" + fmtF(v) + ":" + fmtF(g.z),
+                  [&] { world_->getWorld().params().gravity.y = v; });
+        });
     simSection_.add(&timeStepView_);
     simSection_.add(&iterView_);
     simSection_.add(&betaView_);

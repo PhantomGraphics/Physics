@@ -159,6 +159,15 @@ std::string RigidBodyCommandDispatcher::route(const std::string& cmd) {
         return "OK";
     }
 
+    if (sv == "GetBaumgarteBeta") return std::to_string(world_->getWorld().params().baumgarteBeta);
+
+    if (sv.rfind("SetBaumgarteBeta:", 0) == 0) {
+        float v = 0.0f;
+        if (!parseFlt(cmd.data() + 17, cmd.data() + cmd.size(), v)) return "Error:bad float";
+        world_->getWorld().params().baumgarteBeta = v;
+        return "OK";
+    }
+
     if (sv.rfind("AddSphere:", 0) == 0) {
         auto parts = split(sv.substr(10), ':');
         float px = 0.f, py = 3.f, pz = 0.f, r = 0.5f, mass = 1.f;
