@@ -78,6 +78,10 @@ public:
 		float pbvrSubdivision = 2.0f;
 		float pbvrMinSubPixels = 1.5f;
 		float pbvrDensityScale = 1.0f;
+		float smokeShadowStrength = 1.0f; ///< 0 preserves the unshadowed PBVR colour
+		float smokeShadowAmbient = 0.25f; ///< unoccluded fill fraction
+		glm::vec3 smokeLightDirection{ -0.5f, -1.0f, -0.3f }; ///< direction of light travel
+		glm::vec3 smokeLightRadiance{ 1.0f };
 		bool operator==(const Shading& o) const;
 	};
 
@@ -97,7 +101,12 @@ public:
 	void setCamera(const glm::mat4& proj, const glm::mat4& view) { proj_ = proj; view_ = view; }
 	/** @brief Render-target height in pixels (world-size -> gl_PointSize conversion). */
 	void setViewportHeight(float h) { viewportHeight_ = h; }
-	void setShading(const Shading& s) { shading_ = s; }
+	void setShading(const Shading& s) {
+		if (shading_.smokeExtinction != s.smokeExtinction || shading_.pbvrDensityScale != s.pbvrDensityScale ||
+			shading_.smokeShadowStrength != s.smokeShadowStrength || shading_.smokeLightDirection != s.smokeLightDirection)
+			smokeShadowDirty_ = true;
+		shading_ = s;
+	}
 	/**
 	 * @brief The simulation state changed since the last rendered frame
 	 * (latched until onUpdate() consumes it). discontinuous = it jumped by
@@ -122,6 +131,8 @@ public:
 	void onCleanup(VkDevice device) override;
 
 private:
+	bool smokeShadowDirty_ = true;
+	std::vector<float> smokeShadowDepth_;
 	Shaders shaders_;
 
 	std::vector<float> emitPositions_, emitTemperatures_, emitSizes_;

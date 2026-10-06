@@ -147,6 +147,8 @@ void FlameControlPanel::drawContents()
         Im::sliderFloat("Smoke Albedo", render.smokeAlbedo, 0.0f, 0.5f);
 
         if (render.pbvrMode) {
+            Im::sliderFloat("Smoke Self Shadow", render.smokeShadowStrength, 0.0f, 4.0f);
+            Im::sliderFloat("Smoke Shadow Fill", render.smokeShadowAmbient, 0.0f, 1.0f);
             const auto& st = pbvrStats_ ? pbvrStats_() : FlamePBVRPass::Stats{};
             Im::text("Ensembles: %u shown, %u this frame, %.2f ms GPU",
                      st.displayedEnsembles, st.ensemblesThisFrame, st.gpuMs);
