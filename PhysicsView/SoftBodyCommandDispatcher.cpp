@@ -21,30 +21,19 @@ bool parseInt(const char* begin, const char* end, int& out) {
 } // namespace
 
 void SoftBodyCommandDispatcher::dispatch(const std::string& command) {
-    std::lock_guard<std::mutex> lk(mutex_);
-    inputQueue_.push(command);
+    queue_.submit(command);
 }
 
 std::vector<std::string> SoftBodyCommandDispatcher::collectResponses() {
-    std::vector<std::string> out;
-    std::lock_guard<std::mutex> lk(mutex_);
-    while (!outputQueue_.empty()) {
-        out.push_back(std::move(outputQueue_.front()));
-        outputQueue_.pop();
-    }
-    return out;
+    return queue_.collectResponses();
 }
 
 void SoftBodyCommandDispatcher::processQueue() {
-    std::queue<std::string> local;
-    { std::lock_guard<std::mutex> lk(mutex_); std::swap(local, inputQueue_); }
+    std::queue<std::string> local = queue_.takeAll();
     while (!local.empty()) {
         std::string resp = route(local.front());
         local.pop();
-        if (!resp.empty()) {
-            std::lock_guard<std::mutex> lk(mutex_);
-            outputQueue_.push(std::move(resp));
-        }
+        if (!resp.empty()) queue_.respond(std::move(resp));
     }
 }
 
@@ -55,8 +44,7 @@ std::optional<std::filesystem::path> SoftBodyCommandDispatcher::takePendingScree
 }
 
 void SoftBodyCommandDispatcher::signalScreenshotDone(bool ok, const std::string& path) {
-    std::lock_guard<std::mutex> lk(mutex_);
-    outputQueue_.push(ok ? "OK" : "FAIL:" + path);
+    queue_.respond(ok ? "OK" : "FAIL:" + path);
 }
 
 std::string SoftBodyCommandDispatcher::route(const std::string& cmd) {

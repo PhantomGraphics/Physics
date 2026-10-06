@@ -86,18 +86,11 @@ std::vector<std::string_view> split(std::string_view sv, char delim) {
 // ---- IScenarioDispatcher ------------------------------------------------
 
 void CommandDispatcher::dispatch(const std::string& command) {
-    std::lock_guard<std::mutex> lk(mutex_);
-    inputQueue_.push(command);
+    queue_.submit(command);
 }
 
 std::vector<std::string> CommandDispatcher::collectResponses() {
-    std::vector<std::string> out;
-    std::lock_guard<std::mutex> lk(mutex_);
-    while (!outputQueue_.empty()) {
-        out.push_back(std::move(outputQueue_.front()));
-        outputQueue_.pop();
-    }
-    return out;
+    return queue_.collectResponses();
 }
 
 // Command catalog (help / completion). Built from the command names the PhysicsView
@@ -277,10 +270,7 @@ void CommandDispatcher::stepSimulation() {
 void CommandDispatcher::processQueue() {
     // A FlameStep:<n> is spread over frames (see FlameCommandDispatcher::tick); its
     // answer is pushed here when the last step is done.
-    flameDispatcher_.setDeferredDone([this](const std::string& r) {
-        std::lock_guard<std::mutex> lk(mutex_);
-        outputQueue_.push(r);
-    });
+    flameDispatcher_.setDeferredDone([this](const std::string& r) { queue_.respond(r); });
     flameDispatcher_.tick(simulationBudgetMs_);
     if (simulationStepsRemaining_ > 0) {
         const auto start = std::chrono::steady_clock::now();
@@ -290,23 +280,14 @@ void CommandDispatcher::processQueue() {
         } while (simulationStepsRemaining_ > 0 &&
             std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count() < simulationBudgetMs_);
         if (onWorldChanged_) onWorldChanged_();
-        if (simulationStepsRemaining_ == 0) {
-            std::lock_guard<std::mutex> lk(mutex_);
-            outputQueue_.push("OK");
-        }
+        if (simulationStepsRemaining_ == 0) queue_.respond("OK");
     }
 
-    std::queue<std::string> local;
-    {
-        std::lock_guard<std::mutex> lk(mutex_);
-        std::swap(local, inputQueue_);
-    }
+    std::queue<std::string> local = queue_.takeAll();
     while (!local.empty()) {
         if (flameDispatcher_.busy() || simulationStepsRemaining_ > 0) {
             // Keep command order: hold back everything behind the running FlameStep.
-            std::lock_guard<std::mutex> lk(mutex_);
-            while (!inputQueue_.empty()) { local.push(std::move(inputQueue_.front())); inputQueue_.pop(); }
-            std::swap(local, inputQueue_);
+            queue_.requeueFront(local);
             break;
         }
         const std::string cmd = std::move(local.front());
@@ -331,8 +312,7 @@ void CommandDispatcher::processQueue() {
             }
         }
 
-        std::lock_guard<std::mutex> lk(mutex_);
-        outputQueue_.push(std::move(*resp));
+        queue_.respond(std::move(*resp));
     }
 }
 

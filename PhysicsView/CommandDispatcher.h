@@ -1,5 +1,6 @@
 #pragma once
 #include "../../CGLib/VkAppBase/ScenarioRunner/IScenarioDispatcher.h"
+#include "../../CGLib/VkAppBase/ScenarioRunner/CommandQueue.h"
 
 #include "RigidBodyCommandDispatcher.h"
 #include "SoftBodyCommandDispatcher.h"
@@ -210,7 +211,7 @@ namespace Phantom {
 
         // Passthrough for RigidBodyViewApp's screenshot-on-scenario-command pattern.
         std::optional<std::filesystem::path> takePendingScreenshot() { return rigidDispatcher_.takePendingScreenshot(); }
-        // Pushes straight onto this dispatcher's own outputQueue_ (not
+        // Pushes straight onto this dispatcher's own queue_ (not
         // rigidDispatcher_'s) -- collectResponses() below is what
         // ScenarioRunner::tick() actually polls, and nothing ever drains
         // rigidDispatcher_'s queue again after the "SaveScreenshot:" command
@@ -220,8 +221,7 @@ namespace Phantom {
         // response stranded there forever, hanging the scenario runner on
         // every SaveScreenshot step (internal design notes 1.8).
         void signalScreenshotDone(bool ok, const std::string& path) {
-            std::lock_guard<std::mutex> lk(mutex_);
-            outputQueue_.push(ok ? "OK" : "FAIL:" + path);
+            queue_.respond(ok ? "OK" : "FAIL:" + path);
         }
 
     private:
@@ -260,9 +260,7 @@ namespace Phantom {
         std::filesystem::path plyOutputDir_;
         int                   plyFrameCounter_ = 1;
 
-        std::mutex              mutex_;
-        std::queue<std::string> inputQueue_;
-        std::queue<std::string> outputQueue_;
+        CommandQueue queue_;
     };
 
 }
