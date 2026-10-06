@@ -8,7 +8,7 @@
     { "label": "Rebuild fluid (GPU buffers)", "command": "Reset", "expect": "OK" },
     { "label": "Precondition: sane, non-zero seed count", "command": "GetParticleCount", "expect_prefix": "Count:", "store_as": "count0", "strip_prefix": "Count:" },
     { "label": "Precondition: reports as GPU_CSPH", "command": "GetSimulationType", "expect": "GPU_CSPH" },
-    { "label": "Change: GPU compute step runs without erroring, repeatedly (~2s -- the closest thing to a 'settling' observation available for this type)", "command": "Step", "expect": "OK", "repeat": 200 },
+    { "label": "Change: GPU compute step runs without erroring, repeatedly (~2s -- the closest thing to a 'settling' observation available for this type)", "command": "StepSimulation:200", "expect": "OK" },
     { "label": "Invariant: particle count conserved across 200 GPU steps (no desync/loss between CPU-side bookkeeping and the GPU buffer)", "command": "GetParticleCount", "expect": "Count:${count0}" },
     { "label": "Process exits cleanly after GPU_CSPH was selected (regression check for the VMA shutdown abort, see internal design notes 1.3 history)", "command": "GetStatus", "expect": "OK" }
   ]

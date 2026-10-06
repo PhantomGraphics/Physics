@@ -16,13 +16,13 @@
     { "label": "Baseline: SoftBody-Fluid coupling disabled", "command": "SetSoftFluidCouplingEnabled:false", "expect": "OK" },
     { "label": "Rebuild fluid+soft (uncoupled)",     "command": "Reset",                         "expect": "OK" },
     { "label": "Precondition: coupling reports disabled", "command": "IsSoftFluidCouplingEnabled", "expect": "No" },
-    { "label": "Jelly free-falls through the pool while still in transit (~0.4s; sustained rest-on-floor contact with Two-Way coupling active is a known-unstable regime, see 51_couple_rigid_fluid_twoway.json/52_couple_buoyancy_compare.json -- this samples the mid-fall buoyancy effect instead)", "command": "Step", "expect": "OK", "repeat": 40 },
+    { "label": "Jelly free-falls through the pool while still in transit (~0.4s; sustained rest-on-floor contact with Two-Way coupling active is a known-unstable regime, see 51_couple_rigid_fluid_twoway.json/52_couple_buoyancy_compare.json -- this samples the mid-fall buoyancy effect instead)", "command": "StepSimulation:40", "expect": "OK" },
     { "label": "Baseline min Y (still descending, unimpeded)", "command": "GetSoftMinPositionY", "store_as": "baseline_min_y" },
 
     { "label": "Enable SoftBody-Fluid coupling",     "command": "SetSoftFluidCouplingEnabled:true", "expect": "OK" },
     { "label": "Coupling reports enabled",           "command": "IsSoftFluidCouplingEnabled",    "expect": "OK" },
     { "label": "Rebuild fluid+soft+bindings",        "command": "Reset",                         "expect": "OK" },
-    { "label": "Jelly falls into the coupled pool, buoyancy/drag should slow its descent (~0.4s)", "command": "Step", "expect": "OK", "repeat": 40 },
+    { "label": "Jelly falls into the coupled pool, buoyancy/drag should slow its descent (~0.4s)", "command": "StepSimulation:40", "expect": "OK" },
     { "label": "Change: coupled min Y",              "command": "GetSoftMinPositionY",           "store_as": "coupled_min_y" },
 
     { "label": "Invariant: body/particle counts unchanged by coupling", "command": "GetSoftBodyCount", "expect": "Count:1" },

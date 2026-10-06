@@ -15,7 +15,7 @@
     { "label": "Baseline run: One-Way (SDF penalty only, no reaction force back on the sphere)", "command": "SetCouplingMode:OneWay", "expect": "OK" },
     { "label": "Rebuild fluid+rigid+bindings", "command": "Reset", "expect": "OK" },
     { "label": "One-Way confirmed active", "command": "GetActiveCouplingMode", "expect": "OneWay" },
-    { "label": "Sphere falls into the pool, unaffected by any buoyant reaction (~0.4s)", "command": "Step", "expect": "OK", "repeat": 40 },
+    { "label": "Sphere falls into the pool, unaffected by any buoyant reaction (~0.4s)", "command": "StepSimulation:40", "expect": "OK" },
     { "label": "One-Way sphere height after falling", "command": "GetBodyPositionY:1", "store_as": "bodyY_oneway" },
 
     { "label": "Comparison run: Two-Way (Akinci boundary particles, buoyant reaction now applies)", "command": "SetPreset:SphereDrop", "expect": "OK" },
@@ -23,7 +23,7 @@
     { "label": "Two-Way requested", "command": "SetCouplingMode:TwoWay", "expect": "OK" },
     { "label": "Rebuild fluid+rigid+bindings", "command": "Reset", "expect": "OK" },
     { "label": "Two-Way confirmed active for this dynamic, non-Plane body", "command": "GetActiveCouplingMode", "expect": "TwoWay" },
-    { "label": "Sphere falls into the pool, same duration, now with a buoyant reaction pushing back (~0.4s)", "command": "Step", "expect": "OK", "repeat": 40 },
+    { "label": "Sphere falls into the pool, same duration, now with a buoyant reaction pushing back (~0.4s)", "command": "StepSimulation:40", "expect": "OK" },
     { "label": "Change: Two-Way sphere height after falling", "command": "GetBodyPositionY:1", "store_as": "bodyY_twoway" },
 
     { "label": "Invariant: the Two-Way run's fluid stays bounded -- it used to explode to max particle Y in the thousands on sphere impact (internal design notes 1.6)", "command": "GetMaxParticlePositionY", "expect_range": "-0.1,3.6" },

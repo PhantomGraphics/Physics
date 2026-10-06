@@ -1,3 +1,4 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
-#include "gltf_fragment.glsl"
+#define COMBUSTIBLE_SCALARS
+#include "gltf_vertex.glsl"

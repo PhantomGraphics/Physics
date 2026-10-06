@@ -74,7 +74,10 @@ public:
     bool loadScenario(const std::string& jsonPath) override;
     void disableInteractiveLayoutPersistence() { controlHost_.setLayoutFile({}); }
     void useVerificationLayout(std::string ini) { verificationLayout_=std::move(ini); }
-    void setExitOnScenarioComplete(bool v) override { exitOnComplete_ = v; }
+    void setExitOnScenarioComplete(bool v) override {
+        exitOnComplete_ = v;
+        dispatcher_.setAutomatedScenario(v);
+    }
     int  getExitCode() const               { return exitCode_; }
 
     // IScenarioHost (drives ScenarioBrowserPanel)

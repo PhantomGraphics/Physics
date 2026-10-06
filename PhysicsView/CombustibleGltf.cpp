@@ -9,24 +9,25 @@ int Phantom::combustibleColorLevel(const Physics::CombustibleSample& s,int mode)
     return std::clamp(static_cast<int>(value*15),0,15);
 }
 
-Phantom::Gltf::GltfDocument Phantom::makeCombustibleGltf(const Physics::CombustibleBody& body,int mode)
+static Phantom::Gltf::GltfDocument buildCombustibleGltf(const Phantom::Physics::CombustibleBody& body,int mode,bool scalarField)
 {
+    using namespace Phantom;
     using namespace Gltf;
     GltfDocument doc; GltfMesh mesh;
-    struct Geometry { std::vector<glm::vec3> p,n; std::vector<uint32_t> indices; };
+    struct Geometry { std::vector<glm::vec3> p,n; std::vector<glm::vec2> uv; std::vector<uint32_t> indices; };
     Geometry geometry[16];
-    for(int i=0;i<16;++i) {
+    for(int i=0;i<(scalarField?1:16);++i) {
         const float t=i/15.0f; glm::vec3 color=glm::mix(glm::vec3(0.015f),glm::vec3(0.45f,0.22f,0.08f),t);
         if(mode==1) color=glm::mix(glm::vec3(0.02f,0.1f,0.6f),glm::vec3(1,0.12f,0.01f),t);
         if(mode==2) color=glm::mix(glm::vec3(0.1f,0.01f,0.01f),glm::vec3(0.1f,0.7f,0.1f),t);
-        GltfMaterial material; material.pbrMetallicRoughness.baseColorFactor=glm::vec4(color,1);
+        GltfMaterial material; material.pbrMetallicRoughness.baseColorFactor=glm::vec4(scalarField?glm::vec3(1):color,1);
         material.pbrMetallicRoughness.metallicFactor=0; material.pbrMetallicRoughness.roughnessFactor=0.8f;
         doc.materials.push_back(material);
     }
     const bool box=body.shape()==Physics::CombustibleBody::Shape::Box;
     const int n=static_cast<int>(std::lround(std::sqrt(body.samples().size()/(box?6.0:8.0))));
     for(size_t index=0;index<body.samples().size();++index) {
-        const auto& s=body.samples()[index]; auto& g=geometry[combustibleColorLevel(s,mode)];
+        const auto& s=body.samples()[index]; auto& g=geometry[scalarField?0:combustibleColorLevel(s,mode)];
         if(body.usesSolidParticles()) {
             // Opaque particle glyphs: the visible colors are the actual volume
             // particle temperatures/fuel, with the same depth in Normal/PBVR.
@@ -38,6 +39,7 @@ Phantom::Gltf::GltfDocument Phantom::makeCombustibleGltf(const Physics::Combusti
                 const glm::vec3 axis{std::sin(theta)*std::cos(phi),std::cos(theta),std::sin(theta)*std::sin(phi)};
                 g.p.push_back(s.position+axis*s.glyphHalfExtent);
                 g.n.push_back(glm::normalize(axis/s.glyphHalfExtent));
+                if(scalarField) g.uv.emplace_back(static_cast<float>(index),0);
             }
             for(int lat=0;lat<bands;++lat) for(int lon=0;lon<slices;++lon) {
                 const auto a=base+lat*(slices+1)+lon,b=a+1,c=a+slices+1,d=c+1;
@@ -66,13 +68,14 @@ Phantom::Gltf::GltfDocument Phantom::makeCombustibleGltf(const Physics::Combusti
             }
         }
         const auto base=static_cast<uint32_t>(g.p.size());
-        for(int k=0;k<4;++k) { g.p.push_back(p[k]); g.n.push_back(normals[k]); }
+        for(int k=0;k<4;++k) { g.p.push_back(p[k]); g.n.push_back(normals[k]); if(scalarField) g.uv.emplace_back(static_cast<float>(index),0); }
         g.indices.insert(g.indices.end(),{base,base+1,base+2,base,base+2,base+3});
     }
     for(int i=0;i<16;++i) if(!geometry[i].p.empty()) {
         GltfPrimitive primitive; auto& g=geometry[i];
         primitive.positionAccessor=appendAccessor(doc,g.p,GltfComponentType::Float,GltfAccessorType::Vec3);
         primitive.normalAccessor=appendAccessor(doc,g.n,GltfComponentType::Float,GltfAccessorType::Vec3);
+        if(scalarField) primitive.texCoord0Accessor=appendAccessor(doc,g.uv,GltfComponentType::Float,GltfAccessorType::Vec2);
         primitive.indicesAccessor=appendAccessor(doc,g.indices,GltfComponentType::UnsignedInt,GltfAccessorType::Scalar);
         primitive.materialIndex=i; mesh.primitives.push_back(primitive);
     }
@@ -80,3 +83,9 @@ Phantom::Gltf::GltfDocument Phantom::makeCombustibleGltf(const Physics::Combusti
     GltfScene scene; scene.nodes.push_back(0); doc.scenes.push_back(scene); doc.defaultScene=0;
     return doc;
 }
+
+Phantom::Gltf::GltfDocument Phantom::makeCombustibleGltf(const Physics::CombustibleBody& body,int mode)
+{ return buildCombustibleGltf(body,mode,false); }
+
+Phantom::Gltf::GltfDocument Phantom::makeCombustibleScalarGltf(const Physics::CombustibleBody& body)
+{ return buildCombustibleGltf(body,0,true); }

@@ -39,7 +39,8 @@ float FlameParticle::getPressure() const
 
 float FlameParticle::getMass() const
 {
-	return fluid_->getDensity() * std::pow(getDiameter(), 3.0f);
+	const float diameter = getDiameter();
+	return fluid_->getDensity() * (diameter * diameter * diameter);
 }
 
 float FlameParticle::getVolume() const

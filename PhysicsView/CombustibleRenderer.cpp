@@ -24,16 +24,20 @@ void CombustibleRenderer::onUpdate(uint32_t frame)
     for(const auto& b:world_->bodies()) {
         auto& ptr=instances_[b->id()]; const bool fresh=!ptr;
         if(fresh) ptr=std::make_unique<Instance>();
-        auto& inst=*ptr; std::vector<int> keys;
-        for(const auto& s:b->samples()) keys.push_back(combustibleColorLevel(s,world_->solidDebugColor)+16*world_->solidDebugColor);
-        if(inst.colorKeys!=keys) {
+        auto& inst=*ptr;
+        if(fresh) {
             changed=true;
-            inst.doc=makeCombustibleGltf(*b,world_->solidDebugColor);
-            if(fresh) { inst.renderer.setDocument(inst.doc); inst.renderer.setShaders(shaders_);
-                inst.renderer.onInit(*ctx_,*pool_,pass_,frames_); }
-            else { vkDeviceWaitIdle(ctx_->getDevice()); inst.renderer.loadDocument(inst.doc); }
-            inst.colorKeys=std::move(keys);
+            inst.doc=makeCombustibleScalarGltf(*b);
+            inst.renderer.setDocument(inst.doc); inst.renderer.setShaders(shaders_);
+            inst.renderer.onInit(*ctx_,*pool_,pass_,frames_);
         }
+        std::vector<glm::vec4> values;
+        values.reserve(b->samples().size()+1);
+        values.emplace_back(static_cast<float>(world_->solidDebugColor),0,0,0);
+        for(const auto& s:b->samples()) values.emplace_back(s.temperature,static_cast<float>(s.fuel),static_cast<float>(s.initialFuel),0);
+        changed=changed || values!=inst.scalarValues;
+        inst.scalarValues=values;
+        inst.renderer.setScalarField(std::move(values));
         const auto& physical=world_->physicalTransform();
         const glm::vec3 center=physical.toScene(b->center());
         changed=changed || center!=inst.center || b->orientation()!=inst.orientation; inst.center=center; inst.orientation=b->orientation();

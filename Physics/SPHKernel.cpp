@@ -22,7 +22,8 @@ float SPHKernel::getPoly6Kernel(const float distance)
 	if (distance > effectLength) {
 		return 0.0f;
 	}
-	return this->poly6KernelConstant * std::pow(effectLength * effectLength - distance * distance, 3.0f);
+	const float a = effectLengthSquared - distance * distance;
+	return this->poly6KernelConstant * a * a * a;
 }
 
 float SPHKernel::getPoly6Kernel2(const float distanceSquared)
@@ -100,7 +101,8 @@ Vector3df SPHKernel::getSpikyKernelGradient(const Vector3df& distanceVector) con
 	if (distance <= 0.0f) {
 		return Vector3df(0, 0, 0);
 	}
-	return distanceVector * this->spikyKernelGradConstant * std::pow(effectLength - distance, 2.0f) / distance;
+	const float a = effectLength - distance;
+	return distanceVector * this->spikyKernelGradConstant * (a * a) / distance;
 }
 
 float SPHKernel::getSpikyKernelGradientWeight(const float distance)
@@ -115,8 +117,8 @@ float SPHKernel::getSpikyKernelGradientWeight(const float distance)
 	if (distance <= 0.0f) {
 		return 0.0f;
 	}
-	const auto constant = 45.0f / (PIf * std::pow(effectLength, 6.0f));
-	return constant * std::pow(effectLength - distance, 2.0f) / distance;
+	const float a = effectLength - distance;
+	return spikyKernelGradConstant * (a * a) / distance;
 }
 
 /*
@@ -136,8 +138,7 @@ float SPHKernel::getViscosityKernelLaplacian(const float distance)
 	if (distance > effectLength) {
 		return 0.0f;
 	}
-	const auto constant = 45.0f / (PIf * std::pow(effectLength, 6.0f));
-	return (effectLength - distance) * constant;
+	return (effectLength - distance) * spikyKernelGradConstant;
 }
 
 float SPHKernel::getCubicSpline(const float distance) const

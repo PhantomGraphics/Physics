@@ -6,6 +6,7 @@
 #include "../PhysicsView/FlameWorld.h"
 #include "../Physics/FlameStats.h"
 #include "../PhysicsView/CombustibleGltf.h"
+#include <cstring>
 #include <limits>
 
 using namespace Phantom::Physics;
@@ -319,6 +320,31 @@ TEST(CombustibleGltf, LocalCharAndOpaqueGeometry)
     for(const auto& primitive:particleDoc.meshes[0].primitives)
         vertices+=particleDoc.accessors[primitive.positionAccessor].count;
     EXPECT_EQ(vertices,body.particles().size()*63);
+}
+
+TEST(CombustibleGltf, ScalarGeometryKeepsSampleIndicesAndDoesNotChangeWithHeatOrFuel)
+{
+    CombustibleBody body;
+    ASSERT_TRUE(body.initializeParticles(1,CombustibleBody::Shape::Box,{0,0,0},{0.1f,0.1f,0.1f},2,0.01,{}));
+    const auto before=Phantom::makeCombustibleScalarGltf(body);
+    ASSERT_EQ(before.meshes.size(),1u);
+    ASSERT_EQ(before.meshes[0].primitives.size(),1u);
+    ASSERT_EQ(before.materials.size(),1u);
+    const auto& primitive=before.meshes[0].primitives[0];
+    const auto& uv=before.accessors[primitive.texCoord0Accessor];
+    const auto& view=before.bufferViews[uv.bufferViewIndex];
+    const auto& bytes=before.buffers[view.bufferIndex].data;
+    ASSERT_EQ(uv.count,body.samples().size()*63);
+    for(size_t i=0;i<uv.count;++i) {
+        glm::vec2 value;
+        std::memcpy(&value,bytes.data()+view.byteOffset+uv.byteOffset+i*sizeof(value),sizeof(value));
+        EXPECT_FLOAT_EQ(value.x,static_cast<float>(i/63));
+    }
+    for(auto& sample:body.samples()) { sample.temperature=1500; sample.fuel=0; }
+    const auto after=Phantom::makeCombustibleScalarGltf(body);
+    ASSERT_EQ(before.buffers.size(),after.buffers.size());
+    for(size_t i=0;i<before.buffers.size();++i) EXPECT_EQ(before.buffers[i].data,after.buffers[i].data);
+    EXPECT_FLOAT_EQ(after.materials[0].pbrMetallicRoughness.baseColorFactor.a,1);
 }
 
 TEST(SolidCombustionSolver, PyrolysisPendingSensibleHeatAndLatentEnergy)
