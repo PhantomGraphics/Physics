@@ -7,6 +7,7 @@
 #include "SoftBodyCommandDispatcher.h"
 #include "FlameCommandDispatcher.h"
 #include "CloudCommandDispatcher.h"
+#include "HairCommandDispatcher.h"
 
 #include <optional>
 
@@ -170,6 +171,7 @@ namespace Phantom {
         // Cloud page surface (SetCloudPage / CloudReset / CloudAdvance:s / AddCloudSource:... /
         // GetCloudStat:name / ...), see CloudCommandDispatcher.h. Every command name contains "Cloud".
         CloudCommandDispatcher& cloud() { return cloudDispatcher_; }
+        HairCommandDispatcher& hair() { return hairDispatcher_; }
 
         // Tears the whole 3D scene down to nothing (the "NewScene" command /
         // File > New). Unset makes "NewScene" an "Error:".
@@ -240,6 +242,7 @@ namespace Phantom {
         SoftBodyCommandDispatcher softDispatcher_;
         FlameCommandDispatcher flameDispatcher_;
         CloudCommandDispatcher cloudDispatcher_;
+        HairCommandDispatcher hairDispatcher_;
         double simulationBudgetMs_ = 8.0;
         int simulationStepsRemaining_ = 0;
         FluidVolumeConverter* volumeConverter_ = nullptr;

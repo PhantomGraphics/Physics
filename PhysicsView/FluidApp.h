@@ -56,6 +56,8 @@
 #include "CloudWorld.h"
 #include "CloudVolumeRenderer.h"
 #include "CloudControlPanel.h"
+#include "HairWorld.h"
+#include "HairControlPanel.h"
 
 #include <filesystem>
 #include <optional>
@@ -187,6 +189,11 @@ private:
     // pattern as Flame. Phase 2 shows the air particles through the shared
     // FluidRenderer (coloured by cloud water); the PBVR cloud renderer is Phase 3.
     CloudWorld        cloudWorld_;
+    HairWorld         hairWorld_;
+    // The existing wire renderer already accepts arbitrary indexed line data.
+    SoftBodyWireRenderer hairRenderer_;
+    HairControlPanel  hairControlPanel_;
+    double            hairLastTime_ = -1.;
     CloudControlPanel cloudControlPanel_;
     CloudVolumeRenderer cloudVolumeRenderer_;
     Volume::ScalarGrid3D cloudDensity_;            // last reconstructed density (cloud space)
@@ -241,6 +248,7 @@ private:
     void destroyHdrTargets();
     void syncRigidRenderer();
     void syncSoftRenderer();
+    void syncHairRenderer();
     void syncFlameRenderer();
     void syncCloudRenderer();
     void syncVolumeRenderer();

@@ -124,6 +124,9 @@ if(PHANTOM_GTEST_FOUND)
     target_sources(PhysicsTest PRIVATE ${PHYSICS_ROOT}/PhysicsView/FlameWorld.cpp
         ${PHYSICS_ROOT}/PhysicsView/RigidBodyWorld.cpp
         ${PHYSICS_ROOT}/PhysicsView/SceneComponentRegistry.cpp)
+    target_sources(PhysicsTest PRIVATE
+        ${PHYSICS_ROOT}/PhysicsView/HairWorld.cpp
+        ${PHYSICS_ROOT}/PhysicsView/HairCommandDispatcher.cpp)
     target_sources(PhysicsTest PRIVATE ${PHYSICS_ROOT}/PhysicsView/CombustibleGltf.cpp)
     set_target_properties(PhysicsTest PROPERTIES
         CXX_STANDARD 20
@@ -269,6 +272,9 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/CloudWorld.cpp
     ${PHYSICS_ROOT}/PhysicsView/CloudCommandDispatcher.cpp
     ${PHYSICS_ROOT}/PhysicsView/CloudControlPanel.cpp
+    ${PHYSICS_ROOT}/PhysicsView/HairWorld.cpp
+    ${PHYSICS_ROOT}/PhysicsView/HairControlPanel.cpp
+    ${PHYSICS_ROOT}/PhysicsView/HairCommandDispatcher.cpp
     ${PHYSICS_ROOT}/PhysicsView/CloudVolumeRenderer.cpp
 )
 target_include_directories(PhysicsView PRIVATE

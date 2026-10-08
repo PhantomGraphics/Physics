@@ -20,12 +20,14 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     , softControlPanel_(&softWorld_)
     , flameControlPanel_(&flameWorld_)
     , cloudControlPanel_(&cloudWorld_)
+    , hairControlPanel_(&hairWorld_)
 {
     // Every scene object registers itself into the shared registry: the fluid
     // + mesh boundary + emitters/outflow via FluidWorld, its rigid bodies via
     // the forwarded RigidBodyWorld, and the soft bodies via SoftBodyWorld.
     world_.setComponentRegistry(&sceneComponents_);
     softWorld_.setComponentRegistry(&sceneComponents_);
+    hairWorld_.setComponentRegistry(&sceneComponents_);
     objectListPanel_.bind(&sceneComponents_);
 
     dispatcher_.setWorld(&world_);
@@ -100,6 +102,19 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     dispatcher_.flame().setPBVRStatsHook([this] { return flameRenderer_.pbvrStats(); });
     dispatcher_.flame().setOnFlameChanged([this]() { syncFlameRenderer(); syncRigidRenderer(); });
     cloudControlPanel_.setOnWorldChanged([this]() { cloudDirty_ = true; });
+    hairControlPanel_.setOnWorldChanged([this]() { syncHairRenderer(); });
+    hairControlPanel_.setOnFrameGuides([this]() {
+        fluidRenderer_.setCameraTarget({0.f, 0.9f, 0.f});
+        fluidRenderer_.setCameraOrbit(5.f, 0.25f, 0.1f);
+    });
+    dispatcher_.hair().setWorld(&hairWorld_);
+    dispatcher_.hair().setOnChanged([this]() { syncHairRenderer(); });
+    dispatcher_.hair().setPageHooks(
+        [this](bool on) {
+            controlHost_.setPage(on ? ControlPage::Hair : ControlPage::Fluid);
+            controlHost_.setVisible(true);
+        },
+        [this] { return controlHost_.getPage() == ControlPage::Hair; });
     dispatcher_.cloud().setWorld(&cloudWorld_);
     dispatcher_.cloud().setPageHooks(
         [this](bool on) {
@@ -148,7 +163,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     // manually against hdrScene_'s render pass.
     hdrRenderers_ = { &bgGltfRenderer_, &fluidRenderer_,
                       &rigidGltfRenderer_, &rigidRenderer_,
-                      &softGltfRenderer_, &softRenderer_,
+                      &softGltfRenderer_, &softRenderer_, &hairRenderer_,
                       &volumeRenderer_, &meshRenderer_, &combustibleRenderer_, &flameRenderer_, &flameDebugRenderer_,
                       &cloudVolumeRenderer_ };
     add(&ssfrRenderer_);
@@ -186,6 +201,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
             const char* page = "Fluid";
             if (c.kind == SceneComponentKind::RigidBody) page = "RigidBody";
             else if (c.kind == SceneComponentKind::SoftBody) page = "SoftBody";
+            else if (c.kind == SceneComponentKind::Hair) page = "Hair";
             items.push_back({static_cast<uint64_t>(c.id),
                              "#" + std::to_string(c.id) + " " + c.label + ": " + (c.describe ? c.describe() : std::string{}),
                              page});
@@ -197,6 +213,7 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
         ControlPage p = ControlPage::Fluid;
         if (page == "RigidBody") p = ControlPage::RigidBody;
         else if (page == "SoftBody") p = ControlPage::SoftBody;
+        else if (page == "Hair") p = ControlPage::Hair;
         controlHost_.setPage(p);
         controlHost_.setVisible(true);
     });
@@ -293,6 +310,7 @@ void FluidApp::registerControlPages()
     controlHost_.registerPage(ControlPage::SoftBody,         &softControlPanel_);
     controlHost_.registerPage(ControlPage::Flame,            &flameControlPanel_);
     controlHost_.registerPage(ControlPage::Cloud,            &cloudControlPanel_);
+    controlHost_.registerPage(ControlPage::Hair,             &hairControlPanel_);
     controlHost_.registerPage(ControlPage::FluidRendering,   &fluidRenderer_);
     controlHost_.registerPage(ControlPage::SSFR,             &ssfrPanel_);
     controlHost_.registerPage(ControlPage::Rendering,        &renderingPanel_);
@@ -312,6 +330,7 @@ void FluidApp::onInit()
     ssfrRenderer_.setParticleRadius(world_.params().radius);
     rigidRenderer_.setExtent(getExtent());
     softRenderer_.setExtent(getExtent());
+    hairRenderer_.setExtent(getExtent());
 
     {
         FluidRenderer::Shaders s;
@@ -335,6 +354,10 @@ void FluidApp::onInit()
         s.vertSpv = ::VKG::loadSPVRepo("shaders/line.vert.spv");
         s.fragSpv = ::VKG::loadSPVRepo("shaders/line.frag.spv");
         softRenderer_.setShaders(std::move(s));
+        SoftBodyWireRenderer::Shaders hairShaders;
+        hairShaders.vertSpv = ::VKG::loadSPVRepo("shaders/line.vert.spv");
+        hairShaders.fragSpv = ::VKG::loadSPVRepo("shaders/line.frag.spv");
+        hairRenderer_.setShaders(std::move(hairShaders));
     }
     {
         VolumeRenderer::Shaders s;
@@ -533,6 +556,9 @@ void FluidApp::newScene()
                                 // emitters / outflow / sources / boundaries / coupling
     world_.rigid().clear();     // 0 rigid bodies (no preset, not even a floor)
     softWorld_.clear();         // 0 soft bodies
+    hairWorld_.clear();
+    hairLastTime_ = -1.;
+    syncHairRenderer();
     flameWorld_.clear();        // fresh flame scene, stopped and out of the shared scene
     syncFlameRenderer();
     renderBackground_.clearBackground();  // release the glTF background document
@@ -589,6 +615,7 @@ void FluidApp::onSwapChainCreated()
     rigidRenderer_.setExtent(ext);
     flameDebugRenderer_.setExtent(ext);
     softRenderer_.setExtent(ext);
+    hairRenderer_.setExtent(ext);
     bgGltfRenderer_.setExtent(ext);
 
     // Phase 5. run() calls onInit() (which builds the HDR target) then this,
@@ -623,6 +650,11 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         verificationLayout_.clear();
     }
     dispatcher_.processQueue();
+    const double hairNow = std::chrono::duration<double>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    const double hairDt = hairLastTime_ < 0. ? 0. : hairNow - hairLastTime_;
+    hairLastTime_ = hairNow;
+    if (hairWorld_.update(hairDt)) syncHairRenderer();
 
     // Keep the Scenario Browser's GUI run-queue advancing every frame, even
     // when its page is not the one currently shown in the Control window.
@@ -767,6 +799,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     prevCloudActive_ = cloudActive;
     cloudVolumeRenderer_.setEnabled(cloudActive && cloudWorld_.render().volumeMode);
     const bool ownsViewport = cloudActive;
+    hairRenderer_.setEnabled(!ownsViewport);
     // Rigid / soft body: wire (RigidBodyWireRenderer / SoftBodyWireRenderer) vs
     // shaded (GltfBodyRenderer / GltfSoftRenderer) vs both, per SetRigidRenderMode
     // / SetSoftRenderMode / the "glTF Rendering" panel. Flame still takes the
@@ -787,6 +820,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     rigidRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
     flameDebugRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
     softRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
+    hairRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
     volumeRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
     meshRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
 
@@ -1053,6 +1087,15 @@ void FluidApp::syncSoftRenderer()
     softRenderer_.update(wd.positions, wd.colors, wd.indices,
                           fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
     softGltfRenderer_.syncFromWorld();
+}
+
+void FluidApp::syncHairRenderer()
+{
+    // Invalidate flame PBVR accumulation when another visible domain moves.
+    flameRenderer_.notifySimulationAdvanced(!hairWorld_.isRunning());
+    const auto wd = hairWorld_.buildWireData();
+    hairRenderer_.update(wd.positions, wd.colors, wd.indices,
+        fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
 }
 
 void FluidApp::syncCloudRenderer()

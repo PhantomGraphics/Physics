@@ -175,6 +175,17 @@ std::vector<CommandInfo> CommandDispatcher::commandCatalog() const {
         {"GetSoftRenderMode", "", ""},
         {"GetSoftTotalVolume", "", "e.g. GetSoftTotalVolume:0"},
         {"GetStatus", "", ""},
+        {"HairPreset", "", "e.g. HairPreset:Bundle"},
+        {"HairStep", "", "e.g. HairStep:60"},
+        {"HairReset", "", ""},
+        {"HairClear", "", ""},
+        {"SetHairPage", "", "e.g. SetHairPage:true"},
+        {"SetHairRunning", "", "e.g. SetHairRunning:true"},
+        {"IsHairPage", "", ""},
+        {"IsHairRunning", "", ""},
+        {"SetHairParam", "", "e.g. SetHairParam:shapeCompliance,0.02"},
+        {"GetHairParam", "", "e.g. GetHairParam:substeps"},
+        {"GetHairStat", "", "e.g. GetHairStat:lengthError"},
         {"GetVolumeVoxelCount", "", ""},
         {"IsCloudPage", "", ""},
         {"IsCloudRunning", "", ""},
@@ -332,6 +343,7 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
 
     if (auto flameResp = flameDispatcher_.route(cmd)) return flameResp;
     if (auto cloudResp = cloudDispatcher_.route(cmd)) return cloudResp;
+    if (auto hairResp = hairDispatcher_.route(cmd)) return hairResp;
 
     if (sv.rfind("SetCameraTarget:",0)==0) {
         if(!fluidRenderer_) return std::string("Error:camera not available");

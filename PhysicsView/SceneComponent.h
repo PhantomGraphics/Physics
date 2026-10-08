@@ -14,6 +14,7 @@ enum class SceneComponentKind {
     MeshBoundary,
     Emitter,
     OutflowRegion,
+    Hair,
 };
 
 /**
