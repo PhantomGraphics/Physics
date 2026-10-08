@@ -26,6 +26,7 @@ void FlameWorld::reset()
     fluid_  = std::make_unique<FlameFluid>();
     solver_ = std::make_unique<FlameSolver>();
     simTime_ = 0.0f;
+    emissionHistory_.clear();
     buildScene();
     populated_ = true;
 }
@@ -134,6 +135,13 @@ void FlameWorld::stepOnce()
         solver_->simulate(timeStep_/count);
     }
     simTime_ += timeStep_;
+    // Sample the simulation clock, not presentation frames. A paused view
+    // therefore preserves the same finite shutter window for comparisons.
+    if (fluid_->fixedCarriers) {
+        const auto& gas=fluid_->getParticles();
+        emissionHistory_.push_back({gas.positions,gas.temperatures});
+        if (emissionHistory_.size()>16) emissionHistory_.pop_front();
+    }
 }
 
 uint64_t FlameWorld::addBody(CombustibleBody::Shape shape, const glm::vec3& center,

@@ -192,6 +192,8 @@ const std::vector<ParamDef>& renderParams()
 		{ "hazeFrequency", FLAME_R(hazeFrequency) },
 		{ "hazeRiseSpeed", FLAME_R(hazeRiseSpeed) },
 		{ "exposure", FLAME_R(exposure) },
+		{ "temporalBlurFrames", [](FlameWorld& w) { return static_cast<float>(w.render().temporalBlurFrames); },
+			[](FlameWorld& w, float v) { if(v<0 || v>16 || v!=std::floor(v)) return false; w.render().temporalBlurFrames=static_cast<int>(v); return true; } },
 		{ "autoReferenceTemperature", FLAME_R(autoReferenceTemperature) },
 		{ "referenceTemperature", FLAME_R(referenceTemperature) },
 		{ "whiteBalance", FLAME_R(whiteBalance) },

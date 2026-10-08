@@ -70,6 +70,7 @@ public:
 		float ambientTemperature = 300.0f;
 		float referenceTemperature = 2000.0f; ///< radiance 1 here, HDR above
 		float exposure = 1.0f;
+		float emissionWeight = 1.0f; ///< normalized finite shutter samples (emission and heat haze only)
 		float whiteBalanceTemperature = 0.0f; ///< adapt this blackbody's white to D65 (0 = off)
 		float whiteBalanceDegree = 1.0f;      ///< 0..1, CIECAM02-style adaptation degree D
 		float smokeExtinction = 4.0f;          ///< sigma: optical depth per unit density

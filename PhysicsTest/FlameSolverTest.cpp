@@ -18,6 +18,28 @@
 using namespace Phantom::Math;
 using namespace Phantom::Physics;
 
+TEST(FlameWorld, EmissionHistoryTracksSimulationStepsAndResetsWithPresets)
+{
+  Phantom::FlameWorld world;
+  ASSERT_TRUE(world.circulationPreset(true,0.3f,0.8f,0.08f));
+  EXPECT_TRUE(world.emissionHistory().empty());
+  world.stepOnce();
+  ASSERT_EQ(world.emissionHistory().size(),1u);
+  const auto oldPosition=world.emissionHistory().front().positions.front();
+  const auto oldTemperature=world.emissionHistory().front().temperatures.front();
+  world.stepOnce();
+  ASSERT_EQ(world.emissionHistory().size(),2u);
+  EXPECT_EQ(world.emissionHistory().front().positions.front(),oldPosition);
+  EXPECT_EQ(world.emissionHistory().front().temperatures.front(),oldTemperature);
+  EXPECT_EQ(world.emissionHistory().back().positions,world.fluid().getParticles().positions);
+  for(int i=0;i<20;++i) world.stepOnce();
+  EXPECT_EQ(world.emissionHistory().size(),16u);
+  world.setRunning(false); world.step();
+  EXPECT_EQ(world.emissionHistory().size(),16u);
+  ASSERT_TRUE(world.sphericalPreset(false,0.3f,0.08f));
+  EXPECT_TRUE(world.emissionHistory().empty());
+}
+
 TEST(FlameSolverTest, ClosedCylinderClampsSideAndCapsWithoutRemovingTangentialVelocity)
 {
   FlameFluid fluid; FlameSolver solver;

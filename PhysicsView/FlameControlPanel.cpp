@@ -133,6 +133,10 @@ void FlameControlPanel::drawContents()
 
         Im::textDisabled("Emission: blackbody HDR, radiance 1 at the reference temperature.");
         Im::sliderFloat("Exposure", render.exposure, 0.0f, 8.0f);
+        if (!render.pbvrMode && fluid.fixedCarriers) {
+            Im::sliderInt("Emission Shutter Steps", render.temporalBlurFrames, 0, 16);
+            Im::textDisabled("0/1 off; averages past simulation steps, including when paused.");
+        }
         Im::checkbox("Auto Reference Temperature", render.autoReferenceTemperature);
         if (!render.autoReferenceTemperature) {
             Im::sliderFloat("Reference Temperature (K)", render.referenceTemperature, 500.0f, 4000.0f);

@@ -1252,9 +1252,24 @@ void FluidApp::syncFlameRenderer()
         maxT = std::max(maxT, t);
         if (!fluid.fixedCarriers || render.carrierDebug==0) pushEmitter(xf(particles.positions[i]), t, flameSize);
     }
+    size_t emissionSamples=1;
+    const auto& history=flameWorld_.emissionHistory();
+    if (fluid.fixedCarriers && render.carrierDebug==0 && !render.pbvrMode && render.temporalBlurFrames>1 && !history.empty()) {
+        emissionSamples=std::min(history.size(),static_cast<size_t>(render.temporalBlurFrames));
+        // Current primaries were emitted above. Exclude the newest snapshot
+        // so the latest state is counted exactly once.
+        for(size_t frame=history.size()-emissionSamples;frame+1<history.size();++frame)
+            for(size_t i=0;i<history[frame].positions.size();++i) {
+                const float t=history[frame].temperatures[i];
+                if(std::isfinite(t)) pushEmitter(xf(history[frame].positions[i]),t,flameSize);
+            }
+    }
     for (const auto& sp : secondaries) {
         if (sp.kind == Phantom::Physics::FlameFluid::SecondaryKind::Spark) {
-            pushEmitter(xf(sp.position), sp.temperature, flameSize * sp.size);
+            // Sparks have no SPH history. Replication cancels the common
+            // shutter normalization without changing their appearance.
+            for(size_t sample=0;sample<emissionSamples;++sample)
+                pushEmitter(xf(sp.position), sp.temperature, flameSize * sp.size);
         } else {
             const glm::vec3 p = xf(sp.position);
             smokePositions.push_back(p.x);
@@ -1292,6 +1307,7 @@ void FluidApp::syncFlameRenderer()
         render.autoReferenceTemperature ? flameAutoRefT_ : render.referenceTemperature,
         shading.ambientTemperature + 200.0f);
     shading.exposure = render.exposure;
+    shading.emissionWeight = 1.0f/static_cast<float>(emissionSamples);
     shading.whiteBalanceTemperature =
         // Auto adapts to the smoothed hottest temperature (the radiance
         // reference). Tried: the radiance-weighted mean temperature ("gray

@@ -19,6 +19,6 @@ void main() {
     // ubo.smoke.w = haze extent: the haze reaches beyond the visible flame body.
     gl_PointSize = flamePointSize(inSize * ubo.smoke.w, gl_Position);
     float excess = (inTemperature - ubo.thermal.x) / max(ubo.thermal.y - ubo.thermal.x, 1.0);
-    outHeat = clamp(excess, 0.0, 1.5);
+    outHeat = clamp(excess, 0.0, 1.5) * ubo.thermal.w;
     outDepth = gl_Position.z / max(gl_Position.w, 1.0e-4);
 }

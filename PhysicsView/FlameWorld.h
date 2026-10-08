@@ -9,6 +9,7 @@
 #include <memory>
 #include <functional>
 #include <cmath>
+#include <deque>
 
 namespace Phantom {
 class RigidBodyWorld;
@@ -112,6 +113,7 @@ public:
         // Emission (plan Phase 3): blackbody radiance, 1 at the reference
         // temperature and HDR above it; ACES downstream rolls the core to white.
         float exposure               = 4.0f;
+        int temporalBlurFrames       = 0; ///< Normal fixed-carrier emission, past simulation steps (0/1 off)
         bool  autoReferenceTemperature = true;   ///< track the (smoothed) hottest particle
         float referenceTemperature   = 2000.0f;  ///< used when auto is off
         // White balance (chromatic adaptation, Bradford): 0 = off (colorimetric
@@ -164,6 +166,11 @@ public:
 
     RenderParams&       render()       { return render_; }
     const RenderParams& render() const { return render_; }
+    struct EmissionFrame {
+        std::vector<Math::Vector3df> positions;
+        std::vector<float> temperatures;
+    };
+    const std::deque<EmissionFrame>& emissionHistory() const { return emissionHistory_; }
 
 private:
     std::function<bool()> canBindRigid_;
@@ -182,6 +189,7 @@ private:
     float        timeStep_ = 1.0f / 60.0f;
     float        simTime_  = 0.0f;
     RenderParams render_;
+    std::deque<EmissionFrame> emissionHistory_;
 
     void buildScene();
 };
