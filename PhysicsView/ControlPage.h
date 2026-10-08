@@ -22,6 +22,7 @@ enum class ControlPage {
     SSFR,
     Rendering,
     VolumeConversion,
+    Hair, // append to preserve existing persisted page numbers
     Count,
 };
 
@@ -40,6 +41,7 @@ inline const char* toString(ControlPage page)
     case ControlPage::SSFR:             return "SSFR";
     case ControlPage::Rendering:        return "glTF Rendering";
     case ControlPage::VolumeConversion: return "Volume / Mesh Conversion";
+    case ControlPage::Hair:             return "Hair / Fur";
     default:                            return "?";
     }
 }

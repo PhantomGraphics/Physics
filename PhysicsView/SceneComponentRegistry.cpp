@@ -35,6 +35,7 @@ const char* SceneComponentRegistry::kindName(SceneComponentKind kind)
     case SceneComponentKind::MeshBoundary:  return "MeshBoundary";
     case SceneComponentKind::Emitter:       return "Emitter";
     case SceneComponentKind::OutflowRegion: return "OutflowRegion";
+    case SceneComponentKind::Hair:          return "Hair";
     }
     return "?";
 }
