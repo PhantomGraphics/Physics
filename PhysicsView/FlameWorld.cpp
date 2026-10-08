@@ -364,3 +364,35 @@ bool FlameWorld::combustionPreset(int resolution, double fuelMass)
 }
 
 } // namespace Phantom
+
+namespace Phantom {
+bool FlameWorld::circulationPreset(bool cylinder,float radius,float height,float spacing)
+{
+ if (!std::isfinite(radius)||!std::isfinite(height)||!std::isfinite(spacing)||radius<0.05f||height<0.1f||
+     spacing<0.005f||spacing>radius||spacing>height*0.5f||radius/spacing>16||height/spacing>40) return false;
+ const Vector3df center(0,height*0.5f,0);
+ std::vector<Vector3df> seeds;
+ const int nx=static_cast<int>(radius/spacing),ny=static_cast<int>(height*0.5f/spacing);
+ for(int z=-nx;z<=nx;++z) for(int y=-ny;y<=ny;++y) for(int x=-nx;x<=nx;++x) {
+  const Vector3df p(x*spacing,y*spacing,z*spacing);
+  if (cylinder ? (std::sqrt(p.x*p.x+p.z*p.z)>radius-spacing*0.5f || std::abs(p.y)>height*0.5f-spacing*0.5f)
+               : getLength(p)>radius-spacing*0.5f) continue;
+  seeds.push_back(center+p);
+ }
+ if(seeds.empty()||seeds.size()>12000) return false;
+ reset(); running_=false; fluid_->getParticles().clear();
+ fluid_->initialFuelMass=fluid_->initialOxygenMass=fluid_->initialHeat=0;
+ fluid_->setMaxParticles(static_cast<int>(seeds.size()));
+ fluid_->setEffectLength(spacing*2); solver_->setEffectLength(spacing*2);
+ for(auto& emitter:fluid_->getEmittersMutable()) emitter.center=center;
+ if(cylinder) solver_->setBoundaryCylinder(center,radius,height); else solver_->setBoundarySphere(center,radius);
+ auto thermal=solver_->getThermalBoundary(); thermal.sourceCenter=center;
+ thermal.wallThickness=spacing*2; solver_->setThermalBoundary(thermal);
+ for(const auto& pos:seeds) {
+  fluid_->createParticle(pos,spacing*0.5f);
+  FlameParticle p(fluid_->getParticles(),fluid_->getParticles().size()-1,fluid_.get()); p.setAir(true);
+  fluid_->initialOxygenMass+=p.getMass(); fluid_->initialHeat+=p.getMass()*p.getTemperature();
+ }
+ return true;
+}
+}

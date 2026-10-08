@@ -54,10 +54,18 @@ FlameStats Phantom::Physics::computeFlameStats(const FlameFluid& fluid, const Fl
 		sumVy += mass*soa.velocities[i].y; sumTVy += mass*soa.temperatures[i]*soa.velocities[i].y;
 		st.densityError = std::max(st.densityError, std::abs(soa.densities[i]/fluid.getDensity()-1));
 		if (getLength(soa.velocities[i]) >= fluid.getMaxSpeed()*0.999f) ++capped;
-		if (solver && solver->getBoundarySphere()) {
-			const auto& wall = *solver->getBoundarySphere();
-			const auto offset = soa.positions[i]-wall.getCenter();
-			const float radial = std::sqrt(offset.x*offset.x+offset.z*offset.z)/wall.getRadius();
+		for (const auto& e:fluid.getEmitters()) {
+            const auto d=soa.positions[i]-e.center;
+            if(e.rate>0 && d.y>=-0.05f && d.y<=std::max(e.pilotHeight,0.12f) && d.x*d.x+d.z*d.z<=e.radius*e.radius) {
+                ++st.sourceCarrierCount; break;
+            }
+        }
+        if (solver && solver->getClosedBoundary()) {
+			const auto& wall = *solver->getClosedBoundary();
+            const auto center=solver->getBoundarySphere()?solver->getBoundarySphere()->getCenter():solver->getBoundaryCylinder()->getCenter();
+            const float radius=solver->getBoundarySphere()?solver->getBoundarySphere()->getRadius():solver->getBoundaryCylinder()->getRadius();
+			const auto offset = soa.positions[i]-center;
+			const float radial = std::sqrt(offset.x*offset.x+offset.z*offset.z)/radius;
 			if (radial < 0.3f) { ++st.coreCount; st.coreVelocityY += soa.velocities[i].y; }
 			if (radial > 0.65f) { ++st.outerCount; st.outerVelocityY += soa.velocities[i].y; }
 			st.maxWallPenetration = std::max(st.maxWallPenetration, soa.radii[i]-wall.getSignedDistance(soa.positions[i]));
@@ -167,7 +175,7 @@ FlameStats Phantom::Physics::computeFlameStats(const FlameFluid& fluid, const Fl
 
 const char* FlameStats::names()
 {
-	return "count,airCount,secondaryCount,nanCount,avgY,maxY,airAvgY,avgSpeed,maxSpeed,"
+	return "sourceCarrierCount,count,airCount,secondaryCount,nanCount,avgY,maxY,airAvgY,avgSpeed,maxSpeed,"
 		"boundaryEnergyLoss,maxAttemptedWallPenetration,"
 		"carrierMass,totalHeat,oxygenMass,kineticEnergy,heatBalanceError,oxygenBalanceError,sourceHeat,wallHeat,clampHeat,"
 		"allAvgT,coreVelocityY,outerVelocityY,thermalVelocityCovariance,maxWallPenetration,densityError,speedCapFraction,coreCount,outerCount,"
@@ -178,7 +186,7 @@ const char* FlameStats::names()
 bool FlameStats::get(const std::string& name, float& out) const
 {
 #define MASS(n) if(name==#n) { out=static_cast<float>(n); return true; }
-	MASS(boundaryEnergyLoss) MASS(maxAttemptedWallPenetration)
+	MASS(sourceCarrierCount) MASS(boundaryEnergyLoss) MASS(maxAttemptedWallPenetration)
 	MASS(carrierMass) MASS(totalHeat) MASS(oxygenMass) MASS(kineticEnergy) MASS(heatBalanceError) MASS(oxygenBalanceError)
 	MASS(sourceHeat) MASS(wallHeat) MASS(clampHeat) MASS(allAvgT) MASS(coreVelocityY) MASS(outerVelocityY)
 	MASS(thermalVelocityCovariance) MASS(maxWallPenetration) MASS(densityError) MASS(speedCapFraction) MASS(coreCount) MASS(outerCount)
@@ -213,7 +221,7 @@ std::string FlameStats::toString() const
 		count, airCount, secondaryCount, nanCount, avgY, maxY, airAvgY, avgSpeed, maxSpeed,
 		avgT, maxT, hotY, avgFuel, avgSoot, avgOxygen, burningFraction, histMinT, histMaxT);
 	std::string s(buf);
-	for (const char* name : {"carrierMass", "totalHeat", "allAvgT", "coreVelocityY", "outerVelocityY",
+	for (const char* name : {"sourceCarrierCount", "maxT", "burningFraction", "speedCapFraction", "sourceFuel", "carrierMass", "totalHeat", "allAvgT", "coreVelocityY", "outerVelocityY",
 		"thermalVelocityCovariance", "maxWallPenetration", "heatBalanceError", "oxygenBalanceError", "sourceHeat", "wallHeat"}) {
 		float value; get(name,value); s += std::string(";")+name+"="+std::to_string(value);
 	}

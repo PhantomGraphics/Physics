@@ -120,6 +120,7 @@ std::vector<CommandInfo> CommandDispatcher::commandCatalog() const {
         {"ConvertToVolume", "", ""},
         {"FlameCombustionPreset", "", ""},
         {"FlameReset", "", ""},
+        {"FlameCirculationPreset", "", "e.g. FlameCirculationPreset:cylinder,0.8,2.4,0.12"},
         {"FlameSpherePreset", "", "e.g. FlameSpherePreset:convection,0.3,0.06"},
         {"FlameStep", "", "e.g. FlameStep:240"},
         {"GetActiveCouplingMode", "", ""},

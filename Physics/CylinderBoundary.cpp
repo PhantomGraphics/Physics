@@ -51,7 +51,9 @@ Vector3df CylinderBoundary::getBoundaryForce(const Vector3df& pos, const float t
 	const float d = getSignedDistance(pos);
 	if (d >= 0.f || d < -maxPenetration_) return Vector3df(0.f);
 	const Vector3df inward = closestPoint(pos) - pos;
-	return inward * ((-d / (timeStep * timeStep)) / glm::length(inward));
+	const float length = glm::length(inward);
+	if (length == 0.f) return Vector3df(0.f);
+	return inward * ((-d / (timeStep * timeStep)) / length);
 }
 
 Vector3df CylinderBoundary::getBoundaryForce(const Vector3df& pos, const Vector3df& velocity,
@@ -59,7 +61,12 @@ Vector3df CylinderBoundary::getBoundaryForce(const Vector3df& pos, const Vector3
 {
 	const float d = getSignedDistance(pos);
 	if (d >= 0.f || d < -maxPenetration_) return Vector3df(0.f);
-	const Vector3df inward = glm::normalize(closestPoint(pos) - pos);
+	const Vector3df delta = closestPoint(pos) - pos;
+	const float length = glm::length(delta);
+	// Rounded cap/rim coordinates can have a negative SDF even though the
+	// closest point is bit-identical. There is no correction direction then.
+	if (length == 0.f) return Vector3df(0.f);
+	const Vector3df inward = delta / length;
 	return inward * boundaryPenaltyAcceleration(d, glm::dot(inward, velocity), timeStep, dampingRatio);
 }
 

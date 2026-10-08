@@ -45,6 +45,8 @@ public:
     void reset();
 
     /** Rebuilds a deterministic fixed-carrier sphere. False leaves the scene intact. */
+    /** Continuous burner at the interior center; height also sets center.y for spheres. */
+    bool circulationPreset(bool cylinder, float radius, float height, float spacing);
     bool sphericalPreset(bool combustion, float radius = 0.6f, float spacing = 0.08f);
 
     /**

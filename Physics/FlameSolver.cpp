@@ -114,6 +114,7 @@ void FlameSolver::simulate(const float dt)
 		auto& soa = fluid->getParticles();
 		for (size_t i = 0; i < soa.size(); ++i) {
 			particles.emplace_back(soa, i, fluid);
+			constrainCylinder(particles.back());
 			if (sphere_) {
 				auto& p = particles.back();
 				const float allowed = std::max(0.0f, sphere_->getRadius()-soa.radii[i]);
@@ -158,15 +159,32 @@ void FlameSolver::simulate(const float dt)
 	neighbors.build(positions, effectLength);
 	// Mirror samples across each near-wall particle's local tangent plane.
 	// These supply missing kernel support and pressure reaction without adding carriers.
-	const auto mirror = [&](int i, int j) {
-		const auto offset = positions[i]-sphere_->getCenter();
-		const float distance = Math::getLength(offset);
-		const auto normal = distance > 0 ? offset/distance : Vector3df(0,1,0);
-		const auto wall = sphere_->getCenter()+normal*sphere_->getRadius();
-		return positions[j]+normal*(2*glm::dot(wall-positions[j],normal));
-	};
-	const auto nearWall = [&](int i) {
-		return sphere_ && particles[i].getFluid()->fixedCarriers && sphere_->getSignedDistance(positions[i]) < effectLength;
+	struct GhostPlane { Vector3df normal, point; };
+	std::vector<std::vector<GhostPlane>> ghosts(particleCount);
+	for (int i=0;i<particleCount;++i) {
+		if (!particles[i].getFluid()->fixedCarriers) continue;
+		if (sphere_ && sphere_->getSignedDistance(positions[i]) < effectLength) {
+			const auto offset=positions[i]-sphere_->getCenter(); const float d=getLength(offset);
+			const auto n=d>0?offset/d:Vector3df(0,1,0);
+			ghosts[i].push_back({n,sphere_->getCenter()+n*sphere_->getRadius()});
+		}
+		if (cylinder_) {
+			const auto c=cylinder_->getCenter(); const auto offset=positions[i]-c;
+			const Vector3df radial(offset.x,0,offset.z); const float d=getLength(radial);
+			if (d>0 && cylinder_->getRadius()-d<effectLength) {
+				const auto n=radial/d; ghosts[i].push_back({n,c+n*cylinder_->getRadius()});
+			}
+			for (float sign : {-1.0f,1.0f}) if (cylinder_->getHalfHeight()-sign*offset.y<effectLength)
+				ghosts[i].push_back({Vector3df(0,sign,0),c+Vector3df(0,sign*cylinder_->getHalfHeight(),0)});
+		}
+	}
+	// Combined side/cap reflections fill kernel support at the cylinder rim.
+	const auto mirror = [&](int i,int j,int mask) {
+		auto pos=positions[j];
+		for (size_t k=0;k<ghosts[i].size();++k) if (mask & (1<<k)) {
+			const auto& g=ghosts[i][k]; pos+=g.normal*(2*glm::dot(g.point-pos,g.normal));
+		}
+		return pos;
 	};
 
 	// ---- Density pass -------------------------------------------------------
@@ -174,11 +192,11 @@ void FlameSolver::simulate(const float dt)
 	for (int i = 0; i < particleCount; ++i) {
 		for (const int neighbor : neighbors[i]) {
 			particles[i].addDensity(particles[neighbor]);
-			if (nearWall(i)) particles[i].addDensity(particles[neighbor].getMass()*
-				kernel.getPoly6Kernel(Math::getDistance(positions[i],mirror(i,neighbor))));
+			for (int mask=1;mask<(1<<ghosts[i].size());++mask) particles[i].addDensity(particles[neighbor].getMass()*
+				kernel.getPoly6Kernel(Math::getDistance(positions[i],mirror(i,neighbor,mask))));
 		}
-		if (nearWall(i)) particles[i].addDensity(particles[i].getMass()*
-			kernel.getPoly6Kernel(Math::getDistance(positions[i],mirror(i,i))));
+		for (int mask=1;mask<(1<<ghosts[i].size());++mask) particles[i].addDensity(particles[i].getMass()*
+			kernel.getPoly6Kernel(Math::getDistance(positions[i],mirror(i,i,mask))));
 	}
 	for (auto& p : particles) {
 		p.addSelfDensity();
@@ -280,10 +298,10 @@ void FlameSolver::simulate(const float dt)
 		for (const int neighbor : neighbors[i]) {
 			particles[i].solvePressureForce(particles[neighbor]);
 			particles[i].solveViscosityForce(particles[neighbor]);
-			if (nearWall(i)) particles[i].addForce(kernel.getSpikyKernelGradient(positions[i]-mirror(i,neighbor))*
+			for (int mask=1;mask<(1<<ghosts[i].size());++mask) particles[i].addForce(kernel.getSpikyKernelGradient(positions[i]-mirror(i,neighbor,mask))*
 				(0.5f*(particles[i].getPressure()+particles[neighbor].getPressure())*particles[neighbor].getMass()));
 		}
-		if (nearWall(i)) particles[i].addForce(kernel.getSpikyKernelGradient(positions[i]-mirror(i,i))*
+		for (int mask=1;mask<(1<<ghosts[i].size());++mask) particles[i].addForce(kernel.getSpikyKernelGradient(positions[i]-mirror(i,i,mask))*
 			(particles[i].getPressure()*particles[i].getMass()));
 	}
 
@@ -353,6 +371,7 @@ void FlameSolver::simulate(const float dt)
 			fluid->reactionHeat += reaction; fluid->coolingHeat += cooling;
 			fluid->clampHeat += mass * (before - p.getTemperature()) + reaction - cooling;
 		}
+		constrainCylinder(p);
 		if (sphere_) {
 			const float radius = std::max(0.0f, sphere_->getRadius() - 0.5f * p.getDiameter());
 			const auto offset = p.getPosition() - sphere_->getCenter(); const float distance = Math::getLength(offset);
@@ -397,7 +416,7 @@ void FlameSolver::simulate(const float dt)
 
 void FlameSolver::addBoundaryForce(std::vector<FlameParticle>& particles, const float dt)
 {
-	if (boundaryPlanes_.empty() && !sphere_) {
+	if (boundaryPlanes_.empty() && !sphere_ && !cylinder_) {
 		return;
 	}
 #pragma omp parallel for
@@ -411,6 +430,12 @@ void FlameSolver::addBoundaryForce(std::vector<FlameParticle>& particles, const 
 				sphere_->getRadius() - particles[i].getDiameter() * 0.5f));
 			force += wall.getBoundaryForce(particles[i].getPosition(), particles[i].getVelocity(), dt, sphereDamping_);
 		}
+		if (cylinder_) {
+			const float r=particles[i].getDiameter()*0.5f;
+			const CylinderBoundary wall(cylinder_->getCenter(),{0,1,0},std::max(0.001f,cylinder_->getRadius()-r),
+				std::max(0.001f,cylinder_->getHalfHeight()-r));
+			force+=wall.getBoundaryForce(particles[i].getPosition(),particles[i].getVelocity(),dt,sphereDamping_);
+		}
 		particles[i].addForce(force * particles[i].getDensity());
 	}
 }
@@ -419,7 +444,7 @@ bool FlameSolver::setBoundarySphere(const Vector3df& center, float radius, float
 {
 	if (!std::isfinite(center.x) || !std::isfinite(center.y) || !std::isfinite(center.z) ||
 		!std::isfinite(radius) || radius <= 0 || !std::isfinite(damping) || damping < 0 || damping > 0.5f) return false;
-	sphere_.emplace(center, radius); sphereDamping_ = damping; boundaryPlanes_.clear(); return true;
+	cylinder_.reset(); sphere_.emplace(center, radius); sphereDamping_ = damping; boundaryPlanes_.clear(); return true;
 }
 
 bool FlameSolver::setThermalBoundary(const ThermalBoundary& t)
@@ -434,7 +459,8 @@ bool FlameSolver::setThermalBoundary(const ThermalBoundary& t)
 
 void FlameSolver::applyThermalBoundary(float dt)
 {
-	if (!sphere_) return;
+	const auto* boundary=getClosedBoundary();
+	if (!boundary) return;
 	const float activeDt = thermal_.sourceDuration > 0 ?
 		std::clamp(thermal_.sourceDuration - simTime_, 0.0f, dt) : dt;
 	for (auto* fluid : fluids) {
@@ -451,7 +477,7 @@ void FlameSolver::applyThermalBoundary(float dt)
 				fluid->sourceHeat += mass * delta;
 				fluid->clampHeat += mass * (before + delta - gas.temperatures[i]);
 			}
-			const float wallDistance = sphere_->getSignedDistance(gas.positions[i]) - gas.radii[i];
+			const float wallDistance = boundary->getSignedDistance(gas.positions[i]) - gas.radii[i];
 			const float weight = std::clamp(1 - wallDistance / thermal_.wallThickness, 0.0f, 1.0f);
 			const float before = gas.temperatures[i];
 			gas.temperatures[i] = thermal_.wallTemperature + (before - thermal_.wallTemperature) *
@@ -463,4 +489,36 @@ void FlameSolver::applyThermalBoundary(float dt)
 			gas.velocities[i] *= std::exp(-thermal_.velocityDampingRate*weight*dt);
 		}
 	}
+}
+
+bool FlameSolver::setBoundaryCylinder(const Vector3df& center,float radius,float height,float damping)
+{
+ if (!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(center.z)||
+     !std::isfinite(radius)||radius<=0||!std::isfinite(height)||height<=0||
+     !std::isfinite(damping)||damping<0||damping>0.5f) return false;
+ cylinder_.emplace(center,Vector3df(0,1,0),radius,height*0.5f);
+ sphere_.reset(); boundaryPlanes_.clear(); sphereDamping_=damping; return true;
+}
+
+void FlameSolver::constrainCylinder(FlameParticle& p)
+{
+ if (!cylinder_) return;
+ auto* fluid=p.getFluid(); const float r=p.getDiameter()*0.5f;
+ const float radius=std::max(0.0f,cylinder_->getRadius()-r), half=std::max(0.0f,cylinder_->getHalfHeight()-r);
+ auto offset=p.getPosition()-cylinder_->getCenter(); auto velocity=p.getVelocity();
+ const Vector3df radial(offset.x,0,offset.z); const float d=getLength(radial);
+ const float penetration=std::max(d-radius,std::abs(offset.y)-half);
+ if (penetration<=0) return;
+ const float before=getLengthSquared(velocity);
+ if (d>radius && d>0) {
+  const auto normal=radial/d; offset.x=normal.x*radius; offset.z=normal.z*radius;
+  velocity-=normal*std::max(0.0f,glm::dot(velocity,normal));
+ }
+ if (std::abs(offset.y)>half) {
+  const float sign=offset.y>0?1.0f:-1.0f; offset.y=sign*half;
+  velocity.y-=sign*std::max(0.0f,sign*velocity.y);
+ }
+ p.move(cylinder_->getCenter()+offset-p.getPosition()); p.setVelocity(velocity);
+ fluid->maxAttemptedWallPenetration=std::max(fluid->maxAttemptedWallPenetration,penetration);
+ fluid->boundaryEnergyLoss+=0.5*p.getMass()*(before-getLengthSquared(velocity));
 }

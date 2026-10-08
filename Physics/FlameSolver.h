@@ -3,6 +3,7 @@
 #include "SPHKernel.h"
 #include "PlaneBoundary.h"
 #include "SphereBoundary.h"
+#include "CylinderBoundary.h"
 #include <optional>
 #include "CGLib/Util/UnCopyable.h"
 #include "CGLib/Math/Box3d.h"
@@ -36,6 +37,9 @@ public:
 	/** Selects a closed sphere; invalid settings leave the previous domain intact. */
 	bool setBoundarySphere(const Math::Vector3df& center, float radius, float damping = 0.25f);
 	const std::optional<SphereBoundary>& getBoundarySphere() const { return sphere_; }
+	bool setBoundaryCylinder(const Math::Vector3df& center, float radius, float height, float damping = 0.25f);
+	const std::optional<CylinderBoundary>& getBoundaryCylinder() const { return cylinder_; }
+	const IShapeBoundary* getClosedBoundary() const { return sphere_ ? static_cast<const IShapeBoundary*>(&*sphere_) : cylinder_ ? static_cast<const IShapeBoundary*>(&*cylinder_) : nullptr; }
 	struct ThermalBoundary {
 		Math::Vector3df sourceCenter{0, 0, 0};
 		float sourceRadius = 0.2f;
@@ -81,6 +85,7 @@ public:
 		(void)timeStep;   // ignored -- see setBoundaryPlanes() below
 		boundaryPlanes_ = makeBoxPlaneBoundaries(box);
 		sphere_.reset();
+		cylinder_.reset();
 	}
 
 	/**
@@ -96,6 +101,7 @@ public:
 		(void)timeStep;
 		boundaryPlanes_ = std::move(planes);
 		sphere_.reset();
+		cylinder_.reset();
 	}
 
 	/** @brief Simulated seconds accumulated by simulate() (curl-noise clock). */
@@ -113,6 +119,8 @@ private:
 	float simTime_ = 0.0f;
 	FlameSolidCoupler* solidCoupler_ = nullptr;
 	std::optional<SphereBoundary> sphere_;
+	std::optional<CylinderBoundary> cylinder_;
+	void constrainCylinder(FlameParticle& particle);
 	float sphereDamping_ = 0.25f;
 	ThermalBoundary thermal_;
 	void applyThermalBoundary(float dt);
