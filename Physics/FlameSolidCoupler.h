@@ -15,6 +15,8 @@ public:
     float heatTransfer = 0.04f;
     float gasSpecificHeat = 1.0f;
     float emissionSpeed = 0.15f;
+    // Fixed-carrier worlds transfer pending vapor to existing gas; legacy
+    // standalone callers may still use explicit carrier emission.
     SolidCombustionSolver solidSolver;
     void update(FlameFluid& fluid, float dt, double time);
     void constrain(FlameFluid& fluid, const std::vector<Math::Vector3df>& previous) const;

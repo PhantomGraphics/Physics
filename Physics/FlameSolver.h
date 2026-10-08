@@ -44,6 +44,9 @@ public:
 		float wallTemperature = 300;
 		float wallRate = 0; // 1/second; 0 = adiabatic
 		float wallThickness = 0.12f;
+		float oxygenRecoveryRate = 0; // outer-shell CG ventilation; finite presets keep zero
+		float smokeDecayRate = 0;
+		float velocityDampingRate = 0;
 	};
 	const ThermalBoundary& getThermalBoundary() const { return thermal_; }
 	bool setThermalBoundary(const ThermalBoundary& settings);

@@ -170,21 +170,76 @@ TEST(FlameSolverTest, FiniteReactionRetainsParticlesAndClosesFuelBudget)
   EXPECT_NEAR(0,st.heatBalanceError,1e-4); EXPECT_LT(st.burningFraction,0.001f);
 }
 
-TEST(FlameWorld, SpherePresetIgnitesAndRejectsIncompatibleSolidRelease)
+TEST(FlameWorld, SpherePresetIgnitesAndRetainsFiniteCarriers)
 {
   Phantom::FlameWorld world;
   ASSERT_TRUE(world.sphericalPreset(true,0.3f,0.06f));
   const int count=world.fluid().getNumParticles();
   EXPECT_FALSE(world.sphericalPreset(false,-1,0.06f));
   EXPECT_EQ(count,world.fluid().getNumParticles());
-  EXPECT_EQ(0u,world.addBody(CombustibleBody::Shape::Sphere,{0,0,0},{0.1f,0.1f,0.1f},0.01));
   for(int i=0;i<60;++i) world.stepOnce();
   const auto st=computeFlameStats(world.fluid(),nullptr,&world.solver());
   std::printf("sphere preset maxT=%g burned=%g initial=%g heatError=%g\n",st.maxT,st.burnedFuel,world.fluid().initialFuelMass,st.heatBalanceError);
   EXPECT_EQ(count,st.count); EXPECT_GT(st.burnedFuel,world.fluid().initialFuelMass*0.01);
   EXPECT_NEAR(0,st.fuelBalanceError,1e-6); EXPECT_NEAR(0,st.heatBalanceError,1e-4);
   world.stopSource(); EXPECT_EQ(0,world.solver().getThermalBoundary().sourcePower);
-  world.reset(); EXPECT_FALSE(world.fluid().fixedCarriers); EXPECT_FALSE(world.solver().getBoundarySphere());
+  world.reset(); EXPECT_TRUE(world.fluid().fixedCarriers); EXPECT_TRUE(world.solver().getBoundarySphere());
+}
+
+TEST(FlameWorld, ContinuousSourceReusesCarriersAfterStoppingAndRestarting)
+{
+  Phantom::FlameWorld world;
+  const int count = world.fluid().getNumParticles();
+  ASSERT_GT(count,100);
+  for (int i=0;i<120;++i) world.stepOnce();
+  auto st=computeFlameStats(world.fluid(),nullptr,&world.solver());
+  EXPECT_EQ(count,st.count); EXPECT_EQ(0,st.nanCount);
+  EXPECT_GT(st.sourceFuel,0); EXPECT_GT(st.burnedFuel,0);
+  EXPECT_LT(st.maxWallPenetration,1e-5f);
+  EXPECT_NEAR(0,st.fuelBalanceError,1e-5);
+  world.stopSource(); const double supplied=world.fluid().sourceFuelMass;
+  world.fluid().setLifeMax(0.001f);
+  for (int i=0;i<120;++i) world.stepOnce();
+  EXPECT_EQ(count,world.fluid().getNumParticles());
+  EXPECT_DOUBLE_EQ(supplied,world.fluid().sourceFuelMass);
+  world.fluid().getEmittersMutable().front().rate=150;
+  world.fluid().getEmittersMutable().front().pilotTemperature=1500;
+  for (int i=0;i<60;++i) world.stepOnce();
+  EXPECT_EQ(count,world.fluid().getNumParticles());
+  EXPECT_GT(world.fluid().sourceFuelMass,supplied);
+}
+
+TEST(FlameWorld, SolidReservoirTransfersFuelWithoutCreatingCarriers)
+{
+  Phantom::FlameWorld world;
+  world.stopSource();
+  const int count=world.fluid().getNumParticles();
+  const auto id=world.addBody(CombustibleBody::Shape::Sphere,{0,0.4f,0},{0.15f,0.15f,0.15f},0.01);
+  ASSERT_NE(0u,id);
+  auto* body=world.findBody(id);
+  ASSERT_NE(nullptr,body);
+  for (auto& s:body->samples()) if(s.area>0) { s.pending=1e-6; s.pendingHeat=0; }
+  world.coupler().update(world.fluid(),0.001f,0);
+  EXPECT_EQ(count,world.fluid().getNumParticles());
+  EXPECT_GT(body->emitted,0);
+}
+
+TEST(FlameFluidTest, CarrierSourceOnlyAffectsItsConfiguredRegion)
+{
+  FlameFluid fluid; fluid.fixedCarriers=true; fluid.recycleSources=true;
+  fluid.createParticle({0,0.1f,0},0.04f);
+  fluid.createParticle({2,0.1f,0},0.04f);
+  FlameFluid::Emitter e; e.radius=0.3f; e.pilotHeight=0.3f;
+  e.rate=150; e.airRate=0; e.pilotTemperature=1500; fluid.addEmitter(e);
+  fluid.updateCarrierSources(0.01f);
+  auto& gas=fluid.getParticles();
+  EXPECT_GT(gas.fuels[0],0); EXPECT_GT(gas.temperatures[0],300);
+  EXPECT_FLOAT_EQ(gas.fuels[1],0); EXPECT_FLOAT_EQ(gas.temperatures[1],300);
+  gas.positions[0]={2,0.1f,0};
+  const auto fuel=gas.fuels; const auto temperatures=gas.temperatures;
+  fluid.updateCarrierSources(0.01f);
+  EXPECT_EQ(fuel,gas.fuels); EXPECT_EQ(temperatures,gas.temperatures);
+  EXPECT_EQ(2u,gas.size());
 }
 
 TEST(FlameWorld, SphereConvectionSurvivesTimeStepAndResolutionChanges)

@@ -73,7 +73,7 @@ FlameStats Phantom::Physics::computeFlameStats(const FlameFluid& fluid, const Fl
 	st.sourceHeat=fluid.sourceHeat; st.wallHeat=fluid.wallHeat; st.clampHeat=fluid.clampHeat;
 	st.heatBalanceError=fluid.initialHeat+fluid.sourceHeat+fluid.reactionHeat-fluid.wallHeat-
 		fluid.coolingHeat-fluid.clampHeat-st.totalHeat;
-	st.oxygenBalanceError=fluid.initialOxygenMass-fluid.consumedOxygen-st.oxygenMass;
+	st.oxygenBalanceError=fluid.initialOxygenMass+fluid.sourceOxygenMass-fluid.consumedOxygen-st.oxygenMass;
 	st.count = static_cast<int>(soa.size());
 	st.secondaryCount = static_cast<int>(fluid.getSecondaryParticles().size());
 	st.histMinT = fluid.getAmbientTemperature();

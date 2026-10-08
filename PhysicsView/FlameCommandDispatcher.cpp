@@ -88,6 +88,9 @@ const std::vector<ParamDef>& simParams()
 		THERMAL_PARAM("wallTemperature", wallTemperature),
 		THERMAL_PARAM("wallRate", wallRate),
 		THERMAL_PARAM("wallThickness", wallThickness),
+		THERMAL_PARAM("oxygenRecoveryRate", oxygenRecoveryRate),
+		THERMAL_PARAM("smokeDecayRate", smokeDecayRate),
+		THERMAL_PARAM("velocityDampingRate", velocityDampingRate),
 #undef THERMAL_PARAM
 		{ "pressureCoe", FLAME_F(pressureCoe, getPressureCoe), nonNeg([](FlameWorld& w, float v) { w.fluid().setPressureCoe(v); }) },
 		{ "viscosityCoe", FLAME_F(viscosityCoe, getViscosityCoe), nonNeg([](FlameWorld& w, float v) { w.fluid().setVicosityCoe(v); }) },

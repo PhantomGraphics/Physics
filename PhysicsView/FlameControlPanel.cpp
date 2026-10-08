@@ -17,7 +17,7 @@ void FlameControlPanel::drawContents()
     Im::sameLine();
     if (Im::button("Spherical Closed Flame")) { sphereSetupFailed_=!world_->sphericalPreset(true,sphereRadius_,sphereSpacing_); notifyWorldChanged(); return; }
     if(sphereSetupFailed_) Im::text("Invalid sphere setup: increase spacing (limit 12000 carriers).");
-    if (Im::button("Emitter Flame")) { world_->reset(); notifyWorldChanged(); return; }
+    if (Im::button("Continuous Closed Flame")) { world_->reset(); notifyWorldChanged(); return; }
 
     auto& fluid  = world_->fluid();
     auto& render = world_->render();
@@ -36,6 +36,9 @@ void FlameControlPanel::drawContents()
 		Im::textDisabled("Heat Time 0 = continuous heating.");
 		changed |= Im::sliderFloat("Wall Temperature", thermal.wallTemperature, 250, 600);
 		changed |= Im::sliderFloat("Wall Cooling Rate", thermal.wallRate, 0, 10);
+		changed |= Im::sliderFloat("Outer Oxygen Recovery", thermal.oxygenRecoveryRate, 0, 10);
+		changed |= Im::sliderFloat("Outer Smoke Decay", thermal.smokeDecayRate, 0, 10);
+		changed |= Im::sliderFloat("Outer Velocity Damping", thermal.velocityDampingRate, 0, 10);
 		if (changed) world_->solver().setThermalBoundary(thermal);
 		const auto st = Physics::computeFlameStats(fluid, nullptr, &world_->solver());
 		Im::text("Mean %.1f K / mass %.5f", st.allAvgT, st.carrierMass);
@@ -60,7 +63,7 @@ void FlameControlPanel::drawContents()
     Im::sliderFloat("Particle Size", render.particleSize, 0.01f, 0.6f);
 
     if (Im::collapsingHeader("Object Combustion", true)) {
-        if (Im::button("Spread / Burnout Preset")) { world_->combustionPreset(); selectedBody_=0; notifyWorldChanged(); return; }
+        if (Im::button("Finite Object Fuel Preset")) { world_->combustionPreset(); selectedBody_=0; notifyWorldChanged(); return; }
         Im::sameLine();
         if (Im::button("Stop Ignition Source")) { world_->stopSource(); notifyWorldChanged(); }
         Im::textDisabled("Visual material presets; positions / sizes in simulation units.");
@@ -196,10 +199,10 @@ void FlameControlPanel::drawContents()
     if (Im::collapsingHeader("Emitter", true)) {
         auto& emitters = fluid.getEmittersMutable();
         if (!emitters.empty()) {
-            Im::sliderFloat("Rate (particles/sec)", emitters[0].rate, 0.0f, 2000.0f);
-            Im::sliderFloat("Air Rate (particles/sec)", emitters[0].airRate, 0.0f, 2000.0f);
+            Im::sliderFloat("Fuel Supply", emitters[0].rate, 0.0f, 2000.0f);
+            Im::sliderFloat("Local Oxygen Recovery", emitters[0].airRate, 0.0f, 2000.0f);
             Im::sliderFloat("Emitter Radius", emitters[0].radius, 0.01f, 0.5f);
-            Im::sliderFloat("Fuel Spawn Temperature (<0: ignition)", emitters[0].fuelTemperature, -1.0f, 2500.0f);
+            Im::sliderFloat("Fuel Heating Temperature (<0: ignition)", emitters[0].fuelTemperature, -1.0f, 2500.0f);
             Im::sliderFloat("Pilot Temperature (0: off)", emitters[0].pilotTemperature, 0.0f, 2500.0f);
             Im::sliderFloat("Pilot Height", emitters[0].pilotHeight, 0.0f, 1.0f);
         }
@@ -224,8 +227,7 @@ void FlameControlPanel::drawContents()
         float sootYield = fluid.getSootYield();
         if (Im::sliderFloat("Soot Yield", sootYield, 0.0f, 1.0f)) fluid.setSootYield(sootYield);
 
-        float lifeMax = fluid.getLifeMax();
-        if (Im::sliderFloat("Life Max (s)", lifeMax, 0.5f, 15.0f)) fluid.setLifeMax(lifeMax);
+        Im::textDisabled("SPH carriers are retained after cooling and burnout.");
     }
 
     if (Im::collapsingHeader("Combustion Model", true)) {
