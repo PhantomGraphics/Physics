@@ -38,6 +38,13 @@ bool param(Physics::HairSolver::Params& p, std::string_view name, double& value,
     else if (name == "gravityX") field = &p.gravity.x;
     else if (name == "gravityY") field = &p.gravity.y;
     else if (name == "gravityZ") field = &p.gravity.z;
+    else if (name == "windX") field = &p.windVelocity.x;
+    else if (name == "windY") field = &p.windVelocity.y;
+    else if (name == "windZ") field = &p.windVelocity.z;
+    else if (name == "windDrag") field = &p.windDrag;
+    else if (name == "collisionRadius") field = &p.collisionRadius;
+    else if (name == "teleportDistance") field = &p.teleportDistance;
+    else if (name == "teleportAngle") field = &p.teleportAngle;
     if (!field) return false;
     if (set) *field = static_cast<float>(value); else value = *field;
     return true;
@@ -50,10 +57,34 @@ std::optional<std::string> HairCommandDispatcher::route(const std::string& cmd) 
     const auto arg = colon == std::string_view::npos ? std::string_view{} : text.substr(colon+1);
     if (verb != "HairPreset" && verb != "HairClear" && verb != "HairReset" && verb != "HairStep" &&
         verb != "SetHairRunning" && verb != "IsHairRunning" && verb != "SetHairPage" &&
-        verb != "IsHairPage" && verb != "SetHairParam" && verb != "GetHairParam" && verb != "GetHairStat")
+        verb != "IsHairPage" && verb != "SetHairParam" && verb != "GetHairParam" && verb != "GetHairStat" &&
+        verb != "SetHairRootPose" && verb != "HairTeleport" && verb != "SetHairMotion" &&
+        verb != "IsHairMotion" && verb != "SetHairFriction")
         return std::nullopt;
     if (!world_) return "Error: hair world unavailable";
     auto& w = *world_;
+    if (verb == "SetHairRootPose" || verb == "HairTeleport") {
+        double values[7];
+        auto remaining = arg;
+        for (int i = 0; i < 7; ++i) {
+            const auto comma = remaining.find(',');
+            if ((i < 6 && comma == std::string_view::npos) || (i == 6 && comma != std::string_view::npos) ||
+                !parse(remaining.substr(0, comma), values[i])) return "Error: expected x,y,z,qw,qx,qy,qz";
+            if (i < 6) remaining.remove_prefix(comma+1);
+        }
+        Physics::HairRootPose pose;
+        pose.position = Math::Vector3df(values[0], values[1], values[2]);
+        pose.rotation = Math::Quaternion(static_cast<float>(values[3]), static_cast<float>(values[4]),
+            static_cast<float>(values[5]), static_cast<float>(values[6]));
+        if (!w.setRigPose(pose, verb == "HairTeleport")) return "Error: invalid hair root pose";
+        if (changed_) changed_();
+        return "OK";
+    }
+    if (verb == "SetHairFriction") {
+        double value;
+        if (!parse(arg, value) || !w.setFriction(static_cast<float>(value))) return "Error: invalid hair friction";
+        return "OK";
+    }
     if (verb == "GetHairStat") {
         const auto& s = w.stats();
         if (arg == "guides") return number(static_cast<double>(w.strands().strandCount()));
@@ -65,6 +96,11 @@ std::optional<std::string> HairCommandDispatcher::route(const std::string& cmd) 
         if (arg == "nonFinite") return number(static_cast<double>(s.nonFiniteCount));
         if (arg == "rootError") return number(w.maxRootError());
         if (arg == "tipY") return number(w.tipY());
+        if (arg == "tipX") return number(w.tipX());
+        if (arg == "colliders") return number(static_cast<double>(w.colliderCount()));
+        if (arg == "penetration") return number(s.maxPenetration);
+        if (arg == "pinnedPenetration") return number(s.pinnedPenetration);
+        if (arg == "rootResets") return number(static_cast<double>(s.rootResets));
         if (arg == "droppedTime") return number(w.droppedTime());
         return "Error: unknown hair statistic";
     }
@@ -79,22 +115,30 @@ std::optional<std::string> HairCommandDispatcher::route(const std::string& cmd) 
         if (!set) return number(value);
         return w.setParams(p) ? "OK" : "Error: invalid hair parameter value";
     }
-    if (verb == "SetHairPage" || verb == "SetHairRunning") {
+    if (verb == "SetHairPage" || verb == "SetHairRunning" || verb == "SetHairMotion") {
         if (arg != "true" && arg != "false" && arg != "1" && arg != "0") return "Error: expected boolean";
         const bool on = arg == "true" || arg == "1";
         if (verb == "SetHairPage") {
             if (!setPage_) return "Error: hair page unavailable";
             setPage_(on);
-        } else w.setRunning(on);
+        } else if (verb == "SetHairMotion") w.setMotion(on);
+        else w.setRunning(on);
         return "OK";
     }
     if (colon != std::string_view::npos && verb != "HairPreset" && verb != "HairStep")
         return "Error: unexpected hair command argument";
     if (verb == "IsHairPage") return isPage_ && isPage_() ? "true" : "false";
     if (verb == "IsHairRunning") return w.isRunning() ? "true" : "false";
+    if (verb == "IsHairMotion") return w.motionEnabled() ? "true" : "false";
     if (verb == "HairPreset") {
-        if (arg != "Single" && arg != "Bundle") return "Error: unknown hair preset";
-        if (!w.setPreset(arg == "Single" ? HairPreset::Single : HairPreset::Bundle)) return "Error: hair generation failed";
+        HairPreset preset;
+        if (arg == "Single") preset = HairPreset::Single;
+        else if (arg == "Bundle") preset = HairPreset::Bundle;
+        else if (arg == "Body") preset = HairPreset::Body;
+        else if (arg == "HeadShake") preset = HairPreset::HeadShake;
+        else if (arg == "StrongWind") preset = HairPreset::StrongWind;
+        else return "Error: unknown hair preset";
+        if (!w.setPreset(preset)) return "Error: hair generation failed";
     } else if (verb == "HairClear") w.clear();
     else if (verb == "HairReset") w.reset();
     else if (verb == "HairStep") {

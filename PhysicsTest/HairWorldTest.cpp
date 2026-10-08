@@ -79,3 +79,31 @@ TEST(HairCommandDispatcherTest, CommandsAndInvalidInputsUseSameWorld) {
     EXPECT_EQ(d.route("HairClear"), "OK");
     EXPECT_EQ(d.route("GetHairStat:particles"), "0");
 }
+
+TEST(HairCommandDispatcherTest, BodyMotionWindAndTeleportShareValidatedState) {
+    HairWorld world;
+    HairCommandDispatcher dispatcher;
+    dispatcher.setWorld(&world);
+    EXPECT_EQ(dispatcher.route("HairPreset:StrongWind"), "OK");
+    EXPECT_EQ(dispatcher.route("GetHairStat:colliders"), "2");
+    EXPECT_EQ(dispatcher.route("GetHairParam:windX"), "12");
+    EXPECT_EQ(dispatcher.route("SetHairMotion:true"), "OK");
+    EXPECT_EQ(dispatcher.route("IsHairMotion"), "true");
+    EXPECT_EQ(dispatcher.route("SetHairMotion:false"), "OK");
+    EXPECT_EQ(dispatcher.route("SetHairFriction:0.6"), "OK");
+    EXPECT_NEAR(world.friction(), .6f, 1.e-6f);
+    EXPECT_EQ(dispatcher.route("SetHairRootPose:0.05,0,0,1,0,0,0"), "OK");
+    EXPECT_EQ(dispatcher.route("HairStep"), "OK");
+    EXPECT_EQ(dispatcher.route("GetHairStat:rootError"), "0");
+    EXPECT_EQ(dispatcher.route("HairTeleport:1,0,0,1,0,0,0"), "OK");
+    EXPECT_EQ(dispatcher.route("GetHairStat:maxSpeed"), "0");
+    for (const char* command : {"SetHairRootPose:0,0,0,0,0,0,0", "HairTeleport:0,0,0",
+        "SetHairRootPose:0,0,0,1,0,0,nan", "SetHairRootPose:0,0,0,1,0,0,0,1",
+        "SetHairFriction:2", "SetHairMotion:maybe", "SetHairParam:windDrag,-1"}) {
+        const auto result = dispatcher.route(command);
+        ASSERT_TRUE(result.has_value());
+        EXPECT_EQ(result->find("Error:"), 0u) << command;
+    }
+    EXPECT_FLOAT_EQ(world.rigPose().position.x, 1.f);
+    EXPECT_NEAR(world.friction(), .6f, 1.e-6f);
+}
