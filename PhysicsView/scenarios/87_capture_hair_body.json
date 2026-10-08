@@ -1,0 +1,41 @@
+{
+  "name": "87_capture_hair_body",
+  "tags": [
+    "hair"
+  ],
+  "steps": [
+    {
+      "command": "SetHairPage:true",
+      "expect": "OK"
+    },
+    {
+      "command": "HairPreset:StrongWind",
+      "expect": "OK"
+    },
+    {
+      "command": "SetCameraTarget:0,0.9,0",
+      "expect": "OK"
+    },
+    {
+      "command": "SetCameraOrbit:5,0.25,0.1",
+      "expect": "OK"
+    },
+    {
+      "command": "HairStep:60",
+      "expect": "OK"
+    },
+    {
+      "command": "GetHairStat:nonFinite",
+      "expect": "0"
+    },
+    {
+      "command": "GetStatus",
+      "expect": "OK",
+      "repeat": 3
+    },
+    {
+      "command": "SaveScreenshot:testdata/screenshots/87_capture_hair_body.png",
+      "expect": "OK"
+    }
+  ]
+}

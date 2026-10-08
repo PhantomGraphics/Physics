@@ -1,0 +1,164 @@
+{
+  "name": "06_smoke_hair_dynamics",
+  "tags": [
+    "hair"
+  ],
+  "steps": [
+    {
+      "command": "SetHairPage:true",
+      "expect": "OK"
+    },
+    {
+      "command": "HairPreset:Body",
+      "expect": "OK"
+    },
+    {
+      "command": "GetHairStat:colliders",
+      "expect": "2"
+    },
+    {
+      "command": "GetHairStat:guides",
+      "expect": "16"
+    },
+    {
+      "command": "HairStep:60",
+      "expect": "OK"
+    },
+    {
+      "command": "GetHairStat:penetration",
+      "expect_range": "0,0.001"
+    },
+    {
+      "command": "GetHairStat:lengthError",
+      "expect_range": "0,0.01"
+    },
+    {
+      "command": "SetHairFriction:0.6",
+      "expect": "OK"
+    },
+    {
+      "command": "SetHairRootPose:0.05,0,0,1,0,0,0",
+      "expect": "OK"
+    },
+    {
+      "command": "HairStep",
+      "expect": "OK"
+    },
+    {
+      "command": "GetHairStat:rootError",
+      "expect": "0"
+    },
+    {
+      "command": "HairTeleport:1,0,0,1,0,0,0",
+      "expect": "OK"
+    },
+    {
+      "command": "GetHairStat:maxSpeed",
+      "expect": "0"
+    },
+    {
+      "command": "GetHairStat:rootResets",
+      "expect_range": "16,32"
+    },
+    {
+      "command": "HairReset",
+      "expect": "OK"
+    },
+    {
+      "command": "GetHairStat:time",
+      "expect": "0"
+    },
+    {
+      "command": "HairPreset:HeadShake",
+      "expect": "OK"
+    },
+    {
+      "command": "IsHairMotion",
+      "expect": "true"
+    },
+    {
+      "command": "HairStep:60",
+      "expect": "OK"
+    },
+    {
+      "command": "GetHairStat:penetration",
+      "expect_range": "0,0.001"
+    },
+    {
+      "command": "GetHairStat:rootResets",
+      "expect": "0"
+    },
+    {
+      "command": "GetHairStat:rootError",
+      "expect": "0"
+    },
+    {
+      "command": "SetHairMotion:false",
+      "expect": "OK"
+    },
+    {
+      "command": "IsHairMotion",
+      "expect": "false"
+    },
+    {
+      "command": "HairPreset:StrongWind",
+      "expect": "OK"
+    },
+    {
+      "command": "GetHairParam:windX",
+      "expect": "12"
+    },
+    {
+      "command": "HairStep:60",
+      "expect": "OK"
+    },
+    {
+      "command": "GetHairStat:tipX",
+      "expect_range": "0.05,2"
+    },
+    {
+      "command": "GetHairStat:maxSpeed",
+      "expect_range": "0,50"
+    },
+    {
+      "command": "GetHairStat:nonFinite",
+      "expect": "0"
+    },
+    {
+      "command": "GetHairStat:penetration",
+      "expect_range": "0,0.001"
+    },
+    {
+      "command": "GetHairStat:lengthError",
+      "expect_range": "0,0.01"
+    },
+    {
+      "command": "SetHairRootPose:0,0,0,0,0,0,0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "HairTeleport:0,0,0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetHairFriction:2",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetHairMotion:maybe",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetHairParam:windDrag,-1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "NewScene",
+      "expect": "OK"
+    },
+    {
+      "command": "GetHairStat:colliders",
+      "expect": "0"
+    }
+  ]
+}
