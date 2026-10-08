@@ -10,7 +10,7 @@
 layout(set = 0, binding = 0) uniform FlameUBO {
     mat4 mvp;
     vec4 view;        // x = |proj[1][1]|, y = viewport height (px), z = min PBVR sub-particle size (px), w = PBVR density scale
-    vec4 thermal;     // x = T_ambient, y = T_ref (radiance 1), z = flame exposure, w = unused
+    vec4 thermal;     // x = T_ambient, y = T_ref, z = exposure, w = emission/haze sample weight
     vec4 smoke;       // extinction sigma, smoke glow, PBVR subdivision, density profile (0 uniform, 1 poly6)
     vec4 smokeAlbedo; // rgb = soot albedo * ambient light
     vec4 lutRange;    // x = LUT min T, y = LUT max T

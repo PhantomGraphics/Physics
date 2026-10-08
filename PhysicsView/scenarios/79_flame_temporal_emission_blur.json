@@ -1,0 +1,20 @@
+{
+  "name":"flame_temporal_emission_shutter",
+  "steps":[
+    {"command":"SetFlamePage:true","expect":"OK"},
+    {"command":"GetFlameRenderParam:temporalBlurFrames","expect":"0.000000"},
+    {"command":"SetFlameRunning:false","expect":"OK"},
+    {"command":"FlameCirculationPreset:cylinder,0.3,0.8,0.08","expect":"OK"},
+    {"command":"FlameStep:24","expect":"OK"},
+    {"command":"GetFlameStats","store_as":"physical_state","expect_prefix":"count="},
+    {"command":"SetFlameRenderParam:temporalBlurFrames,4","expect":"OK"},
+    {"command":"GetFlameRenderParam:temporalBlurFrames","expect":"4.000000"},
+    {"command":"GetFlameStats","expect":"${physical_state}"},
+    {"command":"SetFlameRenderParam:temporalBlurFrames,8","expect":"OK"},
+    {"command":"GetFlameStats","expect":"${physical_state}"},
+    {"command":"SetFlameRenderParam:temporalBlurFrames,1.5","expect_prefix":"Error:"},
+    {"command":"SetFlameRenderParam:temporalBlurFrames,17","expect_prefix":"Error:"},
+    {"command":"SetFlameRenderParam:temporalBlurFrames,0","expect":"OK"},
+    {"command":"GetFlameStat:nanCount","expect":"0.000000"}
+  ]
+}

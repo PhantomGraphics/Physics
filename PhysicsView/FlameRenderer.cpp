@@ -16,7 +16,7 @@ namespace Phantom {
 bool FlameRenderer::Shading::operator==(const Shading& o) const
 {
 	return ambientTemperature == o.ambientTemperature && referenceTemperature == o.referenceTemperature &&
-		exposure == o.exposure && whiteBalanceTemperature == o.whiteBalanceTemperature &&
+		exposure == o.exposure && emissionWeight == o.emissionWeight && whiteBalanceTemperature == o.whiteBalanceTemperature &&
 		whiteBalanceDegree == o.whiteBalanceDegree && smokeExtinction == o.smokeExtinction && smokeGlow == o.smokeGlow &&
 		smokeAlbedo == o.smokeAlbedo && pbvrSubdivision == o.pbvrSubdivision &&
 		pbvrMinSubPixels == o.pbvrMinSubPixels && pbvrDensityScale == o.pbvrDensityScale &&
@@ -97,7 +97,7 @@ FlamePointUBO FlameRenderer::makeUBO()
 	ubo.mvp = proj_ * view_;
 	// Vulkan projections often flip Y (negative [1][1]); only the scale matters here.
 	ubo.view = glm::vec4(std::abs(proj_[1][1]), viewportHeight_, shading_.pbvrMinSubPixels, shading_.pbvrDensityScale);
-	ubo.thermal = glm::vec4(shading_.ambientTemperature, shading_.referenceTemperature, shading_.exposure, 0.0f);
+	ubo.thermal = glm::vec4(shading_.ambientTemperature, shading_.referenceTemperature, shading_.exposure, shading_.emissionWeight);
 	ubo.smoke = glm::vec4(shading_.smokeExtinction, shading_.smokeGlow, shading_.pbvrSubdivision, shading_.smokeDensityProfile);
 	ubo.smokeAlbedo = glm::vec4(shading_.smokeAlbedo, 0.0f);
 	const float lightLength = glm::length(shading_.smokeLightDirection);

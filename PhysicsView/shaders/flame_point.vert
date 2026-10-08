@@ -15,5 +15,5 @@ void main() {
     gl_Position = ubo.mvp * vec4(inPos, 1.0);
     gl_PointSize = flamePointSize(inSize, gl_Position);
     // Per-particle constant -> evaluate once per vertex, not per fragment.
-    outRadiance = flameEmission(inTemperature);
+    outRadiance = flameEmission(inTemperature) * ubo.thermal.w;
 }
