@@ -75,8 +75,9 @@ bool FluidMeshConverter::saveToObj(const std::string& filePath)
         obj.normals.push_back(norm);
 
         Phantom::File::OBJFace face;
-        face.positionIndices = { base, base + 1, base + 2 };
-        face.normalIndices   = { ni, ni, ni };
+        // OBJ indices are 1-based (the writer emits them verbatim).
+        face.positionIndices = { base + 1, base + 2, base + 3 };
+        face.normalIndices   = { ni + 1, ni + 1, ni + 1 };
         face.texCoordIndices = { 0, 0, 0 };
         group.faces.push_back(std::move(face));
     }
