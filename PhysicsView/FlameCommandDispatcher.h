@@ -28,7 +28,7 @@ class FlameWorld;
  *   FlameSpherePreset:{convection|combustion}[,<radius>,<spacing>]
  *       Stops/rebuilds a fixed-carrier sphere (defaults 0.6 / 0.08).
  *       Valid radius 0.05..10, spacing >=0.005, at most 12000 carriers.
- *       Fixed mode rejects solid fuel release and live density changes.
+ *       Fixed mode transfers solid fuel to existing carriers and rejects live density changes.
  *       sourcePower/sourceDuration/sourceRadius/wallTemperature/wallRate/wallThickness
  *       are exposed by SetFlameParam. StopFlameSource stops spherical heating too.
  *       carrierDebug (0 radiance, 1 temperature, 2 velocity) and sphereWire

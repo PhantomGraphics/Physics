@@ -48,44 +48,46 @@ void FlameWorld::buildScene()
     fluid_->setMaxParticles(4000);
     fluid_->setMaxSpeed(3.0f);
 
-    // Gentle flicker: an 8 m/s^2 curl-noise acceleration. (The historical
-    // value was 0.5 per step without dt = 30 m/s^2 at 1/60 s, which kept
-    // nearly every particle pinned at the maxSpeed cap -- plan A1 / Phase 2.)
-    fluid_->setCurlNoiseStrength(8.0f);
+    // Closed circulation is driven by heating/buoyancy; noise remains optional.
+    fluid_->setCurlNoiseStrength(0.0f);
 
     FlameFluid::Emitter e;
     e.center = Vector3df(0.0f, 0.0f, 0.0f);
-    e.radius = 0.12f;
+    e.radius = 0.3f;
     e.rate   = 150.0f;
-    // Co-emit ambient "air" particles so freshly ignited particles have SPH
-    // neighbours from frame one instead of spawning into a near-vacuum -- and,
-    // under the Physical model, so the fuel has oxygen to mix with. 2:1 air
-    // keeps the mixture lean enough to burn out instead of leaving an
-    // oxygen-starved fuel plume.
+    // In fixed mode this controls local oxygen recovery, not air spawning.
     e.airRate = 300.0f;
-    // Physical combustion model (the FlameFluid default): fuel vapor leaves
-    // the emitter preheated but below ignition and with no oxygen, so it only
-    // burns where it has mixed with the air carriers. The wick-like pilot
-    // keeps the base of that mixing layer above ignition so the flame stays
-    // lit and anchored; above it the reaction's own heat release (spread by
-    // the thermal diffusion pass) is what keeps the flame burning.
+    // A broad source region spans several carrier spacings. Fuel and finite
+    // pilot heating act only on existing carriers inside that region.
     e.fuelTemperature  = 700.0f;
     e.pilotTemperature = 1500.0f;
-    e.pilotHeight      = 0.15f;
+    e.pilotHeight      = 0.3f;
     fluid_->addEmitter(e);
-
-    // Cosmetic secondary particles (non-SPH): population targets, not flat rates.
-    fluid_->setSparkCountPerPrimary(6.0f);
-    // 5 puffs per primary (was 14): at 14 the closed domain filled with smoke
-    // thick enough that the order-independent PBVR mode (correctly) hid the
-    // flame inside it -- Normal mode had only masked that by drawing the flame
-    // on top of the smoke regardless of depth.
-    fluid_->setSmokeCountPerPrimary(5.0f);
 
     solver_->add(fluid_.get());
     solver_->setEffectLength(fluid_->getEffectLength());
-    solver_->setBoundary(Box3df(Vector3df(-1.5f, -0.05f, -1.5f),
-                                Vector3df(1.5f, 4.0f, 1.5f)), 0.01f);
+    // A permanent carrier lattice surrounds the old source/object scenarios.
+    // The coarser support keeps the full volume within the real-time CPU budget.
+    fluid_->fixedCarriers = true;
+    fluid_->recycleSources = true;
+    fluid_->setThermalExpansionPressure(false);
+    fluid_->setEffectLength(0.24f); solver_->setEffectLength(0.24f);
+    fluid_->setSparkCountPerPrimary(0); fluid_->setSmokeCountPerPrimary(1);
+    const Vector3df center(0,0.65f,0);
+    constexpr float radius = 1.05f, spacing = 0.12f;
+    solver_->setBoundarySphere(center,radius);
+    FlameSolver::ThermalBoundary thermal;
+    thermal.wallThickness = 0.24f; thermal.wallRate = 3;
+    thermal.oxygenRecoveryRate = 2; thermal.smokeDecayRate = 3; thermal.velocityDampingRate = 2;
+    solver_->setThermalBoundary(thermal);
+    for (int z=-8;z<=8;++z) for (int y=-8;y<=8;++y) for (int x=-8;x<=8;++x) {
+        const Vector3df offset(x*spacing,y*spacing,z*spacing);
+        if (getLength(offset) > radius-spacing*0.5f) continue;
+        fluid_->createParticle(center+offset,spacing*0.5f);
+        const size_t i=fluid_->getParticles().size()-1;
+        FlameParticle p(fluid_->getParticles(),i,fluid_.get()); p.setAir(true);
+        fluid_->initialOxygenMass += p.getMass(); fluid_->initialHeat += p.getMass()*p.getTemperature();
+    }
 }
 
 void FlameWorld::step()
@@ -137,7 +139,6 @@ void FlameWorld::stepOnce()
 uint64_t FlameWorld::addBody(CombustibleBody::Shape shape, const glm::vec3& center,
     const glm::vec3& extent, double fuel, int material, int resolution)
 {
-    if (fluid_->fixedCarriers) return 0; // The current solid release adds gas carriers.
     if (material < 0 || material > 3 || bodies_.size() >= 32) return 0;
     auto body=std::make_unique<CombustibleBody>();
     if (!body->initializeParticles(nextBodyId_,shape,center,extent,resolution,fuel,CombustibleMaterial::preset(material))) return 0;
@@ -164,6 +165,8 @@ bool FlameWorld::sphericalPreset(bool combustion, float radius, float spacing)
     if (seeds.empty() || seeds.size() > 12000) return false;
     reset(); running_ = false;
     fluid_->clearEmitters(); fluid_->getParticles().clear(); fluid_->fixedCarriers = true;
+    fluid_->recycleSources = false;
+    fluid_->initialFuelMass = fluid_->initialOxygenMass = fluid_->initialHeat = 0;
     fluid_->setMaxParticles(static_cast<int>(seeds.size()));
     fluid_->setEffectLength(spacing * 2.0f); solver_->setEffectLength(fluid_->getEffectLength());
     fluid_->setCoolRate(0); fluid_->setCurlNoiseStrength(0); fluid_->setVorticityEps(0);
@@ -310,6 +313,23 @@ bool FlameWorld::combustionPreset(int resolution, double fuelMass)
 {
     if(resolution<1 || resolution>8 || !std::isfinite(fuelMass) || fuelMass<=0) return false;
     reset();
+    // Resolve the small solids with a denser, smaller closed domain instead
+    // of paying for the default scene's larger empty surroundings.
+    fluid_->getParticles().clear();
+    fluid_->initialHeat = fluid_->initialOxygenMass = 0;
+    constexpr float spacing=0.08f, radius=0.55f;
+    const Vector3df center(0,0.3f,0);
+    fluid_->setEffectLength(2*spacing); solver_->setEffectLength(2*spacing);
+    solver_->setBoundarySphere(center,radius);
+    auto thermal=solver_->getThermalBoundary(); thermal.wallThickness=2*spacing;
+    solver_->setThermalBoundary(thermal);
+    for(int z=-6;z<=6;++z) for(int y=-6;y<=6;++y) for(int x=-6;x<=6;++x) {
+        const Vector3df offset(x*spacing,y*spacing,z*spacing);
+        if(getLength(offset)>radius-spacing*0.5f) continue;
+        fluid_->createParticle(center+offset,spacing*0.5f);
+        FlameParticle p(fluid_->getParticles(),fluid_->getParticles().size()-1,fluid_.get()); p.setAir(true);
+        fluid_->initialOxygenMass+=p.getMass(); fluid_->initialHeat+=p.getMass()*p.getTemperature();
+    }
     fluid_->setIgnitionTemperature(350);
     render_.particleSize=0.045f;
     render_.smokeParticleSize=0.07f;
@@ -322,13 +342,12 @@ bool FlameWorld::combustionPreset(int resolution, double fuelMass)
     fluid_->setCoolRate(0.1f);
     fluid_->setCurlNoiseStrength(0);
     fluid_->setSparkCountPerPrimary(0);
-    fluid_->setSmokeCountPerPrimary(2);
-    fluid_->setMaxParticles(1800);
+    fluid_->setSmokeCountPerPrimary(0);
     fluid_->setLifeMax(2);
     auto& source=fluid_->getEmittersMutable().front();
     source.center=Vector3df(-0.15f,0.15f,0);
-    source.radius=0.05f; source.rate=100; source.airRate=300;
-    source.pilotTemperature=1500; source.pilotHeight=0.14f;
+    source.radius=0.12f; source.rate=100; source.airRate=300;
+    source.pilotTemperature=1500; source.pilotHeight=0.2f;
     // Explicit scene air supply, retained when the ignition source is stopped.
     FlameFluid::Emitter air;
     air.center=Vector3df(0,0.35f,0); air.radius=0.3f; air.rate=0;

@@ -118,10 +118,14 @@ public:
 
 	FlameFluid();
 
-	/** Fixed carriers remain after burnout; no emitter, pilot or lifetime recycling. */
+	/** Fixed carriers remain after burnout; sources modify their state without spawning. */
 	bool fixedCarriers = false;
+	/** Continuous CG sources refill existing carriers; finite closed presets leave this off. */
+	bool recycleSources = false;
+	void updateCarrierSources(float dt);
 	// Heat accounting in carrier-mass * kelvin (constant specific heat = 1).
 	double initialFuelMass = 0, initialOxygenMass = 0;
+	double sourceOxygenMass = 0;
 	double initialHeat = 0, sourceHeat = 0, wallHeat = 0;
 	double reactionHeat = 0, coolingHeat = 0, clampHeat = 0, consumedOxygen = 0;
 	double boundaryEnergyLoss = 0;

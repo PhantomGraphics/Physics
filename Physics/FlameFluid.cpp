@@ -156,6 +156,46 @@ void FlameFluid::updateEmitters(const float dt)
 	}
 }
 
+void FlameFluid::updateCarrierSources(float dt)
+{
+	if (!fixedCarriers || !recycleSources || dt <= 0) return;
+	// Retain the historical rate unit (0.04-diameter fuel carriers/second),
+	// but distribute that fuel over the existing source-region carriers.
+	const double sourceParticleMass = density * 0.04 * 0.04 * 0.04;
+	for (const auto& e : emitters) {
+		std::vector<size_t> near;
+		double capacity = 0;
+		for (size_t i = 0; i < particles.size(); ++i) {
+			const auto d = particles.positions[i] - e.center;
+			if (d.y < -0.05f || d.y > std::max(e.pilotHeight, 0.12f) ||
+				d.x*d.x + d.z*d.z > e.radius*e.radius) continue;
+			near.push_back(i);
+			capacity += FlameParticle(particles,i,this).getMass() * std::max(0.0f, 1-particles.fuels[i]);
+		}
+		const double amount = std::min(capacity, std::max(0.0f,e.rate)*dt*sourceParticleMass);
+		for (const size_t i : near) {
+			const float mass = FlameParticle(particles,i,this).getMass();
+			const float added = capacity > 0 ? static_cast<float>(amount/capacity)*(1-particles.fuels[i]) : 0;
+			particles.fuels[i] += added;
+			sourceFuelMass += mass*added;
+			if (added > 0) particles.airs[i] = false;
+			// A rate-limited pilot deposits heat rather than setting T every step.
+			const float target = e.pilotTemperature > 0 ? e.pilotTemperature :
+				(e.fuelTemperature >= 0 ? e.fuelTemperature : ignitionTemperature);
+			if (e.rate > 0 && target > particles.temperatures[i]) {
+				const float delta = (target-particles.temperatures[i])*(1-std::exp(-20*dt));
+				const float before = particles.temperatures[i];
+				particles.temperatures[i] = std::min(maxTemperature,before+delta);
+				sourceHeat += mass*(particles.temperatures[i]-before);
+			}
+			if (e.airRate > 0) {
+				const float delta = (1-particles.oxygens[i])*(1-std::exp(-e.airRate*dt/300));
+				particles.oxygens[i] += delta; sourceOxygenMass += mass*delta;
+			}
+		}
+	}
+}
+
 void FlameFluid::applyPilots()
 {
 	if (fixedCarriers) return;

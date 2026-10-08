@@ -64,7 +64,42 @@ void FlameSolidCoupler::update(FlameFluid& fluid, float dt, double time)
         solidSolver.ambientTemperature = fluid.getAmbientTemperature();
         solidSolver.update(*body,dt);
     }
-    // Fixed-size carriers: fraction = emitted mass / carrier mass. No pilot,
+	if (fluid.fixedCarriers) {
+		// Transfer surface reservoirs into nearby existing carriers. Saturated
+		// regions retain pending vapor, so the solid's existing backpressure works.
+		for (auto* body : bodies_) for (auto& s : body->samples()) {
+			if (s.area <= 0 || s.pending <= 1e-14) continue;
+			const auto surface = body->surfacePosition(s);
+			const auto normal = body->surfaceNormal(s);
+			std::vector<std::pair<size_t,double>> recipients;
+			double capacity = 0;
+			for (size_t i=0;i<gas.size();++i) {
+				const auto d = gas.positions[i]-surface;
+				if (glm::length(d) >= exchangeDistance || glm::dot(d,normal) < 0 || occluded(surface,gas.positions[i])) continue;
+				const double available = FlameParticle(gas,i,&fluid).getMass()*std::max(0.0f,1-gas.fuels[i]);
+				if (available > 0) { recipients.emplace_back(i,available); capacity += available; }
+			}
+			const double amount = std::min(s.pending,capacity);
+			if (amount <= 0) continue;
+			const double heat = s.pendingHeat*amount/s.pending;
+			double transferred = 0;
+			for (const auto& [i,available] : recipients) {
+				const float mass = FlameParticle(gas,i,&fluid).getMass();
+				const float before = gas.fuels[i];
+				gas.fuels[i] = std::min(1.0f,before+static_cast<float>(amount*available/capacity/mass));
+				const double actual = mass*(gas.fuels[i]-before);
+				transferred += actual;
+				gas.temperatures[i] = std::min(fluid.getMaxTemperature(),gas.temperatures[i]+
+					static_cast<float>(heat*actual/amount/(mass*gasSpecificHeat)));
+				gas.airs[i] = false;
+			}
+			transferred = std::min(transferred,s.pending);
+			s.pendingHeat -= heat*transferred/amount;
+			s.pending -= transferred; body->emitted += transferred;
+		}
+		return;
+	}
+	// Fixed-size carriers: fraction = emitted mass / carrier mass. No pilot,
     // no injected oxidizer. Gas receives only the current solid temperature.
     for(auto* body:bodies_) if(body->usesSolidParticles()) {
         // Coalesce surface vapor into carriers of a resolution-independent mass.

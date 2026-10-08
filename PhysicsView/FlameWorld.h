@@ -20,7 +20,7 @@ class RigidBodyWorld;
  * the viewport while its control page is open).
  *
  * Owns gas, finite-fuel static solids and their non-owning coupler. With no
- * solids, the historical burner and its display transform are unchanged.
+ * solids, the burner supplies fuel/heat to a permanent spherical gas lattice.
  * Coupled steps use <= 0.004 s substeps, a common gas/solid clock, and an
  * independent FlamePhysicalTransform for both solid and gas placement.
  * Optional stable rigid-body handles follow position/orientation/velocity.
@@ -98,7 +98,7 @@ public:
     /** @brief Display-only parameters (were FlameApp members); never affect the sim. */
     struct RenderParams {
         int carrierDebug = 0; // 0 radiance, 1 temperature dots, 2 velocity vectors
-        bool sphereWire = true;
+        bool sphereWire = false;
         // Sprite diameters in *simulation* units (multiplied by renderScale
         // for display). Projected with each particle's own depth (plan A7);
         // the defaults reproduce the former fixed 14 px / 20 px sprites at

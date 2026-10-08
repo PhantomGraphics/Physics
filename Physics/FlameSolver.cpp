@@ -81,8 +81,6 @@ Vector3df curlNoise(const Vector3df& p, const float frequency, const float w)
 void FlameSolver::simulate(const float dt)
 {
 	if (!std::isfinite(dt) || dt <= 0) return;
-	// A solid coupler currently adds carriers. Reject the incompatible combination.
-	if (solidCoupler_) for (auto* fluid : fluids) if (fluid->fixedCarriers) return;
 	// Fixed mode substeps rather than changing the requested diffusion coefficient.
 	float stableDt = dt;
 	for (auto* fluid : fluids) if (fluid->fixedCarriers) {
@@ -97,9 +95,19 @@ void FlameSolver::simulate(const float dt)
 		for (int i = 0; i < steps; ++i) simulate(dt / steps);
 		return;
 	}
+	for (auto* fluid : fluids) fluid->updateCarrierSources(dt);
 	if (solidCoupler_) for (auto* fluid : fluids) {
+		double before = 0;
+		if (fluid->fixedCarriers) for (size_t i=0;i<fluid->getParticles().size();++i)
+			before += FlameParticle(fluid->getParticles(),i,fluid).getMass()*fluid->getParticles().temperatures[i];
 		fluid->setCombustionModel(FlameFluid::CombustionModel::Physical);
 		solidCoupler_->update(*fluid,dt,simTime_);
+		if (fluid->fixedCarriers) {
+			double after = 0;
+			for (size_t i=0;i<fluid->getParticles().size();++i)
+				after += FlameParticle(fluid->getParticles(),i,fluid).getMass()*fluid->getParticles().temperatures[i];
+			fluid->sourceHeat += after-before;
+		}
 	}
 	std::vector<FlameParticle> particles;
 	for (auto fluid : fluids) {
@@ -417,7 +425,8 @@ bool FlameSolver::setBoundarySphere(const Vector3df& center, float radius, float
 bool FlameSolver::setThermalBoundary(const ThermalBoundary& t)
 {
 	if (!std::isfinite(t.sourceCenter.x) || !std::isfinite(t.sourceCenter.y) || !std::isfinite(t.sourceCenter.z)) return false;
-	for (float v : {t.sourceRadius, t.sourcePower, t.sourceDuration, t.wallTemperature, t.wallRate, t.wallThickness})
+	for (float v : {t.sourceRadius, t.sourcePower, t.sourceDuration, t.wallTemperature, t.wallRate, t.wallThickness,
+		t.oxygenRecoveryRate, t.smokeDecayRate, t.velocityDampingRate})
 		if (!std::isfinite(v) || v < 0) return false;
 	if (t.sourceRadius <= 0 || t.wallThickness <= 0) return false;
 	thermal_ = t; return true;
@@ -448,6 +457,10 @@ void FlameSolver::applyThermalBoundary(float dt)
 			gas.temperatures[i] = thermal_.wallTemperature + (before - thermal_.wallTemperature) *
 				std::exp(-thermal_.wallRate * weight * dt);
 			fluid->wallHeat += mass * (before - gas.temperatures[i]);
+			const float oxygen = (1-gas.oxygens[i])*(1-std::exp(-thermal_.oxygenRecoveryRate*weight*dt));
+			gas.oxygens[i] += oxygen; fluid->sourceOxygenMass += mass*oxygen;
+			gas.soots[i] *= std::exp(-thermal_.smokeDecayRate*weight*dt);
+			gas.velocities[i] *= std::exp(-thermal_.velocityDampingRate*weight*dt);
 		}
 	}
 }
