@@ -26,10 +26,12 @@ void FlameControlPanel::drawContents()
 	if (fluid.fixedCarriers) {
 		if (const auto& sphere=world_->solver().getBoundarySphere())
 			Im::text("Active sphere radius: %.3f",sphere->getRadius());
+		if (const auto& cylinder=world_->solver().getBoundaryCylinder())
+			Im::text("Active cylinder: radius %.3f / height %.3f",cylinder->getRadius(),2*cylinder->getHalfHeight());
 		const char* debugModes[]={"Radiance","Temperature","Velocity"};
 		Im::combo("Carrier Debug",render.carrierDebug,debugModes,3);
-		Im::checkbox("Sphere Wire",render.sphereWire);
-		Im::textDisabled("Fixed carriers / closed sphere.\nPresets stop and rebuild the scene.");
+		Im::checkbox("Boundary Wire",render.sphereWire);
+		Im::textDisabled("Fixed carriers / closed domain.\nPresets stop and rebuild the scene.");
 		auto thermal = world_->solver().getThermalBoundary();
 		bool changed = Im::sliderFloat("Source Power", thermal.sourcePower, 0, 100);
 		changed |= Im::sliderFloat("Heat Time", thermal.sourceDuration, 0, 10);

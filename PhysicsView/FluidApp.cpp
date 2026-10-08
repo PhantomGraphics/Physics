@@ -1169,11 +1169,14 @@ void FluidApp::syncFlameRenderer()
     const auto& secondaries = fluid.getSecondaryParticles();
 
     const auto& sphere = flameWorld_.solver().getBoundarySphere();
-    if (sphere && fluid.fixedCarriers && !flameWasSpherical_) {
-        fluidRenderer_.setCameraTarget(glm::vec3(sphere->getCenter())*render.renderScale+render.renderOffset);
-        fluidRenderer_.setCameraOrbit(sphere->getRadius()*render.renderScale*3.3f,1.1f,1.35f);
+    const auto& cylinder = flameWorld_.solver().getBoundaryCylinder();
+    if ((sphere || cylinder) && fluid.fixedCarriers && !flameWasSpherical_) {
+        const auto center=sphere?sphere->getCenter():cylinder->getCenter();
+        const float extent=sphere?sphere->getRadius():std::max(cylinder->getRadius(),cylinder->getHalfHeight());
+        fluidRenderer_.setCameraTarget(glm::vec3(center)*render.renderScale+render.renderOffset);
+        fluidRenderer_.setCameraOrbit(extent*render.renderScale*3.3f,1.1f,1.35f);
     }
-    flameWasSpherical_=sphere.has_value() && fluid.fixedCarriers;
+    flameWasSpherical_=(sphere.has_value() || cylinder.has_value()) && fluid.fixedCarriers;
 
     const bool coupled=!flameWorld_.bodies().empty();
     if(coupled && !flameWasCoupled_) {
@@ -1192,18 +1195,31 @@ void FluidApp::syncFlameRenderer()
     const float flameSize = render.particleSize * scale;
     const float smokeSize = render.smokeParticleSize * scale;
 
-    if (fluid.fixedCarriers && sphere) {
+    if (fluid.fixedCarriers && (sphere || cylinder)) {
         std::vector<float> points, colors; std::vector<uint32_t> indices;
         const auto line = [&](glm::vec3 a,glm::vec3 b,glm::vec3 color) {
             const uint32_t index=static_cast<uint32_t>(points.size()/3);
             for (auto p : {a,b}) { points.insert(points.end(),{p.x,p.y,p.z}); colors.insert(colors.end(),{color.x,color.y,color.z,1.0f}); }
             indices.insert(indices.end(),{index,index+1});
         };
-        if (render.sphereWire) for(int axis=0;axis<3;++axis) for(int j=0;j<96;++j) {
+        if (render.sphereWire && sphere) for(int axis=0;axis<3;++axis) for(int j=0;j<96;++j) {
             const float a=j*6.2831853f/96, b=(j+1)*6.2831853f/96;
             glm::vec3 p(0),q(0); p[(axis+1)%3]=std::cos(a); p[(axis+2)%3]=std::sin(a);
             q[(axis+1)%3]=std::cos(b); q[(axis+2)%3]=std::sin(b);
             line(xf(sphere->getCenter()+p*sphere->getRadius()),xf(sphere->getCenter()+q*sphere->getRadius()),{0.2f,0.5f,0.7f});
+        }
+        if (render.sphereWire && cylinder) {
+            const auto center=cylinder->getCenter(); const float r=cylinder->getRadius(),h=cylinder->getHalfHeight();
+            for(float y:{-h,h}) for(int j=0;j<96;++j) {
+                const float a=j*6.2831853f/96,b=(j+1)*6.2831853f/96;
+                line(xf(center+glm::vec3(r*std::cos(a),y,r*std::sin(a))),
+                     xf(center+glm::vec3(r*std::cos(b),y,r*std::sin(b))),{0.2f,0.5f,0.7f});
+            }
+            for(int j=0;j<4;++j) {
+                const float a=j*6.2831853f/4;
+                line(xf(center+glm::vec3(r*std::cos(a),-h,r*std::sin(a))),
+                     xf(center+glm::vec3(r*std::cos(a),h,r*std::sin(a))),{0.2f,0.5f,0.7f});
+            }
         }
         if(render.carrierDebug) for(size_t i=0;i<particles.size();i+=render.carrierDebug==2?4:1) {
             const auto p=xf(particles.positions[i]);

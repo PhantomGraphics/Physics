@@ -29,7 +29,7 @@ struct FlameStats {
 	double heatBalanceError = 0, oxygenBalanceError = 0, sourceHeat = 0, wallHeat = 0, clampHeat = 0;
 	float allAvgT = 0, coreVelocityY = 0, outerVelocityY = 0, thermalVelocityCovariance = 0;
 	float maxWallPenetration = 0, densityError = 0, speedCapFraction = 0;
-	int coreCount = 0, outerCount = 0;
+	int coreCount = 0, outerCount = 0, sourceCarrierCount = 0;
 	double gasFuel = 0, burnedFuel = 0, outflowFuel = 0, sourceFuel = 0;
 	double solidFuel = 0, pendingFuel = 0, residueMass = 0, pyrolyzedMass = 0, solidHeatExchange = 0;
 	double initialSolidFuel = 0, removedSolidMass = 0, fuelBalanceError = 0;

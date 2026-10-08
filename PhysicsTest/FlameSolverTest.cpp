@@ -18,6 +18,41 @@
 using namespace Phantom::Math;
 using namespace Phantom::Physics;
 
+TEST(FlameSolverTest, ClosedCylinderClampsSideAndCapsWithoutRemovingTangentialVelocity)
+{
+  FlameFluid fluid; FlameSolver solver;
+  fluid.fixedCarriers=true; fluid.setBurnRate(0); fluid.setCoolRate(0);
+  fluid.setPressureCoe(0); fluid.setVicosityCoe(0); fluid.setVorticityEps(0);
+  fluid.setCurlNoiseStrength(0); fluid.setMaxSpeed(10); fluid.setBuoyancyCoe(0);
+  solver.add(&fluid); solver.setGravity({0,0,0});
+  ASSERT_TRUE(solver.setBoundaryCylinder({0,1,0},1,2));
+  EXPECT_FALSE(solver.setBoundaryCylinder({0,1,0},-1,2));
+  EXPECT_FALSE(solver.getBoundarySphere().has_value());
+  fluid.createParticle({1.1f,2.1f,0},0.05f);
+  FlameParticle p(fluid.getParticles(),0,&fluid); p.setVelocity({1,1,0.25f});
+  solver.simulate(0.001f);
+  EXPECT_LE(p.getPosition().y,1.95001f);
+  EXPECT_GE(solver.getClosedBoundary()->getSignedDistance(p.getPosition()),0.04999f);
+  EXPECT_NEAR(p.getVelocity().z,0.25f,1e-5f);
+  EXPECT_EQ(fluid.getParticles().size(),1u);
+}
+
+TEST(FlameWorld, CylinderCirculationKeepsCarrierMassAndObservesSourceRegion)
+{
+  Phantom::FlameWorld world;
+  ASSERT_TRUE(world.circulationPreset(true,0.3f,0.8f,0.08f));
+  EXPECT_NEAR(world.fluid().getEmitters().front().center.y,0.4f,1e-6f);
+  const auto before=computeFlameStats(world.fluid(),nullptr,&world.solver());
+  EXPECT_GT(before.sourceCarrierCount,0);
+  for(int i=0;i<120;++i) world.stepOnce();
+  const auto after=computeFlameStats(world.fluid(),nullptr,&world.solver());
+  EXPECT_EQ(after.count,before.count);
+  EXPECT_DOUBLE_EQ(after.carrierMass,before.carrierMass);
+  EXPECT_EQ(after.nanCount,0);
+  EXPECT_LE(after.maxWallPenetration,1e-5f);
+  EXPECT_GT(after.burnedFuel,0);
+}
+
 namespace {
 void seedClosedSphere(FlameFluid& fluid, FlameSolver& solver)
 {

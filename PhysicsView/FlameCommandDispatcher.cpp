@@ -297,6 +297,15 @@ std::optional<std::string> FlameCommandDispatcher::route(const std::string& cmd)
 	}
 	if (!world_) return std::string("Error:flame world not set");
 	auto& w = *world_;
+	if (startsWith(sv,"FlameCirculationPreset:")) {
+        auto rest=sv.substr(23); std::vector<std::string_view> args;
+        while(true) { const auto pos=rest.find(','); args.push_back(rest.substr(0,pos)); if(pos==std::string_view::npos) break; rest.remove_prefix(pos+1); }
+        float radius,height,spacing;
+        if(args.size()!=4 || (args[0]!="sphere" && args[0]!="cylinder") ||
+           !parseFloat(args[1],radius)||!parseFloat(args[2],height)||!parseFloat(args[3],spacing)||
+           !w.circulationPreset(args[0]=="cylinder",radius,height,spacing)) return "Error:expected sphere|cylinder,radius,height,spacing";
+        notifyChanged(); return "OK";
+    }
 	if (startsWith(sv, "FlameSpherePreset:")) {
 		auto args=sv.substr(18); const auto comma=args.find(',');
 		const auto mode=args.substr(0,comma);
