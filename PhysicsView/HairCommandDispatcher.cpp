@@ -60,10 +60,41 @@ std::optional<std::string> HairCommandDispatcher::route(const std::string& cmd) 
         verb != "IsHairPage" && verb != "SetHairParam" && verb != "GetHairParam" && verb != "GetHairStat" &&
         verb != "SetHairRootPose" && verb != "HairTeleport" && verb != "SetHairMotion" &&
         verb != "IsHairMotion" && verb != "SetHairFriction" &&
-        verb != "SetHairGenerationParam" && verb != "GetHairGenerationParam")
+        verb != "SetHairGenerationParam" && verb != "GetHairGenerationParam" &&
+        verb != "SetHairLodParam" && verb != "GetHairLodParam" && verb != "GetHairLodStat")
         return std::nullopt;
     if (!world_) return "Error: hair world unavailable";
     auto& w = *world_;
+    if (verb == "GetHairLodStat") {
+        if (arg == "level") return std::to_string(w.lodLevel());
+        if (arg == "distance") return number(w.cameraDistance());
+        if (arg == "updateScale") return std::to_string(w.lodUpdateScale());
+        if (arg == "drawnFollowers") return std::to_string(w.drawnFollowerCount());
+        if (arg == "transitionProgress") return number(w.lodTransitionProgress());
+        return "Error: unknown hair LOD statistic";
+    }
+    if (verb == "SetHairLodParam" || verb == "GetHairLodParam") {
+        const bool set = verb == "SetHairLodParam";
+        const auto comma = arg.find(',');
+        const auto name = set ? arg.substr(0,comma) : arg;
+        double value = 0.;
+        if (set && (comma == std::string_view::npos || !parse(arg.substr(comma+1),value)))
+            return "Error: expected name,finite value";
+        auto p = w.lodParams();
+        if (name == "enabled") {
+            if (set && value != 0. && value != 1.) return "Error: expected 0 or 1";
+            if (set) p.enabled = value != 0.; else value = p.enabled ? 1. : 0.;
+        } else {
+            float* field = name == "mediumDistance" ? &p.mediumDistance : name == "farDistance" ? &p.farDistance :
+                           name == "hysteresis" ? &p.hysteresis : name == "transitionSeconds" ? &p.transitionSeconds : nullptr;
+            if (!field) return "Error: unknown hair LOD parameter";
+            if (set) *field = static_cast<float>(value); else value = *field;
+        }
+        if (!set) return number(value);
+        if (!w.setLodParams(p)) return "Error: invalid hair LOD parameter";
+        if (changed_) changed_();
+        return "OK";
+    }
     if (verb == "SetHairGenerationParam" || verb == "GetHairGenerationParam") {
         const bool set = verb == "SetHairGenerationParam";
         const auto comma = arg.find(',');

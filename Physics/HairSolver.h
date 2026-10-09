@@ -37,7 +37,8 @@ public:
     };
 
     // Non-owning. Caller must detach before changing topology or destroying data.
-    bool setStrands(HairStrands* strands);
+    // preserveClock retains simulated time, step count and root-reset count for LOD rebinding.
+    bool setStrands(HairStrands* strands, bool preserveClock = false);
     bool setParams(const Params& params);
     // Target pose for the next step. Large jumps or teleport=true reset this
     // strand immediately, without resetting the simulation clock.

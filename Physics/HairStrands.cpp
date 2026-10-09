@@ -68,4 +68,17 @@ bool HairStrands::initialize(const std::vector<HairStrandInput>& inputs) {
     ++revision_;
     return true;
 }
+bool HairStrands::setDynamicState(const std::vector<Math::Vector3df>& positions,
+                                 const std::vector<Math::Vector3df>& velocities) {
+    if (positions.size() != particleCount() || velocities.size() != particleCount()) return false;
+    for (size_t i = 0; i < positions.size(); ++i)
+        if (!finite(positions[i]) || !finite(velocities[i])) return false;
+    for (const auto& r : ranges_)
+        if (glm::length(positions[r.offset]-r.root.position) > 1.e-5f ||
+            glm::length(velocities[r.offset]) > 1.e-5f) return false;
+    particles_.positions = particles_.predicted = positions;
+    particles_.velocities = velocities;
+    for (auto& f : particles_.forces) f = Math::Vector3df(0.f);
+    return true;
+}
 } // namespace Phantom::Physics

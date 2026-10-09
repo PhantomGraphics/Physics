@@ -29,6 +29,7 @@ void SoftBodyWireRenderer::onInit(Phantom::VKG::VulkanContext& ctx,
     VKG::VkLineRenderer::Config cfg;
     cfg.vertSpv = std::move(shaders_.vertSpv);
     cfg.fragSpv = std::move(shaders_.fragSpv);
+    cfg.alphaBlend = alphaBlend_;
     lineRenderer_.emplace(std::move(cfg));
     lineRenderer_->create(ctx, pool, renderPass, framesInFlight);
 }

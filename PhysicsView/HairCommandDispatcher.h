@@ -14,6 +14,9 @@ class HairWorld;
 // rootJitter, shapeVariation, lengthVariation and seed for the next preset.
 // Also longHairGuides/longHairFollowers/shortFurGuides/shortFurFollowers:
 // guides 1..10000, followers 0..10000, independent of each other.
+// SetHairLodParam:name,value / GetHairLodParam:name; enabled defaults to 0.
+// GetHairLodStat:level|distance|updateScale|drawnFollowers|transitionProgress.
+// transitionSeconds (0..2, default 0.15) controls CPU shape/opacity interpolation.
 class HairCommandDispatcher {
 public:
     void setWorld(HairWorld* world) { world_ = world; }

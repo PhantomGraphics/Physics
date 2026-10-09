@@ -29,6 +29,10 @@ struct HairStrandRange {
 class HairStrands {
 public:
     bool initialize(const std::vector<HairStrandInput>& inputs);
+    // Restore resampled dynamic state before registering with a solver.
+    // Invalid input preserves state; pinned roots must match their pose.
+    bool setDynamicState(const std::vector<Math::Vector3df>& positions,
+                         const std::vector<Math::Vector3df>& velocities);
     const SoftParticleSoA& particles() const { return particles_; }
     const std::vector<HairStrandRange>& ranges() const { return ranges_; }
     const std::vector<Math::Vector3df>& restPositions() const { return restPositions_; }

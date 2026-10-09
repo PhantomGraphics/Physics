@@ -10,6 +10,21 @@ enum class HairPreset { Single, Bundle, Body, HeadShake, StrongWind, LongHair, S
 
 class HairWorld {
 public:
+    struct LodParams {
+        bool enabled = false;
+        float mediumDistance = 6.f;
+        float farDistance = 12.f;
+        float hysteresis = 0.5f;
+        float transitionSeconds = 0.15f;
+    };
+    bool setLodParams(const LodParams& params);
+    const LodParams& lodParams() const { return lodParams_; }
+    bool setCameraDistance(float distance);
+    int lodLevel() const { return lodLevel_; }
+    float cameraDistance() const { return cameraDistance_; }
+    int lodUpdateScale() const;
+    size_t drawnFollowerCount() const;
+    float lodTransitionProgress() const;
     struct CountParams {
         int longHairGuides = 48;
         int longHairFollowers = 384;
@@ -54,6 +69,18 @@ public:
     WireData buildWireData() const;
 
 private:
+    LodParams lodParams_;
+    int lodLevel_ = 0;
+    float cameraDistance_ = 0.f;
+    std::vector<Physics::HairStrandInput> fullRest_;
+    std::vector<Physics::HairRootPose> followerRoots_;
+    size_t followerVertexCount_ = 0;
+    bool changeLod(int level);
+    WireData canonicalWireData() const;
+    bool advanceLodTransition(double seconds);
+    WireData transitionFrom_;
+    Physics::HairRootPose transitionRig_;
+    double transitionElapsed_ = 0.;
     CountParams countParams_;
     Physics::HairVariationParams generationParams_; // applies on next generated preset
     Physics::HairStrands strands_; // must outlive solver_
@@ -68,7 +95,7 @@ private:
     std::vector<Physics::HairCollider> baseColliders_;
     Physics::HairRootPose rigPose_, completedRig_;
     bool motion_ = false;
-    bool advanceOnce();
+    bool advanceOnce(int timeScale = 1);
     bool applyRig(const Physics::HairRootPose& pose, bool teleport);
     Physics::HairRootPose animatedRig(double time) const;
     void removeComponent();
