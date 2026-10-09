@@ -186,7 +186,7 @@ std::vector<CommandInfo> CommandDispatcher::commandCatalog() const {
         {"IsHairRunning", "", ""},
         {"SetHairParam", "", "e.g. SetHairParam:shapeCompliance,0.02"},
         {"GetHairParam", "", "e.g. GetHairParam:substeps"},
-        {"SetHairGenerationParam", "", "next preset: rootJitter/shapeVariation/lengthVariation/seed,value"},
+        {"SetHairGenerationParam", "", "next preset: rootJitter/shapeVariation/lengthVariation/seed or longHairGuides/longHairFollowers/shortFurGuides/shortFurFollowers,value (guides 1..10000, followers 0..10000)"},
         {"GetHairGenerationParam", "", "e.g. GetHairGenerationParam:seed"},
         {"GetHairStat", "", "e.g. GetHairStat:lengthError"},
         {"SetHairRootPose", "", "x,y,z,qw,qx,qy,qz"},

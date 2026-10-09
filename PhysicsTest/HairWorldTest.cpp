@@ -5,6 +5,171 @@
 
 using namespace Phantom;
 
+TEST(HairWorldTest, CommonApiDemoUpdatesBothStylesWithRealtimeClockAndRootMotion) {
+    SceneComponentRegistry registry;
+    HairWorld world;
+    world.setComponentRegistry(&registry);
+    Physics::HairVariationParams variation{0.5f,0.02f,0.05f,2026};
+    ASSERT_TRUE(world.setGenerationParams(variation));
+    HairWorld::CountParams counts{32,512,64,1024};
+    ASSERT_TRUE(world.setCountParams(counts));
+    for (auto preset : {HairPreset::LongHair,HairPreset::ShortFur}) {
+        SCOPED_TRACE(preset == HairPreset::LongHair ? "LongHair" : "ShortFur");
+        ASSERT_TRUE(world.setPreset(preset));
+        EXPECT_EQ(registry.count(SceneComponentKind::Hair),1);
+        EXPECT_EQ(world.stats().steps,0u);
+        EXPECT_FALSE(world.motionEnabled());
+        EXPECT_FALSE(world.isRunning());
+        EXPECT_FLOAT_EQ(world.params().windDrag,0.f);
+        EXPECT_FLOAT_EQ(world.rigPose().position.x,0.f);
+        const auto restGuides = world.strands().particles().positions;
+        const auto restFollowers = world.followers().positions();
+        auto settings = world.params();
+        settings.windVelocity = {2.f,0.f,0.f};
+        settings.windDrag = 1.f;
+        ASSERT_TRUE(world.setParams(settings));
+        world.setMotion(true);
+        world.setRunning(true);
+        for (int i = 0; i < 30; ++i) {
+            ASSERT_TRUE(world.update(world.params().timeStep));
+            EXPECT_EQ(world.stats().nonFiniteCount,0u);
+            EXPECT_FLOAT_EQ(world.maxRootError(),0.f);
+            EXPECT_LT(world.stats().maxRelativeLengthError,0.01f);
+        }
+        EXPECT_EQ(world.stats().steps,30u);
+        EXPECT_GT(glm::length(world.strands().particles().positions.back()-restGuides.back()),1.e-5f);
+        EXPECT_GT(glm::length(world.followers().positions().back()-restFollowers.back()),1.e-5f);
+        world.setRunning(false);
+        EXPECT_FALSE(world.update(1.));
+        EXPECT_EQ(world.stats().steps,30u);
+        world.setMotion(false);
+        world.reset();
+        for (size_t i = 0; i < restGuides.size(); ++i)
+            EXPECT_LT(glm::length(world.strands().particles().positions[i]-restGuides[i]),1.e-6f);
+        for (size_t i = 0; i < restFollowers.size(); ++i)
+            EXPECT_LT(glm::length(world.followers().positions()[i]-restFollowers[i]),3.e-6f);
+        Physics::HairRootPose pose;
+        pose.position = {0.3f,0.f,0.f};
+        ASSERT_TRUE(world.setRigPose(pose,true));
+        EXPECT_FLOAT_EQ(world.stats().maxSpeed,0.f);
+        for (size_t i = 0; i < restFollowers.size(); ++i)
+            EXPECT_LT(glm::length(world.followers().positions()[i]-restFollowers[i]-pose.position),3.e-6f);
+    }
+    world.clear();
+    EXPECT_EQ(registry.count(SceneComponentKind::Hair),0);
+}
+
+TEST(HairWorldTest, CountsAreStagedIndependentAndPersistAcrossClear) {
+    HairWorld w;
+    ASSERT_TRUE(w.setPreset(HairPreset::LongHair));
+    ASSERT_TRUE(w.stepOnce());
+    auto counts = w.countParams();
+    counts.longHairGuides = 7;
+    counts.longHairFollowers = 19;
+    counts.shortFurGuides = 11;
+    counts.shortFurFollowers = 3;
+    ASSERT_TRUE(w.setCountParams(counts));
+    EXPECT_EQ(w.strands().strandCount(),48u);
+    EXPECT_EQ(w.followers().strandCount(),384u);
+    EXPECT_EQ(w.stats().steps,1u);
+    for (auto preset : {HairPreset::LongHair,HairPreset::ShortFur}) {
+        ASSERT_TRUE(w.setPreset(preset));
+        const size_t guides = preset == HairPreset::LongHair ? 7 : 11;
+        const size_t followers = preset == HairPreset::LongHair ? 19 : 3;
+        const size_t vertices = preset == HairPreset::LongHair ? 24 : 4;
+        EXPECT_EQ(w.strands().strandCount(),guides);
+        EXPECT_EQ(w.stats().particleCount,guides*vertices);
+        EXPECT_EQ(w.followers().strandCount(),followers);
+        EXPECT_EQ(w.followers().particleCount(),followers*vertices);
+        const auto wire = w.buildWireData();
+        EXPECT_EQ(wire.positions.size(),(guides+followers)*vertices*3);
+        EXPECT_EQ(wire.indices.size(),(guides+followers)*(vertices-1)*2);
+        ASSERT_TRUE(w.stepOnce());
+        EXPECT_EQ(w.stats().nonFiniteCount,0u);
+        w.reset();
+        EXPECT_EQ(w.followers().strandCount(),followers);
+    }
+    ASSERT_TRUE(w.setPreset(HairPreset::Single));
+    EXPECT_EQ(w.strands().strandCount(),1u);
+    EXPECT_EQ(w.followers().strandCount(),0u);
+    w.clear();
+    ASSERT_TRUE(w.setPreset(HairPreset::LongHair));
+    EXPECT_EQ(w.strands().strandCount(),7u);
+    EXPECT_EQ(w.followers().strandCount(),19u);
+}
+
+TEST(HairWorldTest, FollowerDensityDoesNotChangeGuideMotionAndCanBeZero) {
+    for (auto preset : {HairPreset::LongHair,HairPreset::ShortFur}) {
+        HairWorld a, b;
+        auto counts = a.countParams();
+        counts.longHairGuides = counts.shortFurGuides = 1;
+        counts.longHairFollowers = counts.shortFurFollowers = 0;
+        ASSERT_TRUE(a.setCountParams(counts));
+        counts.longHairFollowers = counts.shortFurFollowers = 17;
+        ASSERT_TRUE(b.setCountParams(counts));
+        ASSERT_TRUE(a.setPreset(preset));
+        ASSERT_TRUE(b.setPreset(preset));
+        EXPECT_EQ(a.followers().particleCount(),0u);
+        EXPECT_EQ(b.followers().strandCount(),17u);
+        auto p = a.params();
+        p.windVelocity = {2.f,0.f,0.f}; p.windDrag = 1.f;
+        ASSERT_TRUE(a.setParams(p));
+        ASSERT_TRUE(b.setParams(p));
+        for (int step = 0; step < 5; ++step) {
+            ASSERT_TRUE(a.stepOnce());
+            ASSERT_TRUE(b.stepOnce());
+            ASSERT_EQ(a.strands().particleCount(),b.strands().particleCount());
+            for (size_t i = 0; i < a.strands().particleCount(); ++i)
+                EXPECT_LT(glm::length(a.strands().particles().positions[i]-b.strands().particles().positions[i]),1.e-7f);
+        }
+        EXPECT_EQ(a.buildWireData().positions.size(),a.strands().particleCount()*3);
+        a.reset();
+        EXPECT_EQ(a.followers().strandCount(),0u);
+    }
+}
+
+TEST(HairCommandDispatcherTest, CountSettingsValidateIntegersAndPreserveStateOnFailure) {
+    HairWorld w;
+    HairCommandDispatcher d;
+    d.setWorld(&w);
+    EXPECT_EQ(d.route("HairPreset:LongHair"),"OK");
+    EXPECT_EQ(d.route("HairStep"),"OK");
+    EXPECT_EQ(d.route("SetHairGenerationParam:longHairGuides,5"),"OK");
+    EXPECT_EQ(d.route("SetHairGenerationParam:longHairFollowers,13"),"OK");
+    EXPECT_EQ(d.route("SetHairGenerationParam:shortFurGuides,1"),"OK");
+    EXPECT_EQ(d.route("SetHairGenerationParam:shortFurFollowers,0"),"OK");
+    EXPECT_EQ(d.route("GetHairStat:guides"),"48");
+    EXPECT_EQ(d.route("GetHairStat:steps"),"1");
+    for (const char* command : {"SetHairGenerationParam:longHairGuides,0",
+        "SetHairGenerationParam:shortFurGuides,-1", "SetHairGenerationParam:longHairFollowers,-1",
+        "SetHairGenerationParam:shortFurFollowers,0.5", "SetHairGenerationParam:longHairGuides,10001",
+        "SetHairGenerationParam:shortFurFollowers,10001", "SetHairGenerationParam:longHairFollowers,1e100",
+        "SetHairGenerationParam:longHairFollowers,nan", "SetHairGenerationParam:longHairGuides,5,6"}) {
+        const auto result = d.route(command);
+        ASSERT_TRUE(result.has_value());
+        EXPECT_EQ(result->find("Error:"),0u) << command;
+    }
+    EXPECT_EQ(d.route("GetHairGenerationParam:longHairGuides"),"5");
+    EXPECT_EQ(d.route("GetHairGenerationParam:longHairFollowers"),"13");
+    EXPECT_EQ(d.route("GetHairGenerationParam:shortFurGuides"),"1");
+    EXPECT_EQ(d.route("GetHairGenerationParam:shortFurFollowers"),"0");
+    EXPECT_EQ(d.route("GetHairStat:steps"),"1");
+    EXPECT_EQ(d.route("HairPreset:LongHair"),"OK");
+    EXPECT_EQ(d.route("GetHairStat:particles"),"120");
+    EXPECT_EQ(d.route("GetHairStat:followers"),"13");
+    EXPECT_EQ(d.route("HairPreset:ShortFur"),"OK");
+    EXPECT_EQ(d.route("GetHairStat:particles"),"4");
+    EXPECT_EQ(d.route("GetHairStat:followers"),"0");
+    auto counts = w.countParams();
+    counts.longHairGuides = counts.shortFurGuides = 10000;
+    counts.longHairFollowers = counts.shortFurFollowers = 10000;
+    EXPECT_TRUE(w.setCountParams(counts));
+    counts.longHairGuides = 10001;
+    EXPECT_FALSE(w.setCountParams(counts));
+    EXPECT_EQ(w.countParams().longHairGuides,10000);
+    EXPECT_EQ(w.strands().particleCount(),4u);
+}
+
 TEST(HairWorldTest, FollowersRenderSeparateStrandsAndTrackStepResetTeleportAndClear) {
     for (auto preset : {HairPreset::LongHair,HairPreset::ShortFur}) {
         HairWorld w;

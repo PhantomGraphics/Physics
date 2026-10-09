@@ -71,6 +71,18 @@ std::optional<std::string> HairCommandDispatcher::route(const std::string& cmd) 
         double value = 0.;
         if (set && (comma == std::string_view::npos || !parse(arg.substr(comma+1),value)))
             return "Error: expected name,finite value";
+        auto counts = w.countParams();
+        int* count = name == "longHairGuides" ? &counts.longHairGuides :
+                     name == "longHairFollowers" ? &counts.longHairFollowers :
+                     name == "shortFurGuides" ? &counts.shortFurGuides :
+                     name == "shortFurFollowers" ? &counts.shortFurFollowers : nullptr;
+        if (count) {
+            if (!set) return std::to_string(*count);
+            if (value != std::floor(value) || value < 0. || value > 10000.)
+                return "Error: hair count must be integer 0..10000 (guides >= 1)";
+            *count = static_cast<int>(value);
+            return w.setCountParams(counts) ? "OK" : "Error: invalid hair count";
+        }
         auto p = w.generationParams();
         if (name == "seed") {
             if (set && (value != std::floor(value) || value < 0. || value > 4294967295.))

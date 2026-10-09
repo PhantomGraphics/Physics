@@ -31,6 +31,8 @@ bool HairWorld::setPreset(HairPreset preset) {
         }
     }
     if (preset == HairPreset::Single) p.strands = 1;
+    if (preset == HairPreset::LongHair) p.strands = countParams_.longHairGuides;
+    if (preset == HairPreset::ShortFur) p.strands = countParams_.shortFurGuides;
     Physics::HairStrands next;
     std::vector<Physics::HairRootPose> followerRoots;
     const bool body = preset == HairPreset::Body || preset == HairPreset::HeadShake || preset == HairPreset::StrongWind;
@@ -63,10 +65,10 @@ bool HairWorld::setPreset(HairPreset preset) {
             surface.radius = 0.22f;
         }
         if (!Physics::generateHairSurface(next, surface)) return false;
-        surface.strands *= 8;
+        surface.strands = preset == HairPreset::LongHair ? countParams_.longHairFollowers : countParams_.shortFurFollowers;
         surface.particlesPerStrand = 2;
         Physics::HairStrands seeds;
-        if (!Physics::generateHairSurface(seeds, surface)) return false;
+        if (surface.strands > 0 && !Physics::generateHairSurface(seeds, surface)) return false;
         for (const auto& r : seeds.ranges()) followerRoots.push_back(r.root);
     } else if (!Physics::generateHairBundle(next, p)) return false;
     clear();
@@ -98,6 +100,14 @@ bool HairWorld::setPreset(HairPreset preset) {
 bool HairWorld::setGenerationParams(const Physics::HairVariationParams& p) {
     if (!Physics::validateHairVariation(p)) return false;
     generationParams_ = p;
+    return true;
+}
+bool HairWorld::setCountParams(const CountParams& p) {
+    if (p.longHairGuides < 1 || p.longHairGuides > 10000 ||
+        p.shortFurGuides < 1 || p.shortFurGuides > 10000 ||
+        p.longHairFollowers < 0 || p.longHairFollowers > 10000 ||
+        p.shortFurFollowers < 0 || p.shortFurFollowers > 10000) return false;
+    countParams_ = p;
     return true;
 }
 void HairWorld::clear() {

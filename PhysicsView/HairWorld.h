@@ -10,6 +10,15 @@ enum class HairPreset { Single, Bundle, Body, HeadShake, StrongWind, LongHair, S
 
 class HairWorld {
 public:
+    struct CountParams {
+        int longHairGuides = 48;
+        int longHairFollowers = 384;
+        int shortFurGuides = 96;
+        int shortFurFollowers = 768;
+    };
+    // Staged for the next style preset. Guides: 1..10000, followers: 0..10000.
+    bool setCountParams(const CountParams& params);
+    const CountParams& countParams() const { return countParams_; }
     struct WireData {
         std::vector<float> positions;
         std::vector<float> colors;
@@ -45,6 +54,7 @@ public:
     WireData buildWireData() const;
 
 private:
+    CountParams countParams_;
     Physics::HairVariationParams generationParams_; // applies on next generated preset
     Physics::HairStrands strands_; // must outlive solver_
     Physics::HairSolver solver_;
