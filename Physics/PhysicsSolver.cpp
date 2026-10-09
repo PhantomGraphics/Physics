@@ -4,6 +4,27 @@
 namespace Phantom {
 namespace Physics {
 
+void PhysicsSolver::setFluidSolver(ISPHSolver* solver)
+{
+    if (solver == fluidSolver_) return;
+    if (fluidSolver_) {
+        fluidSolver_->clearRigidBoundaries();
+        fluidSolver_->clearRigidBoundaryParticles();
+        fluidSolver_->clearSoftBoundaryParticles();
+    }
+    fluidSolver_ = solver;
+    softFluidKernel_ = solver ? solver->getKernel() : nullptr;
+    softFluidRestDensity_ = solver ? solver->getRestDensity() : 0.f;
+    if (!solver) return;
+    for (auto* boundary : rigidBoundaries_) solver->addRigidBoundary(boundary);
+    for (auto* particles : rigidParticles_) {
+        if (softFluidKernel_) particles->computePsi(*softFluidKernel_, softFluidRestDensity_);
+        particles->clearAccumForce();
+        solver->addRigidBoundaryParticles(particles);
+    }
+    for (auto* particles : softParticles_) solver->addSoftBoundaryParticles(particles);
+}
+
 RigidFluidBinding& PhysicsSolver::bindRigidBody(RigidBody* body, ICollisionShape* shape, CouplingMode mode)
 {
     auto& binding = rigidFluid_.bind(body, shape, mode);
@@ -13,42 +34,48 @@ RigidFluidBinding& PhysicsSolver::bindRigidBody(RigidBody* body, ICollisionShape
 
 void PhysicsSolver::clearRigidBodyBindings()
 {
-    rigidFluid_.clearBindings();
     clearRigidBoundaries();
     clearRigidBoundaryParticles();
+    rigidFluid_.clearBindings();
 }
 
 void PhysicsSolver::addRigidBoundary(RigidBoundary* b)
 {
+    rigidBoundaries_.push_back(b);
     if (fluidSolver_) fluidSolver_->addRigidBoundary(b);
 }
 
 void PhysicsSolver::clearRigidBoundaries()
 {
+    rigidBoundaries_.clear();
     if (fluidSolver_) fluidSolver_->clearRigidBoundaries();
 }
 
 void PhysicsSolver::addRigidBoundaryParticles(RigidBoundaryParticles* p)
 {
+    rigidParticles_.push_back(p);
     if (fluidSolver_) fluidSolver_->addRigidBoundaryParticles(p);
 }
 
 void PhysicsSolver::clearRigidBoundaryParticles()
 {
+    rigidParticles_.clear();
     if (fluidSolver_) fluidSolver_->clearRigidBoundaryParticles();
 }
 
 SoftFluidBinding& PhysicsSolver::bindSoftBody(ISoftBody* body)
 {
     auto& binding = softFluid_.bind(body);
+    softParticles_.push_back(&binding.particles);
     if (fluidSolver_) fluidSolver_->addSoftBoundaryParticles(&binding.particles);
     return binding;
 }
 
 void PhysicsSolver::clearSoftBodyBindings()
 {
-    softFluid_.clearBindings();
     if (fluidSolver_) fluidSolver_->clearSoftBoundaryParticles();
+    softParticles_.clear();
+    softFluid_.clearBindings();
 }
 
 void PhysicsSolver::setRunning(bool running)

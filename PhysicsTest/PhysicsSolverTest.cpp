@@ -13,6 +13,19 @@ using namespace Phantom::Math;
 namespace {
 constexpr float kTol = 1.0e-4f;
 
+class RecordingFluidSolver : public DFSPHSolver {
+public:
+    std::vector<RigidBoundary*> boundaries;
+    std::vector<RigidBoundaryParticles*> rigidParticles;
+    std::vector<SoftBoundaryParticles*> softParticles;
+    void addRigidBoundary(RigidBoundary* p) override { boundaries.push_back(p); }
+    void clearRigidBoundaries() override { boundaries.clear(); }
+    void addRigidBoundaryParticles(RigidBoundaryParticles* p) override { rigidParticles.push_back(p); }
+    void clearRigidBoundaryParticles() override { rigidParticles.clear(); }
+    void addSoftBoundaryParticles(SoftBoundaryParticles* p) override { softParticles.push_back(p); }
+    void clearSoftBoundaryParticles() override { softParticles.clear(); }
+};
+
 // Keeps build()'s uniform-grid seeding to a handful of particles so tests stay fast.
 void useTinyFluidBounds(PhysicsFluidFactory& factory) {
     auto& p = factory.params();
@@ -28,6 +41,45 @@ TEST(PhysicsSolverTest, Build_DFSPH_CreatesParticles) {
     factory.setFluidType(PhysicsFluidFactory::FluidType::DFSPH);
     factory.build();
     EXPECT_GT(factory.getParticleCount(), 0u);
+}
+
+TEST(PhysicsSolverTest, SwitchingFluidTransfersAndDetachesCouplingRegistrations) {
+    RecordingFluidSolver oldFluid, newFluid;
+    PhysicsSolver solver;
+    SphereShape shape;
+    RigidBody body;
+    body.setShape(&shape);
+    ClothBody cloth(ClothBodyParams{});
+    // Binding before installing a fluid must also be supported.
+    auto& rigid = solver.bindRigidBody(&body, &shape, CouplingMode::TwoWay);
+    solver.addRigidBoundaryParticles(&rigid.particles);
+    auto& soft = solver.bindSoftBody(&cloth);
+    solver.setFluidSolver(&oldFluid);
+    ASSERT_EQ(oldFluid.boundaries.size(), 1u);
+    ASSERT_EQ(oldFluid.rigidParticles.size(), 1u);
+    ASSERT_EQ(oldFluid.softParticles.size(), 1u);
+    solver.setFluidSolver(&newFluid);
+    EXPECT_TRUE(oldFluid.boundaries.empty());
+    EXPECT_TRUE(oldFluid.rigidParticles.empty());
+    EXPECT_TRUE(oldFluid.softParticles.empty());
+    ASSERT_EQ(newFluid.boundaries.size(), 1u);
+    EXPECT_EQ(newFluid.boundaries[0], &rigid.boundary);
+    ASSERT_EQ(newFluid.rigidParticles.size(), 1u);
+    EXPECT_EQ(newFluid.rigidParticles[0], &rigid.particles);
+    ASSERT_EQ(newFluid.softParticles.size(), 1u);
+    EXPECT_EQ(newFluid.softParticles[0], &soft.particles);
+    solver.setFluidSolver(&newFluid);
+    EXPECT_EQ(newFluid.boundaries.size(), 1u);
+    solver.setFluidSolver(nullptr);
+    EXPECT_TRUE(newFluid.boundaries.empty());
+    EXPECT_TRUE(newFluid.rigidParticles.empty());
+    EXPECT_TRUE(newFluid.softParticles.empty());
+    solver.clearRigidBodyBindings();
+    solver.clearSoftBodyBindings();
+    solver.setFluidSolver(&oldFluid);
+    EXPECT_TRUE(oldFluid.boundaries.empty());
+    EXPECT_TRUE(oldFluid.rigidParticles.empty());
+    EXPECT_TRUE(oldFluid.softParticles.empty());
 }
 
 TEST(PhysicsSolverTest, Build_PBSPH_CreatesParticles) {

@@ -49,6 +49,8 @@ void RigidBodySolver::stepUnconditional() {
     updateInertias();
     applyGravity(dt);
     integratePositions(dt);
+    // Contact impulses must use the inertia tensor at the integrated pose.
+    updateInertias();
 
     std::vector<std::pair<int, int>> pairs;
     broadPhase(pairs);

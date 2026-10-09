@@ -2,6 +2,7 @@
 #include "../Physics/SoftMesh.h"
 #include "../Physics/XPBDSolver.h"
 #include "../Physics/DistanceConstraint.h"
+#include <limits>
 
 using namespace Phantom::Physics;
 using namespace Phantom::Math;
@@ -32,6 +33,28 @@ SoftMesh makeTwoParticles(Vector3df posA, Vector3df posB) {
 } // namespace
 
 // ------------------------------------------------- pinned particle  ----------
+
+TEST(XPBDSolverTest, InvalidTimeStep_DoesNotCorruptParticles) {
+    auto mesh = makeSingleParticle({0.f, 2.f, 0.f});
+    XPBDSolver solver;
+    solver.setMesh(&mesh);
+    for (float dt : {0.f, -0.01f, std::numeric_limits<float>::infinity(),
+                     std::numeric_limits<float>::quiet_NaN()}) {
+        solver.params().timeStep = dt;
+        solver.step();
+        EXPECT_EQ(mesh.particles.positions[0].y, 2.f);
+        EXPECT_EQ(mesh.particles.velocities[0].y, 0.f);
+    }
+    solver.params().timeStep = 0.016f;
+    for (int substeps : {0, -1}) {
+        solver.params().numSubsteps = substeps;
+        solver.step();
+        EXPECT_EQ(mesh.particles.positions[0].y, 2.f);
+    }
+    solver.params().numSubsteps = 10;
+    solver.step();
+    EXPECT_LT(mesh.particles.positions[0].y, 2.f);
+}
 
 TEST(XPBDSolverTest, PinnedParticle_DoesNotMove) {
     SoftMesh mesh = makeSingleParticle({0.f, 1.f, 0.f}, 0.f);  // pinned

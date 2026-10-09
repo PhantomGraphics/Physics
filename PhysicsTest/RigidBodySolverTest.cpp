@@ -6,6 +6,28 @@
 using namespace Phantom::Physics;
 using namespace Phantom::Math;
 
+TEST(RigidBodySolverTest, RotatingBox_ImpulseUsesIntegratedInertia) {
+    BoxShape shape;
+    shape.halfExtents = {1.f, 2.f, 3.f};
+    RigidBody body;
+    body.setShape(&shape);
+    body.setMass(2.f);
+    body.angularVelocity = {0.f, 0.f, 4.f};
+    RigidBodySolver world;
+    world.params().gravity = {0.f, 0.f, 0.f};
+    world.timeStep = 0.1f;
+    world.addBody(&body);
+    world.stepUnconditional();
+    const auto before = body.angularVelocity;
+    const Vector3df impulse{0.f, 0.f, 1.f};
+    const Vector3df point = body.position + Vector3df(1.f, 0.f, 0.f);
+    body.applyImpulse(impulse, point);
+    const auto actual = body.angularVelocity - before;
+    body.updateInertiaTensor();
+    const auto expected = body.getInverseInertiaTensorWorld() * glm::cross(point - body.position, impulse);
+    EXPECT_NEAR(glm::length(actual - expected), 0.f, 1e-6f);
+}
+
 // --------------------------------------------------------------- helpers ----
 
 namespace {

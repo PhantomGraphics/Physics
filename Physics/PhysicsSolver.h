@@ -70,7 +70,9 @@ public:
      *               Physics/CLAUDE.md's "非所有ポインタの寿命" section). Must
      *               outlive this PhysicsSolver, or be replaced/cleared first.
      */
-    void setFluidSolver(ISPHSolver* solver) { fluidSolver_ = solver; }
+    // Detaches the old solver's coupling registrations and transfers this
+    // orchestrator's registrations. Call before destroying the old solver.
+    void setFluidSolver(ISPHSolver* solver);
 
     ISPHSolver*       fluidSolver()       { return fluidSolver_; }
     const ISPHSolver* fluidSolver() const { return fluidSolver_; }
@@ -179,6 +181,9 @@ public:
 
 private:
     ISPHSolver*      fluidSolver_ = nullptr;
+    std::vector<RigidBoundary*> rigidBoundaries_;
+    std::vector<RigidBoundaryParticles*> rigidParticles_;
+    std::vector<SoftBoundaryParticles*> softParticles_;
     RigidFluidSolver            rigidFluid_;
     SoftFluidSolver             softFluid_;
     RigidSoftSolver             rigidSoft_;
