@@ -207,6 +207,7 @@ void FluidApp::onInit()
     rigidRenderer_.setExtent(getExtent());
     softRenderer_.setExtent(getExtent());
     hairRenderer_.setExtent(getExtent());
+    hairRenderer_.setAlphaBlend(true);
 
     {
         FluidRenderer::Shaders s;
@@ -524,7 +525,11 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         std::chrono::steady_clock::now().time_since_epoch()).count();
     const double hairDt = hairLastTime_ < 0. ? 0. : hairNow - hairLastTime_;
     hairLastTime_ = hairNow;
-    if (hairWorld_.update(hairDt)) syncHairRenderer();
+    const int oldHairLod = hairWorld_.lodLevel();
+    const auto hairEye = glm::vec3(glm::inverse(fluidRenderer_.getViewMatrix())[3]);
+    hairWorld_.setCameraDistance(glm::length(hairEye-(glm::vec3(0.f,1.05f,0.f)+hairWorld_.rigPose().position)));
+    const bool hairAdvanced = hairWorld_.update(hairDt);
+    if (hairAdvanced || oldHairLod != hairWorld_.lodLevel()) syncHairRenderer();
 
     // Keep the Scenario Browser's GUI run-queue advancing every frame.
     scenarioBrowser_.pumpQueue();

@@ -23,6 +23,7 @@ public:
     void setExtent(VkExtent2D e) { extent_ = e; }
     void setEnabled(bool e)      { enabled_ = e; }
     bool isEnabled() const       { return enabled_; }
+    void setAlphaBlend(bool enabled) { alphaBlend_ = enabled; } // before onInit
 
     void update(const std::vector<float>&    positions,
                 const std::vector<float>&    colors,
@@ -48,6 +49,7 @@ private:
     VkExtent2D extent_  = {1280, 720};
     bool       dirty_   = false;
     bool       enabled_ = true;
+    bool       alphaBlend_ = false;
 
     const Phantom::VKG::VulkanContext*     ctx_  = nullptr;
     const Phantom::VKG::VulkanCommandPool* pool_ = nullptr;

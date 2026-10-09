@@ -25,7 +25,8 @@ bool HairSolver::setParams(const Params& p) {
     return true;
 }
 
-bool HairSolver::setStrands(HairStrands* strands) {
+bool HairSolver::setStrands(HairStrands* strands, bool preserveClock) {
+    const auto oldStats = stats_;
     strands_ = strands;
     revision_ = strands ? strands->revision() : 0;
     stretch_.clear();
@@ -35,6 +36,11 @@ bool HairSolver::setStrands(HairStrands* strands) {
     previousRoots_.clear();
     contacts_.clear();
     stats_ = {};
+    if (preserveClock) {
+        stats_.simulatedTime = oldStats.simulatedTime;
+        stats_.steps = oldStats.steps;
+        stats_.rootResets = oldStats.rootResets;
+    }
     if (!strands) return true;
     targets_.resize(strands->particleCount());
     shapeLambda_.resize(strands->particleCount(), Math::Vector3df(0.f));
