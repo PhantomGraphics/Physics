@@ -23,9 +23,6 @@ bool HairWorld::setPreset(HairPreset preset) {
             p.strands = 96;
             p.particlesPerStrand = 4;
             p.length = 0.06f;
-            p.spacing = 0.02f;
-            p.curvature = 0.15f;
-            p.root.rotation = glm::angleAxis(3.14159265f, Math::Vector3df(0.f,0.f,1.f));
             settings.bendCompliance = 1.e-6f;
             settings.shapeCompliance = 1.e-5f;
             settings.dampingRate = 6.f;
@@ -53,6 +50,16 @@ bool HairWorld::setPreset(HairPreset preset) {
             inputs.push_back(std::move(in));
         }
         if (!next.initialize(inputs)) return false;
+    } else if (preset == HairPreset::LongHair || preset == HairPreset::ShortFur) {
+        Physics::HairSurfaceParams surface;
+        surface.strands = p.strands;
+        surface.particlesPerStrand = p.particlesPerStrand;
+        surface.length = p.length;
+        if (preset == HairPreset::ShortFur) {
+            surface.surface = Physics::HairSurface::Capsule;
+            surface.radius = 0.22f;
+        }
+        if (!Physics::generateHairSurface(next, surface)) return false;
     } else if (!Physics::generateHairBundle(next, p)) return false;
     clear();
     solver_.setParams(settings);

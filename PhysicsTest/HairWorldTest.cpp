@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "../PhysicsView/HairWorld.h"
 #include "../PhysicsView/HairCommandDispatcher.h"
+#include <algorithm>
 
 using namespace Phantom;
 
@@ -22,7 +23,9 @@ TEST(HairWorldTest, StylePresetsSetGeometryAndRestoreSolverSettings) {
             length += glm::length(w.strands().particles().positions[r.offset+j] -
                                   w.strands().particles().positions[r.offset+j-1]);
         EXPECT_NEAR(length, 0.06f, 1.e-6f);
-        EXPECT_GT(w.strands().particles().positions[r.offset+r.count-1].y, r.root.position.y);
+        const auto axisPoint = Math::Vector3df(0.f,1.05f,std::clamp(r.root.position.z,-0.4f,0.4f));
+        const auto normal = glm::normalize(r.root.position-axisPoint);
+        EXPECT_GT(glm::dot(w.strands().particles().positions[r.offset+r.count-1]-r.root.position,normal),0.059f);
     }
     ASSERT_TRUE(w.setPreset(HairPreset::LongHair));
     EXPECT_EQ(w.strands().strandCount(), 48u);
