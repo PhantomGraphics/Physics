@@ -89,6 +89,10 @@ std::optional<std::string> HairCommandDispatcher::route(const std::string& cmd) 
         const auto& s = w.stats();
         if (arg == "guides") return number(static_cast<double>(w.strands().strandCount()));
         if (arg == "particles") return number(static_cast<double>(s.particleCount));
+        if (arg == "followers") return number(static_cast<double>(w.followers().strandCount()));
+        if (arg == "followerVertices") return number(static_cast<double>(w.followers().particleCount()));
+        if (arg == "followerTipX") return number(w.followers().positions().empty() ? 0.f : w.followers().positions().back().x);
+        if (arg == "followerTipY") return number(w.followers().positions().empty() ? 0.f : w.followers().positions().back().y);
         if (arg == "time") return number(s.simulatedTime);
         if (arg == "steps") return number(static_cast<double>(s.steps));
         if (arg == "maxSpeed") return number(s.maxSpeed);

@@ -1,6 +1,7 @@
 #pragma once
 #include "../Physics/HairSolver.h"
 #include "../Physics/HairGenerator.h"
+#include "../Physics/HairFollowers.h"
 #include "SceneComponent.h"
 
 namespace Phantom {
@@ -34,6 +35,7 @@ public:
     const Physics::HairSolver::Params& params() const { return solver_.params(); }
     const Physics::HairSolver::Stats& stats() const { return solver_.stats(); }
     const Physics::HairStrands& strands() const { return strands_; }
+    const Physics::HairFollowers& followers() const { return followers_; }
     double droppedTime() const { return droppedTime_; }
     float tipY() const;
     float tipX() const;
@@ -43,6 +45,7 @@ public:
 private:
     Physics::HairStrands strands_; // must outlive solver_
     Physics::HairSolver solver_;
+    Physics::HairFollowers followers_;
     bool running_ = false;
     double accumulator_ = 0.;
     double droppedTime_ = 0.;
