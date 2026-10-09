@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "FluidApp.h"
 
 #include <chrono>
@@ -14,13 +14,7 @@ namespace Phantom {
 
 FluidApp::FluidApp(int width, int height, const std::string& title)
     : VkAppBase(width, height, title)
-    , controlPanel_(&world_)
-    , rigidControlPanel_(&world_.rigid())
     , softWorld_(world_.physicsSolver())
-    , softControlPanel_(&softWorld_)
-    , flameControlPanel_(&flameWorld_)
-    , cloudControlPanel_(&cloudWorld_)
-    , hairControlPanel_(&hairWorld_)
 {
     // Every scene object registers itself into the shared registry: the fluid
     // + mesh boundary + emitters/outflow via FluidWorld, its rigid bodies via
@@ -56,28 +50,6 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     scenarioBrowser_.setHost(this);
     scenarioBrowser_.setDefaultFolder("scenarios");
 
-    controlPanel_.setOnWorldChanged([this]() { syncParticlesToRenderer(); });
-    controlPanel_.setCommandSink([this](const std::string& cmd) { dispatcher_.submitUi(cmd); });
-    rigidControlPanel_.setCommandSink([this](const std::string& cmd) { dispatcher_.submitUi(cmd); });
-    softControlPanel_.setCommandSink([this](const std::string& cmd) { dispatcher_.submitUi(cmd); });
-    rigidControlPanel_.setOnWorldChanged([this]() {
-        world_.refreshCoupling();
-        syncRigidRenderer();
-    });
-    softControlPanel_.setOnWorldChanged([this]() {
-        world_.refreshSoftCoupling();
-        syncSoftRenderer();
-    });
-    flameControlPanel_.setOnWorldChanged([this]() { syncFlameRenderer(); syncRigidRenderer(); });
-    flameControlPanel_.setPBVRStatsSource([this] { return flameRenderer_.pbvrStats(); });
-    ssfrTestPanel_.bindSSFRRenderer(&ssfrRenderer_);
-    ssfrTestPanel_.init();
-    ssfrPanel_.bindRenderer(&ssfrRenderer_);
-    ssfrPanel_.bindWorld(&world_);
-    // The former "SSFR Test" page is now a collapsible section of the SSFR page.
-    ssfrPanel_.bindDebugPanel(&ssfrTestPanel_);
-    ssfrPanel_.init();
-
     // glTF background / environment / shared light (PLAN_physicsview_gltf_rendering.md).
     renderBackground_.bind(&bgGltfRenderer_, &ssfrRenderer_);
     dispatcher_.setRenderBackground(&renderBackground_);
@@ -86,7 +58,8 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     dispatcher_.setRigidBodyRenderer(&rigidGltfRenderer_);
     softGltfRenderer_.bindWorld(&softWorld_);
     dispatcher_.setSoftBodyRenderer(&softGltfRenderer_);
-    dispatcher_.setSsfrPanel(&ssfrPanel_);
+    ssfrSettings_.bindRenderer(&ssfrRenderer_);
+    dispatcher_.setSsfrSettings(&ssfrSettings_);
     dispatcher_.setFluidRenderer(&fluidRenderer_);
     dispatcher_.setUIVisibilityHooks([this](bool v) { uiVisible_ = v; },
                                      [this] { return uiVisible_; });
@@ -95,33 +68,24 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     dispatcher_.flame().setWorld(&flameWorld_);
     dispatcher_.flame().setPageHooks(
         [this](bool on) {
-            controlHost_.setPage(on ? ControlPage::Flame : ControlPage::Fluid);
-            controlHost_.setVisible(true);
+            viewDomain_ = on ? ViewDomain::Flame : ViewDomain::Fluid;
         },
-        [this] { return controlHost_.getPage() == ControlPage::Flame; });
+        [this] { return viewDomain_ == ViewDomain::Flame; });
     dispatcher_.flame().setPBVRStatsHook([this] { return flameRenderer_.pbvrStats(); });
     dispatcher_.flame().setOnFlameChanged([this]() { syncFlameRenderer(); syncRigidRenderer(); });
-    cloudControlPanel_.setOnWorldChanged([this]() { cloudDirty_ = true; });
-    hairControlPanel_.setOnWorldChanged([this]() { syncHairRenderer(); });
-    hairControlPanel_.setOnFrameGuides([this]() {
-        fluidRenderer_.setCameraTarget({0.f, 0.9f, 0.f});
-        fluidRenderer_.setCameraOrbit(5.f, 0.25f, 0.1f);
-    });
     dispatcher_.hair().setWorld(&hairWorld_);
     dispatcher_.hair().setOnChanged([this]() { syncHairRenderer(); });
     dispatcher_.hair().setPageHooks(
         [this](bool on) {
-            controlHost_.setPage(on ? ControlPage::Hair : ControlPage::Fluid);
-            controlHost_.setVisible(true);
+            viewDomain_ = on ? ViewDomain::Hair : ViewDomain::Fluid;
         },
-        [this] { return controlHost_.getPage() == ControlPage::Hair; });
+        [this] { return viewDomain_ == ViewDomain::Hair; });
     dispatcher_.cloud().setWorld(&cloudWorld_);
     dispatcher_.cloud().setPageHooks(
         [this](bool on) {
-            controlHost_.setPage(on ? ControlPage::Cloud : ControlPage::Fluid);
-            controlHost_.setVisible(true);
+            viewDomain_ = on ? ViewDomain::Cloud : ViewDomain::Fluid;
         },
-        [this] { return controlHost_.getPage() == ControlPage::Cloud; });
+        [this] { return viewDomain_ == ViewDomain::Cloud; });
     dispatcher_.cloud().setOnCloudChanged([this]() { cloudDirty_ = true; });
     dispatcher_.cloud().setPbvrStatsHook([this]() -> std::optional<std::array<double, 3>> {
         if (!cloudVolumeRenderer_.isReady()) return std::nullopt;
@@ -129,20 +93,6 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
         return std::array<double, 3>{ static_cast<double>(s.accumulated), static_cast<double>(s.overflowed),
                                       static_cast<double>(s.generated) };
     });
-    renderingPanel_.setCommandSink([this](const std::string& cmd) { dispatcher_.submitUi(cmd); });
-    renderingPanel_.bind(&renderBackground_);
-    renderingPanel_.bindRigidBodyRenderer(&rigidGltfRenderer_);
-    renderingPanel_.bindSoftBodyRenderer(&softGltfRenderer_);
-    renderingPanel_.init();
-
-    volumeConvertPanel_.bindWorld(&world_);
-    volumeConvertPanel_.bindConverter(&volumeConverter_);
-    volumeConvertPanel_.bindMeshConverter(&meshConverter_);
-    volumeConvertPanel_.bindVolumeRenderer(&volumeRenderer_);
-    volumeConvertPanel_.bindMeshRenderer(&meshRenderer_);
-    volumeConvertPanel_.setOnVolumeChanged([this]() { syncVolumeRenderer(); });
-    volumeConvertPanel_.setOnMeshChanged([this]() { syncMeshRenderer(); });
-    volumeConvertPanel_.init();
     dispatcher_.setVolumeConverter(&volumeConverter_);
     dispatcher_.setMeshConverter(&meshConverter_);
     dispatcher_.setVolumeRenderer(&volumeRenderer_);
@@ -168,20 +118,6 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
                       &cloudVolumeRenderer_ };
     add(&ssfrRenderer_);
 
-    // The per-domain control panels are no longer registered as standalone
-    // UI panels -- they are embedded into controlHost_ (one shared "Control"
-    // window, selected from the Physics menu), which is the only control-side
-    // IVkUIPanel added here. This also prevents the double-draw described in
-    // GUI_RESTRUCTURING_PLAN.md section 11.
-    registerControlPages();
-    statusView_.bind(&world_, &softWorld_, &runner_);
-    controlHost_.setStatusView(&statusView_);
-    // Remembers the last active page + window-visible flag across runs (the
-    // window geometry and section fold state are handled by imgui.ini). The
-    // layout file is loaded once in controlHost_.init() (from onInit(), after
-    // main.cpp may have cleared it for a scenario run).
-    controlHost_.setLayoutFile("physicsview_control_layout.ini");
-    add(&controlHost_);
     add(&objectListPanel_);
     add(&scenarioBrowser_);
 
@@ -189,8 +125,6 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
     // drawing themselves; the shell owns their visibility (hidden by default, imgui.ini)
     // and first-use placement.
     shell_.setDispatcher(&dispatcher_);
-    shell_.bindPanel("Control", {0.70f, 0.00f, 0.30f, 0.66f},
-                     [this] { return controlHost_.isVisible(); }, [this](bool v) { controlHost_.setVisible(v); });
     shell_.bindPanel("Scene Objects", {0.45f, 0.00f, 0.25f, 0.50f},
                      [this] { return objectListPanel_.isVisible(); }, [this](bool v) { objectListPanel_.setVisible(v); });
     shell_.bindPanel("Scenario Browser", {0.30f, 0.05f, 0.40f, 0.55f},
@@ -208,16 +142,6 @@ FluidApp::FluidApp(int width, int height, const std::string& title)
         }
         return items;
     });
-    // An outliner entry opens the page of its domain in the Control window.
-    shell_.setOpenHandler([this](const std::string& page) {
-        ControlPage p = ControlPage::Fluid;
-        if (page == "RigidBody") p = ControlPage::RigidBody;
-        else if (page == "SoftBody") p = ControlPage::SoftBody;
-        else if (page == "Hair") p = ControlPage::Hair;
-        controlHost_.setPage(p);
-        controlHost_.setVisible(true);
-    });
-
     buildMenuBar();
 }
 
@@ -237,32 +161,6 @@ void FluidApp::buildMenuBar()
         glfwSetWindowShouldClose(getWindow().get(), GLFW_TRUE);
     });
 
-    // One declarative entry per ControlPage. Rendering and tool pages are
-    // routed to their dedicated top-level menus.
-    for (int i = 0; i < static_cast<int>(kControlPageCount); ++i) {
-        const auto page = static_cast<ControlPage>(i);
-        const bool isRenderingPage =
-            page == ControlPage::FluidRendering ||
-            page == ControlPage::SSFR ||
-            page == ControlPage::Rendering;
-        const bool isToolsPage = page == ControlPage::VolumeConversion;
-        DeclarativeMenu* targetMenu = isRenderingPage ? static_cast<DeclarativeMenu*>(&renderingMenu_)
-                                    : isToolsPage ? static_cast<DeclarativeMenu*>(&toolsMenu_)
-                                                  : static_cast<DeclarativeMenu*>(&physicsMenu_);
-
-        targetMenu->build({{toString(page), [this, page] {
-            controlHost_.setPage(page);
-            controlHost_.setVisible(true);
-        }, [this, page] {
-            return controlHost_.getPage() == page && controlHost_.isVisible();
-        }, [this, page] { return controlHost_.isPageEnabled(page); },
-        [this, page]() -> std::string {
-            return controlHost_.isPageEnabled(page)
-                ? std::string{}
-                : controlHost_.pageDisabledReason(page);
-        }}});
-    }
-
     windowMenu_.build({{"Outliner",
                 [this] { shell_.setPanelVisible("Outliner", !shell_.isPanelVisible("Outliner")); },
                 [this] { return shell_.isPanelVisible("Outliner"); }},
@@ -270,10 +168,6 @@ void FluidApp::buildMenuBar()
         {"Command",
                 [this] { shell_.setPanelVisible("Command", !shell_.isPanelVisible("Command")); },
                 [this] { return shell_.isPanelVisible("Command"); }},
-
-        {"Control Window",
-                [this] { controlHost_.setVisible(!controlHost_.isVisible()); },
-                [this] { return controlHost_.isVisible(); }},
 
         {"Scene Objects",
                 [this] { objectListPanel_.setVisible(!objectListPanel_.isVisible()); },
@@ -285,7 +179,6 @@ void FluidApp::buildMenuBar()
 
         {"Reset Layout", [this] {
         shell_.resetLayout();
-        controlHost_.setVisible(false);
     }} });
 
     viewMenu_.build({
@@ -297,24 +190,7 @@ void FluidApp::buildMenuBar()
 
     menuBar_.add(&fileMenu_);
     menuBar_.add(&viewMenu_);
-    menuBar_.add(&physicsMenu_);
-    menuBar_.add(&renderingMenu_);
-    menuBar_.add(&toolsMenu_);
     menuBar_.add(&windowMenu_);
-}
-
-void FluidApp::registerControlPages()
-{
-    controlHost_.registerPage(ControlPage::Fluid,            &controlPanel_);
-    controlHost_.registerPage(ControlPage::RigidBody,        &rigidControlPanel_);
-    controlHost_.registerPage(ControlPage::SoftBody,         &softControlPanel_);
-    controlHost_.registerPage(ControlPage::Flame,            &flameControlPanel_);
-    controlHost_.registerPage(ControlPage::Cloud,            &cloudControlPanel_);
-    controlHost_.registerPage(ControlPage::Hair,             &hairControlPanel_);
-    controlHost_.registerPage(ControlPage::FluidRendering,   &fluidRenderer_);
-    controlHost_.registerPage(ControlPage::SSFR,             &ssfrPanel_);
-    controlHost_.registerPage(ControlPage::Rendering,        &renderingPanel_);
-    controlHost_.registerPage(ControlPage::VolumeConversion, &volumeConvertPanel_);
 }
 
 bool FluidApp::loadScenario(const std::string& jsonPath) {
@@ -512,12 +388,6 @@ void FluidApp::onInit()
                                         shadowPass_.getDepthView(), shadowPass_.getShadowSampler());
     }
 
-    // Load the Control-window layout (page + visible flag) and assemble its
-    // widget tree now -- after main.cpp had its chance to clear the layout file
-    // for a non-interactive scenario run (docs/todo/PLAN_physicsview_declarative_ui.md
-    // Phase 2: load at init, save on change).
-    controlHost_.init();
-
     // Load environment map after Vulkan is initialized
     static const std::array<std::string, 6> kFaceNames = {
         "right.png", "left.png", "top.png", "bottom.png", "front.png", "back.png"
@@ -656,8 +526,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     hairLastTime_ = hairNow;
     if (hairWorld_.update(hairDt)) syncHairRenderer();
 
-    // Keep the Scenario Browser's GUI run-queue advancing every frame, even
-    // when its page is not the one currently shown in the Control window.
+    // Keep the Scenario Browser's GUI run-queue advancing every frame.
     scenarioBrowser_.pumpQueue();
     ssfrRenderer_.setParticleRadius(world_.params().radius);
 
@@ -665,69 +534,50 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     // rigid / soft domains and the glTF background, whichever page is shown.
     // Opening its page (or Play / Step / Reset) puts it into the scene; File >
     // New takes it out again.
-    const bool flameActive = (controlHost_.getPage() == ControlPage::Flame);
+    const bool flameActive = (viewDomain_ == ViewDomain::Flame);
     if (flameActive) flameWorld_.setPopulated(true);
-    const bool cloudActive = (controlHost_.getPage() == ControlPage::Cloud);
+    const bool cloudActive = (viewDomain_ == ViewDomain::Cloud);
 
-    const bool testActive = ssfrTestPanel_.isActive();
-
-    if (testActive) {
-        fluidRenderer_.clearDirectGpuBuffer();
-        if (ssfrTestPanel_.consumeDirty()) {
-            const auto& pts = ssfrTestPanel_.getPositions();
-            fluidRenderer_.setParticles(pts);
-            ssfrRenderer_.setParticles(pts);
-            ssfrRenderer_.setSprayParticles({});
-            ssfrRenderer_.setFoamParticles({});
-            updateAnisotropicKernel(pts);
-        } else if (ssfrPanel_.kernelGeneration() != appliedKernelGeneration_) {
-            updateAnisotropicKernel(ssfrTestPanel_.getPositions());
-        }
-    } else {
-        if (prevTestActive_)
-            syncParticlesToRenderer();
-        if (world_.getSimulationType() != FluidWorld::SimulationType::GPU_CSPH) {
-            ssfrRenderer_.clearParticleBuffer();
-        }
-
-        const bool fluidRunning = world_.isRunning();
-        const bool rigidRunning = world_.rigid().isRunning();
-        const bool softRunning  = softWorld_.isRunning();
-
-        // Steps whichever of fluid/rigid are running; if both are running and
-        // Rigid-Fluid coupling is enabled, they step together in lock-step
-        // (see FluidWorld::step()) instead of independently.
-        flameWorld_.syncRigidBindings();
-        world_.step();
-
-        // softWorld_ is independent of world_ unless SoftBody-Fluid coupling
-        // is enabled (see FluidWorld::setSoftCouplingEnabled()), in which
-        // case world_.step() above already advanced it -- stepping it again
-        // here would double-step it.
-        if (softRunning && !world_.isSoftCouplingEnabled()) softWorld_.step();
-
-        if (fluidRunning) {
-            if (world_.getSimulationType() == FluidWorld::SimulationType::GPU_CSPH) {
-                syncGpuCsphBufferToRenderer();
-            } else {
-                syncParticlesToRenderer();
-            }
-        } else if (ssfrPanel_.kernelGeneration() != appliedKernelGeneration_ &&
-                   world_.getSimulationType() != FluidWorld::SimulationType::GPU_CSPH) {
-            // Kernel toggled / retuned while paused: rebuild the ellipsoids
-            // from the current (unchanged) particle positions.
-            updateAnisotropicKernel(world_.getParticlePositions());
-        }
-        if (rigidRunning) {
-            syncRigidRenderer();
-        }
-        if (softRunning) {
-            syncSoftRenderer();
-        }
+    if (world_.getSimulationType() != FluidWorld::SimulationType::GPU_CSPH) {
+        ssfrRenderer_.clearParticleBuffer();
     }
-    prevTestActive_ = testActive;
 
-    const bool useSSFR = testActive || ssfrPanel_.isEnabled();
+    const bool fluidRunning = world_.isRunning();
+    const bool rigidRunning = world_.rigid().isRunning();
+    const bool softRunning  = softWorld_.isRunning();
+
+    // Steps whichever of fluid/rigid are running; if both are running and
+    // Rigid-Fluid coupling is enabled, they step together in lock-step
+    // (see FluidWorld::step()) instead of independently.
+    flameWorld_.syncRigidBindings();
+    world_.step();
+
+    // softWorld_ is independent of world_ unless SoftBody-Fluid coupling
+    // is enabled (see FluidWorld::setSoftCouplingEnabled()), in which
+    // case world_.step() above already advanced it -- stepping it again
+    // here would double-step it.
+    if (softRunning && !world_.isSoftCouplingEnabled()) softWorld_.step();
+
+    if (fluidRunning) {
+        if (world_.getSimulationType() == FluidWorld::SimulationType::GPU_CSPH) {
+            syncGpuCsphBufferToRenderer();
+        } else {
+            syncParticlesToRenderer();
+        }
+    } else if (ssfrSettings_.kernelGeneration() != appliedKernelGeneration_ &&
+               world_.getSimulationType() != FluidWorld::SimulationType::GPU_CSPH) {
+        // Kernel toggled / retuned while paused: rebuild the ellipsoids
+        // from the current (unchanged) particle positions.
+        updateAnisotropicKernel(world_.getParticlePositions());
+    }
+    if (rigidRunning) {
+        syncRigidRenderer();
+    }
+    if (softRunning) {
+        syncSoftRenderer();
+    }
+
+    const bool useSSFR = ssfrSettings_.isEnabled();
     // Phase 5: SSFR's composite is the mandatory final pass whenever the HDR
     // path is active -- it samples the linear-HDR scene target, applies ACES +
     // exposure once, and writes the swapchain. That composite runs even with
@@ -746,12 +596,10 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     // passthrough mode without the pre-pass having run this frame.
     ssfrRenderer_.setEnabled(useSSFR);
     fluidRenderer_.setEnabled(!useSSFR);
-    ssfrRenderer_.setMode(static_cast<SSFluidRenderer::Mode>(ssfrPanel_.getModeIndex()));
+    ssfrRenderer_.setMode(static_cast<SSFluidRenderer::Mode>(ssfrSettings_.getModeIndex()));
     {
-        // White-water spray/foam visibility follows the SSFRPanel checkboxes
-        // (whiteWaterParams()) but is force-off for GPU_CSPH (no CPU white
-        // water). Was a per-frame push inside SSFRPanel::drawContents();
-        // moved here so it stays in sync regardless of the active page.
+        // White-water visibility follows the command-controlled parameters.
+        // GPU_CSPH has no CPU white water.
         const bool gpu = world_.getSimulationType() == FluidWorld::SimulationType::GPU_CSPH;
         const auto& ww = world_.whiteWaterParams();
         ssfrRenderer_.setShowSpray(gpu ? false : ww.enableSpray);
@@ -857,8 +705,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         screenshotPending_ = false;
     }
 
-    // A command-line scenario run (exit-on-complete) hides the Scenario Browser: its default
-    // position overlaps the Control window and ends up in --screenshot captures of every page.
+    // Hide the Scenario Browser during command-line runs to keep captures clear.
     if (exitOnComplete_ && runner_.isActive()) scenarioBrowser_.setVisible(false);
 
     // Single place that collects responses: first the ones for commands typed
@@ -906,7 +753,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
 void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
 {
     // GPU_CSPH + SSFR: barrier for compute-written posBuf used as vertex input
-    if ((ssfrTestPanel_.isActive() || ssfrPanel_.isEnabled()) &&
+    if (ssfrSettings_.isEnabled() &&
         world_.getSimulationType() == FluidWorld::SimulationType::GPU_CSPH)
     {
         VkMemoryBarrier mb{};
@@ -926,7 +773,7 @@ void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
     if (shadowPass_.isValid()) {
         const glm::mat4 vp = shadowPass_.getLightVP();
         shadowPass_.begin(cmd);
-        if (renderBackground_.castShadows() && controlHost_.getPage() != ControlPage::Cloud) {
+        if (renderBackground_.castShadows() && viewDomain_ != ViewDomain::Cloud) {
             bgGltfRenderer_.renderShadowCasters(cmd, vp);
             rigidGltfRenderer_.renderShadowCasters(cmd, vp);
             softGltfRenderer_.renderShadowCasters(cmd, vp);
@@ -970,9 +817,7 @@ void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
 
 void FluidApp::onImGui()
 {
-    // Menu bar (File / Physics / Rendering / Tools / Window / View) is a widget tree assembled once in
-    // buildMenuBar(); the common status area is FluidStatusView, embedded into
-    // controlHost_. Nothing here re-assembles UI per frame.
+    // Command and Outliner remain available; simulation controls use commands.
     // SetUIVisible:false (scenario screenshots) hides every window.
     if (!uiVisible_) return;
     menuBar_.show();
@@ -1424,8 +1269,7 @@ void FluidApp::syncParticlesToRenderer()
 
 void FluidApp::updateAnisotropicKernel(const std::vector<glm::vec3>& positions)
 {
-    appliedKernelGeneration_ = ssfrPanel_.kernelGeneration();
-    ssfrPanel_.setKernelUnavailableReason({});
+    appliedKernelGeneration_ = ssfrSettings_.kernelGeneration();
     // Keyed on the kernel flag alone (not on SSFR being enabled) so turning
     // SSFR on while paused already finds up-to-date ellipsoids.
     const bool wanted = ssfrRenderer_.getAnisotropicKernel() &&
@@ -1434,9 +1278,8 @@ void FluidApp::updateAnisotropicKernel(const std::vector<glm::vec3>& positions)
         ssfrRenderer_.clearParticleEllipsoids();
         return;
     }
-    const float radius = ssfrTestPanel_.isActive() ? ssfrRenderer_.getParticleRadius()
-                                                   : world_.params().radius;
-    ssfrPanel_.setKernelStats(anisotropyBuilder_.build(positions, radius, ssfrPanel_.kernelSettings(),
+    const float radius = world_.params().radius;
+    ssfrSettings_.setKernelStats(anisotropyBuilder_.build(positions, radius, ssfrSettings_.kernelSettings(),
                                                        ellipsoidCenters_, ellipsoidAxes_));
     ssfrRenderer_.setParticleEllipsoids(ellipsoidCenters_, ellipsoidAxes_);
 }
@@ -1464,10 +1307,9 @@ void FluidApp::syncGpuCsphBufferToRenderer()
     // GPU_CSPH positions never reach the CPU, so the (CPU) anisotropic kernel
     // cannot run here yet; SSFR falls back to sphere sprites.
     ssfrRenderer_.clearParticleEllipsoids();
-    ssfrPanel_.setKernelUnavailableReason("Unavailable for GPU_CSPH (sphere sprites)");
-    appliedKernelGeneration_ = ssfrPanel_.kernelGeneration();
+    appliedKernelGeneration_ = ssfrSettings_.kernelGeneration();
 
-    if (ssfrPanel_.isEnabled() || ssfrTestPanel_.isActive()) {
+    if (ssfrSettings_.isEnabled()) {
         ssfrRenderer_.setParticleBuffer(posBuf, count);
     }
 

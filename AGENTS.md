@@ -11,6 +11,8 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Build
 
+PhysicsView の Control ウィンドウ全体は削除済み（2026-10-09）。シミュレーション・描画設定は `Window > Command` から操作する。以前の Control ページを開く Physics / Rendering / Tools メニューも削除済み。`SetHairPage` / `SetFlamePage` / `SetCloudPage` は互換性のため描画ドメインの選択コマンドとして残す。SSFR のコマンド設定は UI 非依存の `SSFRSettings` が保持する。
+
 CMake が唯一のビルド手段（2026-08-19、`.vcxproj` は全削除済み。詳細は
 内部設計メモ Phase 5、親リポジトリ `../AGENTS.md` の Build 節を参照）。
 

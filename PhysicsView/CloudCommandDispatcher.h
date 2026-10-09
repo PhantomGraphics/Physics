@@ -11,8 +11,8 @@ class CloudWorld;
 
 /**
  * @brief Scenario command surface for the Cloud (moist-air SPH) page
- * (docs/todo/PLAN_cloud_sph_pbvr.md Phase 2). The same operations the
- * CloudControlPanel drives, so UI and scenarios share one API.
+ * (docs/todo/PLAN_cloud_sph_pbvr.md Phase 2). Interactive commands and
+ * scenarios share this API.
  *
  * Not an IScenarioDispatcher of its own: CommandDispatcher::route() asks it and it
  * answers synchronously; nullopt = not a Cloud command. Every command name contains

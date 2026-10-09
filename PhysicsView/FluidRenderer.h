@@ -1,16 +1,10 @@
-﻿#pragma once
+#pragma once
 
 #include "../../CGLib/VkAppBase/IVkSubRenderer.h"
 #include "../../CGLib/VulkanGraphics/VulkanBuffer.h"
-#include "../../CGLib/UIWidgets/IView.h"
-#include "../../CGLib/UIWidgets/Section.h"
-#include "../../CGLib/UIWidgets/FloatSlider.h"
-#include "../../CGLib/UIWidgets/BoolView.h"
-#include "../../CGLib/UIWidgets/Label.h"
 
 #include "FluidPipeline.h"
 #include "Camera.h"
-#include "IEmbeddedPanel.h"
 
 #include <string>
 
@@ -26,9 +20,9 @@ struct VkFluidVertex {
     static std::array<VkVertexInputAttributeDescription, 1> getAttributeDescriptions();
 };
 
-class FluidRenderer : public ::VKG::IVkSubRenderer, public IEmbeddedPanel {
+class FluidRenderer : public ::VKG::IVkSubRenderer {
 public:
-    FluidRenderer();
+    FluidRenderer() = default;
 
     struct Shaders {
         std::vector<uint32_t> vertSpv;
@@ -72,7 +66,6 @@ public:
     void onUpdate(uint32_t frameIndex) override;
     void onRender(VkCommandBuffer cmd, uint32_t frameIndex) override;
     void onCleanup(VkDevice device) override;
-    void drawContents() override;
 
 private:
     const Phantom::VKG::VulkanContext* ctx_ = nullptr;
@@ -107,22 +100,5 @@ private:
                         bool hasDensity);
     void updateDensityColorRange(const std::vector<float>& densityDeviations);
 
-    // --- UI (owned content root; drawContents() == contents_.show()) -----
-    void buildUi();
-    std::string quantityText() const;
-    std::string observedRangeText() const;
-
-    UI::IView    contents_ {"FluidRendererControl"};
-    UI::Section  cameraSection_ {"Camera", false};
-    UI::FloatSlider yawSlider_      {"Yaw", -3.14159f, 3.14159f};
-    UI::FloatSlider pitchSlider_    {"Pitch", 0.05f, 3.09f};
-    UI::FloatSlider distanceSlider_ {"Distance", 5.0f, 300.0f};
-    UI::Section  colorMapSection_ {"Fluid Color Map", false};
-    UI::Label    quantityLabel_ {[this] { return quantityText(); }};
-    UI::BoolView autoContrastCheck_ {"Auto Contrast"};
-    UI::Label    observedRangeLabel_ {[this] { return observedRangeText(); }};
-    UI::FloatSlider densityMinSlider_ {"Density Difference Min", -0.5f, 0.0f, "%.3f"};
-    UI::FloatSlider densityMaxSlider_ {"Density Difference Max", 0.0f, 0.5f, "%.3f"};
 };
-
 } // namespace Phantom  

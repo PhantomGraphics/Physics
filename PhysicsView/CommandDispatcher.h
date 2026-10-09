@@ -22,7 +22,7 @@ namespace Phantom {
     class RenderBackground;
     class GltfBodyRenderer;
     class GltfSoftRenderer;
-    class SSFRPanel;
+    class SSFRSettings;
     class FluidRenderer;
 
     // Single IScenarioDispatcher for FluidApp, covering the fluid world,
@@ -153,14 +153,14 @@ namespace Phantom {
 
         // Screen-space fluid rendering toggle + mode (Phase 5). SetSSFREnabled:
         // {true|false} / SetSSFRMode:<index> / IsSSFREnabled. Unset makes them
-        // "Error:SSFR panel not available".
+        // "Error:SSFR settings not available".
         // Anisotropic kernel (Yu & Turk ellipsoid splats,
         // docs/todo/PLAN_ssfr_anisotropic_kernel.md): SetSSFRAnisotropicKernel:
         // {0|1} / GetSSFRAnisotropicKernel / SetSSFRKernelParam:<key>=<v> /
         // GetSSFRKernelParam:<key> (searchScale, maxRatio, isolatedScale,
         // minNeighbors, smoothing) / GetSSFRKernelStat:<computeMs|
         // meanStretchRatio|particleCount|anisotropicCount|active>.
-        void setSsfrPanel(SSFRPanel* p) { ssfrPanel_ = p; }
+        void setSsfrSettings(SSFRSettings* p) { ssfrSettings_ = p; }
 
         // Flame page surface (SetFlamePage / FlameReset / FlameStep:N /
         // SetFlameParam:name,value / GetFlameStat:name / ...), see
@@ -252,7 +252,7 @@ namespace Phantom {
         RenderBackground* renderBg_ = nullptr;
         GltfBodyRenderer* rigidBodyRenderer_ = nullptr;
         GltfSoftRenderer* softBodyRenderer_  = nullptr;
-        SSFRPanel* ssfrPanel_ = nullptr;
+        SSFRSettings* ssfrSettings_ = nullptr;
         std::function<void()> onNewScene_;
         FluidRenderer* fluidRenderer_ = nullptr;
         std::function<void(bool)> setUIVisible_;

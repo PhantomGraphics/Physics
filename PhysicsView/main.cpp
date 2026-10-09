@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "FluidApp.h"
 #include <fstream>
 #include <iterator>
@@ -23,11 +23,8 @@ int main(int argc, char* argv[])
     Phantom::FluidApp app(1280, 720, "Vulkan Fluid View");
 
     if (!scenarioPath.empty()) {
-        // Command-line scenario runs are non-interactive and must not read or
-        // write the GUI layout file. Scenario Browser runs remain interactive
-        // and therefore keep layout persistence enabled.
-        if (!useInteractiveLayout) app.disableInteractiveLayoutPersistence();
-        else {
+        // Optional verification layout affects Command / Outliner windows only.
+        if (useInteractiveLayout) {
             std::ifstream ini("imgui.ini");
             app.useVerificationLayout(std::string(std::istreambuf_iterator<char>(ini),{}));
         }

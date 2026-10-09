@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "FluidRenderer.h"
 
 #include "../../CGLib/VulkanGraphics/VulkanContext.h"
@@ -177,65 +177,6 @@ void FluidRenderer::onCleanup(VkDevice device)
 {
     vertexBuffer_.destroy(device);
     pipeline_.destroy(device);
-}
-
-FluidRenderer::FluidRenderer()
-{
-    buildUi();
-}
-
-std::string FluidRenderer::quantityText() const
-{
-    return hasDensity_ ? "Quantity: (Density - Rest Density) / Rest Density"
-                       : "Quantity: unavailable (fixed color)";
-}
-
-std::string FluidRenderer::observedRangeText() const
-{
-    char buf[64];
-    std::snprintf(buf, sizeof(buf), "Observed robust range: +/- %.5f", observedDensityRange_);
-    return buf;
-}
-
-void FluidRenderer::buildUi()
-{
-    yawSlider_.bind([this] { return camera_.yaw(); },
-                    [this](float v) { camera_.setYaw(v); });
-    pitchSlider_.bind([this] { return camera_.pitch(); },
-                      [this](float v) { camera_.setPitch(v); });
-    distanceSlider_.bind([this] { return camera_.distance(); },
-                         [this](float v) { camera_.setDistance(v); });
-    cameraSection_.add(&yawSlider_);
-    cameraSection_.add(&pitchSlider_);
-    cameraSection_.add(&distanceSlider_);
-
-    autoContrastCheck_.bind([this] { return autoDensityRange_; },
-                            [this](bool v) { autoDensityRange_ = v; });
-    observedRangeLabel_.setVisibleWhen([this] { return hasDensity_; });
-
-    // Keep max at least a hair above min (was a post-slider clamp in the old
-    // immediate-mode drawContents); run it whenever either slider is edited.
-    auto clampRange = [this] {
-        densityRangeMax_ = std::max(densityRangeMax_, densityRangeMin_ + 0.001f);
-    };
-    densityMinSlider_.bind([this] { return densityRangeMin_; },
-                           [this, clampRange](float v) { densityRangeMin_ = v; clampRange(); });
-    densityMaxSlider_.bind([this] { return densityRangeMax_; },
-                           [this, clampRange](float v) { densityRangeMax_ = v; clampRange(); });
-
-    colorMapSection_.add(&quantityLabel_);
-    colorMapSection_.add(&autoContrastCheck_);
-    colorMapSection_.add(&observedRangeLabel_);
-    colorMapSection_.add(&densityMinSlider_);
-    colorMapSection_.add(&densityMaxSlider_);
-
-    contents_.add(&cameraSection_);
-    contents_.add(&colorMapSection_);
-}
-
-void FluidRenderer::drawContents()
-{
-    contents_.show();
 }
 
 void FluidRenderer::uploadVertices(const std::vector<glm::vec3>& pts,
