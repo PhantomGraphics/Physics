@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "../../CGLib/VkAppBase/VkAppBase.h"
 #include "../../CGLib/VkAppBase/ScenarioRunner/ScenarioRunner.h"
@@ -8,17 +8,11 @@
 
 #include "FluidRenderer.h"
 #include "FluidWorld.h"
-#include "ControlPanel.h"
-#include "SSFRPanel.h"
-#include "SSFRTestPanel.h"
+#include "SSFRSettings.h"
 #include "FluidVolumeConverter.h"
 #include "FluidMeshConverter.h"
 #include "VolumeRenderer.h"
 #include "FluidMeshRenderer.h"
-#include "FluidVolumeConvertPanel.h"
-#include "ControlPanelHost.h"
-#include "IEmbeddedPanel.h"
-#include "FluidStatusView.h"
 #include "SceneComponent.h"
 #include "ObjectListPanel.h"
 #include "CommandDispatcher.h"
@@ -30,34 +24,25 @@
 #include "../../CGLib/VulkanGraphics/VulkanOffscreen.h"
 #include "../../CGLib/VulkanGraphics/VulkanSampler.h"
 #include "RenderBackground.h"
-#include "RenderingPanel.h"
 #include "GltfBodyRenderer.h"
 #include "GltfSoftRenderer.h"
 
 #include "../../CGLib/UIWidgets/MainMenuBar.h"
 #include "FileMenu.h"
-#include "PhysicsMenu.h"
-#include "RenderingMenu.h"
-#include "ToolsMenu.h"
 #include "WindowMenu.h"
 #include "ViewMenu.h"
 
 #include "RigidBodyWireRenderer.h"
-#include "RigidBodyControlPanel.h"
 
 #include "SoftBodyWorld.h"
 #include "SoftBodyWireRenderer.h"
-#include "SoftBodyControlPanel.h"
 
 #include "FlameWorld.h"
 #include "FlameRenderer.h"
 #include "CombustibleRenderer.h"
-#include "FlameControlPanel.h"
 #include "CloudWorld.h"
 #include "CloudVolumeRenderer.h"
-#include "CloudControlPanel.h"
 #include "HairWorld.h"
-#include "HairControlPanel.h"
 
 #include <filesystem>
 #include <optional>
@@ -74,7 +59,6 @@ public:
 
     // Scenario runner control (call before run()).
     bool loadScenario(const std::string& jsonPath) override;
-    void disableInteractiveLayoutPersistence() { controlHost_.setLayoutFile({}); }
     void useVerificationLayout(std::string ini) { verificationLayout_=std::move(ini); }
     void setExitOnScenarioComplete(bool v) override {
         exitOnComplete_ = v;
@@ -120,7 +104,6 @@ private:
     // CommandDispatcher and the "glTF Rendering" Control page.
     Phantom::Gltf::GltfSceneRenderer bgGltfRenderer_;
     RenderBackground                 renderBackground_;
-    RenderingPanel                   renderingPanel_;
 
     // Phase 4: one depth-only shadow map for the shared directional light,
     // sampled by the background / rigid / soft glTF PBR passes. FluidApp owns it
@@ -135,10 +118,6 @@ private:
     // Opaque "scene" sub-renderers, driven manually against hdrScene_'s render
     // pass (NOT via add()). Populated in the constructor.
     std::vector<::VKG::IVkSubRenderer*> hdrRenderers_;
-    ControlPanel controlPanel_;
-    SSFRPanel ssfrPanel_;
-    SSFRTestPanel ssfrTestPanel_;
-    bool prevTestActive_ = false;
     // Anisotropic kernel (SSFR ellipsoid splats): recomputed with every
     // particle sync while the renderer's kernel flag is on, and once more when
     // the flag / settings change (kernelGeneration) so a paused scene updates.
@@ -151,7 +130,6 @@ private:
     FluidMeshConverter meshConverter_;
     VolumeRenderer volumeRenderer_;
     FluidMeshRenderer meshRenderer_;
-    FluidVolumeConvertPanel volumeConvertPanel_;
 
     RigidBodyWireRenderer rigidRenderer_;
     RigidBodyWireRenderer flameDebugRenderer_;
@@ -161,7 +139,6 @@ private:
     // GltfSceneRenderer + synthesized unit primitive per body; SetRigidRenderMode
     // / the "glTF Rendering" panel pick wire / shaded / both.
     GltfBodyRenderer      rigidGltfRenderer_;
-    RigidBodyControlPanel rigidControlPanel_;
 
     // Independent SoftBody (cloth/rope/jelly) scene, added alongside fluid/
     // rigid without any physical coupling between the three (see
@@ -174,7 +151,6 @@ private:
     // shaded surface (double-wound, per-frame CPU normals); Rope has no faces
     // and stays wireframe. SetSoftRenderMode / the "glTF Rendering" panel.
     GltfSoftRenderer      softGltfRenderer_;
-    SoftBodyControlPanel  softControlPanel_;
 
     // Flame (reacting hot-gas SPH), folded in from the former standalone
     // FlameView. A peer domain alongside fluid/rigid/soft with its own
@@ -184,7 +160,6 @@ private:
     CombustibleRenderer combustibleRenderer_;
     FlameRenderer     flameRenderer_;
     std::string pbvrSceneState_;
-    FlameControlPanel flameControlPanel_;
     // Cloud (moist-air SPH, docs/todo/PLAN_cloud_sph_pbvr.md). Same peer-domain
     // pattern as Flame. Phase 2 shows the air particles through the shared
     // FluidRenderer (coloured by cloud water); the PBVR cloud renderer is Phase 3.
@@ -192,9 +167,7 @@ private:
     HairWorld         hairWorld_;
     // The existing wire renderer already accepts arbitrary indexed line data.
     SoftBodyWireRenderer hairRenderer_;
-    HairControlPanel  hairControlPanel_;
     double            hairLastTime_ = -1.;
-    CloudControlPanel cloudControlPanel_;
     CloudVolumeRenderer cloudVolumeRenderer_;
     Volume::ScalarGrid3D cloudDensity_;            // last reconstructed density (cloud space)
     bool              cloudDirty_ = true;          // display needs re-uploading
@@ -210,10 +183,10 @@ private:
     CommandDispatcher dispatcher_;
     ScenarioRunner           runner_;
     ScenarioBrowserPanel     scenarioBrowser_;
-    // The single shared "Control" window: the Physics menu picks its page,
-    // this host renders the selected embedded panel plus a common status area.
-    ControlPanelHost         controlHost_;
-    FluidStatusView          statusView_;
+    // Legacy Set*Page commands select a rendering domain, without creating UI.
+    enum class ViewDomain { Fluid, Flame, Cloud, Hair };
+    ViewDomain viewDomain_ = ViewDomain::Fluid;
+    SSFRSettings ssfrSettings_;
 
     // Standalone windows (Window menu toggles).
     ObjectListPanel          objectListPanel_;
@@ -221,9 +194,6 @@ private:
     // Main menu bar, assembled once in buildMenuBar().
     UI::MainMenuBar          menuBar_;
     FileMenu                fileMenu_;
-    PhysicsMenu             physicsMenu_;
-    RenderingMenu           renderingMenu_;
-    ToolsMenu               toolsMenu_;
     WindowMenu              windowMenu_;
     ViewMenu                viewMenu_;
 
@@ -234,7 +204,6 @@ private:
     std::string screenshotPendingPath_;
 
     void setupCallbacks();
-    void registerControlPages();
     void buildMenuBar();
     // Tears the shared 3D scene (fluid + rigid + soft + glTF background) down to
     // nothing. Run at startup and from File > New.

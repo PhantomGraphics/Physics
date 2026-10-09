@@ -225,22 +225,17 @@ target_compile_features(FluidGPUVkCore PRIVATE cxx_std_20)
 add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/main.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidApp.cpp
+    ${PHYSICS_ROOT}/PhysicsView/SSFRSettings.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidPipeline.cpp
     ${PHYSICS_ROOT}/PhysicsView/Camera.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidWorld.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidPLYWriter.cpp
-    ${PHYSICS_ROOT}/PhysicsView/ControlPanel.cpp
-    ${PHYSICS_ROOT}/PhysicsView/FluidStatusView.cpp
-    ${PHYSICS_ROOT}/PhysicsView/SSFRPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidVolumeConverter.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidMeshConverter.cpp
     ${PHYSICS_ROOT}/PhysicsView/VolumeRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidMeshRenderer.cpp
-    ${PHYSICS_ROOT}/PhysicsView/FluidVolumeConvertPanel.cpp
-    ${PHYSICS_ROOT}/PhysicsView/ControlPanelHost.cpp
     ${PHYSICS_ROOT}/PhysicsView/RenderBackground.cpp
-    ${PHYSICS_ROOT}/PhysicsView/RenderingPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/PrimitiveGltf.cpp
     ${PHYSICS_ROOT}/PhysicsView/GltfBodyRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/SoftMeshGltf.cpp
@@ -248,20 +243,16 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/SceneComponentRegistry.cpp
     ${PHYSICS_ROOT}/PhysicsView/ObjectListPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/CommandDispatcher.cpp
-    ${PHYSICS_ROOT}/PhysicsView/SSFRTestPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/RigidBodyWorld.cpp
     ${PHYSICS_ROOT}/PhysicsView/RigidBodyWireRenderer.cpp
-    ${PHYSICS_ROOT}/PhysicsView/RigidBodyControlPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/RigidBodyCommandDispatcher.cpp
     ${PHYSICS_ROOT}/PhysicsView/SoftBodyWorld.cpp
     ${PHYSICS_ROOT}/PhysicsView/SoftBodyWireRenderer.cpp
-    ${PHYSICS_ROOT}/PhysicsView/SoftBodyControlPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/SoftBodyCommandDispatcher.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameWorld.cpp
     ${PHYSICS_ROOT}/PhysicsView/CombustibleRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/CombustibleGltf.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameCommandDispatcher.cpp
-    ${PHYSICS_ROOT}/PhysicsView/FlameControlPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlamePointPipeline.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameBlackbody.cpp
@@ -271,9 +262,7 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/FlameStreamBuffer.cpp
     ${PHYSICS_ROOT}/PhysicsView/CloudWorld.cpp
     ${PHYSICS_ROOT}/PhysicsView/CloudCommandDispatcher.cpp
-    ${PHYSICS_ROOT}/PhysicsView/CloudControlPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/HairWorld.cpp
-    ${PHYSICS_ROOT}/PhysicsView/HairControlPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/HairCommandDispatcher.cpp
     ${PHYSICS_ROOT}/PhysicsView/CloudVolumeRenderer.cpp
 )
@@ -352,7 +341,7 @@ endif()
 # FlameView (the former standalone flame-SPH viewer) was folded into PhysicsView
 # on 2026-09-08: FlameRenderer/FlamePipeline/FlameSmokePipeline/FlamePBVRPipeline
 # and the flame_*.{vert,frag} shaders moved under PhysicsView/, and FlameApp's
-# scene/UI became PhysicsView's FlameWorld + FlameControlPanel (ControlPage::Flame).
+# scene and commands became PhysicsView's FlameWorld + FlameCommandDispatcher.
 # FlameSolidCoupler supports static object combustion; FlameSolver deliberately
 # does not implement ISPHSolver.
 

@@ -11,7 +11,7 @@
 #include "RenderBackground.h"
 #include "GltfBodyRenderer.h"
 #include "GltfSoftRenderer.h"
-#include "SSFRPanel.h"
+#include "SSFRSettings.h"
 #include "FluidRenderer.h"
 
 #include <glm/glm.hpp>
@@ -1038,40 +1038,40 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
     // fluid-surface reconstruction pre-passes run and the surface is composited
     // over the scene with depth occlusion + refraction.
     if (cmd == "SetSSFREnabled:true" || cmd == "SetSSFREnabled:false") {
-        if (!ssfrPanel_) return std::string("Error:SSFR panel not available");
-        ssfrPanel_->setEnabled(cmd == "SetSSFREnabled:true");
+        if (!ssfrSettings_) return std::string("Error:SSFR settings not available");
+        ssfrSettings_->setEnabled(cmd == "SetSSFREnabled:true");
         return std::string("OK");
     }
     if (cmd == "IsSSFREnabled") {
-        if (!ssfrPanel_) return std::string("Error:SSFR panel not available");
-        return ssfrPanel_->isEnabled() ? std::string("1") : std::string("0");
+        if (!ssfrSettings_) return std::string("Error:SSFR settings not available");
+        return ssfrSettings_->isEnabled() ? std::string("1") : std::string("0");
     }
     if (sv.rfind("SetSSFRMode:", 0) == 0) {
-        if (!ssfrPanel_) return std::string("Error:SSFR panel not available");
+        if (!ssfrSettings_) return std::string("Error:SSFR settings not available");
         int idx = 0;
         auto s = sv.substr(12);
         auto [p, ec] = std::from_chars(s.data(), s.data() + s.size(), idx);
         if (ec != std::errc() || idx < 0 || idx > 5)
             return std::string("Error:SSFR mode index must be 0..5");
-        ssfrPanel_->setModeIndex(idx);
+        ssfrSettings_->setModeIndex(idx);
         return std::string("OK");
     }
 
     // Anisotropic kernel (Yu & Turk ellipsoid splats).
     if (sv.rfind("SetSSFRAnisotropicKernel:", 0) == 0) {
-        if (!ssfrPanel_) return std::string("Error:SSFR panel not available");
+        if (!ssfrSettings_) return std::string("Error:SSFR settings not available");
         const auto v = sv.substr(25);
         if (v != "0" && v != "1" && v != "true" && v != "false")
             return std::string("Error:SetSSFRAnisotropicKernel expects 0|1");
-        ssfrPanel_->setAnisotropicKernel(v == "1" || v == "true");
+        ssfrSettings_->setAnisotropicKernel(v == "1" || v == "true");
         return std::string("OK");
     }
     if (cmd == "GetSSFRAnisotropicKernel") {
-        if (!ssfrPanel_) return std::string("Error:SSFR panel not available");
-        return ssfrPanel_->getAnisotropicKernel() ? std::string("1") : std::string("0");
+        if (!ssfrSettings_) return std::string("Error:SSFR settings not available");
+        return ssfrSettings_->getAnisotropicKernel() ? std::string("1") : std::string("0");
     }
     if (sv.rfind("SetSSFRKernelParam:", 0) == 0) {
-        if (!ssfrPanel_) return std::string("Error:SSFR panel not available");
+        if (!ssfrSettings_) return std::string("Error:SSFR settings not available");
         const auto kv = sv.substr(19);
         const auto eq = kv.find('=');
         if (eq == std::string_view::npos) return std::string("Error:expected <key>=<value>");
@@ -1082,29 +1082,29 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
         if (!(value >= spec->lo && value <= spec->hi))
             return std::string("Error:") + spec->name + " out of range [" + std::to_string(spec->lo) +
                    ", " + std::to_string(spec->hi) + "]";
-        auto& settings = ssfrPanel_->kernelSettings();
+        auto& settings = ssfrSettings_->kernelSettings();
         if (spec->field) settings.*(spec->field) = value;
         else             settings.minNeighbors = static_cast<int>(value);
-        ssfrPanel_->markKernelChanged();
+        ssfrSettings_->markKernelChanged();
         return std::string("OK");
     }
     if (sv.rfind("GetSSFRKernelParam:", 0) == 0) {
-        if (!ssfrPanel_) return std::string("Error:SSFR panel not available");
+        if (!ssfrSettings_) return std::string("Error:SSFR settings not available");
         const auto* spec = findKernelParam(sv.substr(19));
         if (!spec) return std::string("Error:unknown kernel param '") + std::string(sv.substr(19)) + "'";
-        const auto& settings = ssfrPanel_->kernelSettings();
+        const auto& settings = ssfrSettings_->kernelSettings();
         return spec->field ? std::to_string(settings.*(spec->field))
                            : std::to_string(settings.minNeighbors);
     }
     if (sv.rfind("GetSSFRKernelStat:", 0) == 0) {
-        if (!ssfrPanel_) return std::string("Error:SSFR panel not available");
+        if (!ssfrSettings_) return std::string("Error:SSFR settings not available");
         const auto key = sv.substr(18);
-        const auto& st = ssfrPanel_->kernelStats();
+        const auto& st = ssfrSettings_->kernelStats();
         if (key == "computeMs")        return std::to_string(st.computeMs);
         if (key == "meanStretchRatio") return std::to_string(st.meanStretchRatio);
         if (key == "particleCount")    return std::to_string(st.particleCount);
         if (key == "anisotropicCount") return std::to_string(st.anisotropicCount);
-        if (key == "active")           return ssfrPanel_->isAnisotropicKernelActive() ? std::string("1") : std::string("0");
+        if (key == "active")           return ssfrSettings_->isAnisotropicKernelActive() ? std::string("1") : std::string("0");
         return std::string("Error:unknown kernel stat '") + std::string(key) + "'";
     }
 

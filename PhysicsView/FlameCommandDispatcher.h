@@ -60,7 +60,7 @@ class FlameCommandDispatcher {
 public:
 	void setWorld(FlameWorld* w) { world_ = w; }
 
-	/** @brief Page switch hooks into FluidApp's ControlPanelHost. */
+	/** @brief Rendering-domain selection hooks into FluidApp. */
 	void setPageHooks(std::function<void(bool)> setFlamePage, std::function<bool()> isFlamePage)
 	{
 		setFlamePage_ = std::move(setFlamePage);
