@@ -3,6 +3,7 @@
 #include "SoftBodyWorld.h"
 
 #include <charconv>
+#include <cmath>
 
 namespace Phantom {
 
@@ -10,12 +11,12 @@ namespace {
 
 bool parseFlt(const char* begin, const char* end, float& out) {
     auto [ptr, ec] = std::from_chars(begin, end, out);
-    return ec == std::errc{};
+    return ec == std::errc{} && ptr == end && std::isfinite(out);
 }
 
 bool parseInt(const char* begin, const char* end, int& out) {
     auto [ptr, ec] = std::from_chars(begin, end, out);
-    return ec == std::errc{};
+    return ec == std::errc{} && ptr == end;
 }
 
 } // namespace
@@ -191,11 +192,17 @@ std::string SoftBodyCommandDispatcher::route(const std::string& cmd) {
         const std::string_view val  = rest.substr(comma + 1);
         float f = 0.0f;
         if (!parseFlt(val.data(), val.data() + val.size(), f)) return "Error:bad value";
+        if (name == "timeStep" && f <= 0.f) return "Error:timeStep must be positive";
+        int count = 0;
+        if (name == "numSubsteps" || name == "numIterations") {
+            if (!parseInt(val.data(), val.data() + val.size(), count) || count <= 0)
+                return "Error:expected a positive integer";
+        }
         auto& sp = world_->getWorld().solverParams();
         auto& wp = world_->getWorld().params();
         if      (name == "timeStep")                  sp.timeStep = f;
-        else if (name == "numSubsteps")               sp.numSubsteps = static_cast<int>(f);
-        else if (name == "numIterations")             sp.numIterations = static_cast<int>(f);
+        else if (name == "numSubsteps")               sp.numSubsteps = count;
+        else if (name == "numIterations")             sp.numIterations = count;
         else if (name == "gravityY")                  sp.gravity.y = f;
         else if (name == "selfCollisionEnabled")      sp.selfCollisionEnabled = f != 0.0f;
         else if (name == "selfCollisionThickness")    sp.selfCollisionThickness = f;

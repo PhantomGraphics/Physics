@@ -24,6 +24,15 @@ SoftParticleSoA makeParticleSoA(Vector3df pos) {
 
 // ------------------------------------------------- SphereCollider  -----------
 
+TEST(SphereColliderTest, ParticleAtCenter_PushedOut) {
+    SphereCollider col;
+    col.center = {1.f, 2.f, 3.f};
+    col.radius = 0.5f;
+    auto p = makeParticleSoA(col.center);
+    col.resolve(p, 0);
+    EXPECT_NEAR(glm::length(p.predicted[0] - col.center), col.radius, 1e-6f);
+}
+
 TEST(SphereColliderTest, ParticleOutside_Unchanged) {
     SphereCollider col;
     col.center = {0.f, 0.f, 0.f};

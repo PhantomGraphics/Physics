@@ -1,4 +1,5 @@
 #include "XPBDSolver.h"
+#include <cmath>
 
 namespace Phantom {
 namespace Physics {
@@ -36,8 +37,11 @@ void XPBDSolver::reset() {
 
 void XPBDSolver::step() {
     if (!mesh_) return;
+    if (!std::isfinite(params_.timeStep) || params_.timeStep <= 0.f ||
+        params_.numSubsteps <= 0 || params_.numIterations <= 0) return;
 
     float dt = params_.timeStep / static_cast<float>(params_.numSubsteps);
+    if (!std::isfinite(dt) || dt <= 0.f) return;
     float alphaHat = 0.f;  // 各制約で個別に計算（dt² で割る）
 
     for (int s = 0; s < params_.numSubsteps; ++s) {

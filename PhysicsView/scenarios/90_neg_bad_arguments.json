@@ -1,6 +1,12 @@
 {
   "name": "90_neg_bad_arguments",
   "steps": [
+    { "command": "SetSoftParam:timeStep,0", "expect_prefix": "Error:" },
+    { "command": "SetSoftParam:timeStep,nan", "expect_prefix": "Error:" },
+    { "command": "SetSoftParam:numSubsteps,0", "expect_prefix": "Error:" },
+    { "command": "SetSoftParam:numSubsteps,1.5", "expect_prefix": "Error:" },
+    { "command": "SetSoftParam:numIterations,-1", "expect_prefix": "Error:" },
+    { "command": "SetSoftParam:numIterations,2147483648", "expect_prefix": "Error:" },
     { "label": "A body to query out-of-range indices against", "command": "SetPreset:SphereDrop", "expect": "OK" },
     { "label": "Non-numeric float argument is rejected", "command": "SetFluidRadius:abc", "expect_prefix": "Error:" },
     { "label": "Insufficient gravity components are rejected (regression check, see internal design notes 1.5 history)",
