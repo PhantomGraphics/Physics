@@ -137,6 +137,8 @@ std::optional<std::string> HairCommandDispatcher::route(const std::string& cmd) 
         else if (arg == "Body") preset = HairPreset::Body;
         else if (arg == "HeadShake") preset = HairPreset::HeadShake;
         else if (arg == "StrongWind") preset = HairPreset::StrongWind;
+        else if (arg == "LongHair") preset = HairPreset::LongHair;
+        else if (arg == "ShortFur") preset = HairPreset::ShortFur;
         else return "Error: unknown hair preset";
         if (!w.setPreset(preset)) return "Error: hair generation failed";
     } else if (verb == "HairClear") w.clear();

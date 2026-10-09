@@ -15,6 +15,23 @@ void HairWorld::setComponentRegistry(SceneComponentRegistry* registry) {
 }
 bool HairWorld::setPreset(HairPreset preset) {
     Physics::HairGeneratorParams p;
+    auto settings = params();
+    // Style presets include their solver settings, independent of previous edits.
+    if (preset == HairPreset::LongHair || preset == HairPreset::ShortFur) {
+        settings = Physics::HairSolver::Params{};
+        if (preset == HairPreset::ShortFur) {
+            p.strands = 96;
+            p.particlesPerStrand = 4;
+            p.length = 0.06f;
+            p.spacing = 0.02f;
+            p.curvature = 0.15f;
+            p.root.rotation = glm::angleAxis(3.14159265f, Math::Vector3df(0.f,0.f,1.f));
+            settings.bendCompliance = 1.e-6f;
+            settings.shapeCompliance = 1.e-5f;
+            settings.dampingRate = 6.f;
+            settings.collisionRadius = 0.001f;
+        }
+    }
     if (preset == HairPreset::Single) p.strands = 1;
     Physics::HairStrands next;
     const bool body = preset == HairPreset::Body || preset == HairPreset::HeadShake || preset == HairPreset::StrongWind;
@@ -38,6 +55,7 @@ bool HairWorld::setPreset(HairPreset preset) {
         if (!next.initialize(inputs)) return false;
     } else if (!Physics::generateHairBundle(next, p)) return false;
     clear();
+    solver_.setParams(settings);
     strands_ = std::move(next);
     solver_.setStrands(&strands_);
     for (const auto& r : strands_.ranges()) baseRoots_.push_back(r.root);
@@ -45,7 +63,6 @@ bool HairWorld::setPreset(HairPreset preset) {
         baseColliders_ = {{{0.f,1.05f,0.f}, {0.f,1.05f,0.f}, 0.28f, 0.3f},
                          {{0.f,0.3f,-0.18f}, {0.f,0.3f,0.18f}, 0.12f, 0.3f}};
         solver_.setColliders(baseColliders_, true);
-        auto settings = params();
         settings.numIterations = std::max(settings.numIterations, 32);
         settings.windVelocity = preset == HairPreset::StrongWind ? Math::Vector3df(12.f,0.f,0.f) : Math::Vector3df(0.f);
         settings.windDrag = preset == HairPreset::StrongWind ? 2.5f : 0.f;

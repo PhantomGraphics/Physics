@@ -11,6 +11,9 @@ void HairControlPanel::drawContents() {
     if (Im::button("Single strand")) changed = w.setPreset(HairPreset::Single);
     Im::sameLine();
     if (Im::button("Bundle (48 guides)")) changed = w.setPreset(HairPreset::Bundle);
+    if (Im::button("Long hair")) changed = w.setPreset(HairPreset::LongHair);
+    Im::sameLine();
+    if (Im::button("Short fur")) changed = w.setPreset(HairPreset::ShortFur);
     if (Im::button("Body collision")) { changed = w.setPreset(HairPreset::Body); if (frame_) frame_(); }
     Im::sameLine();
     if (Im::button("Head shake")) { changed = w.setPreset(HairPreset::HeadShake); if (frame_) frame_(); }
