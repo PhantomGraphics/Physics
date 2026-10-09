@@ -15,6 +15,7 @@ void HairWorld::setComponentRegistry(SceneComponentRegistry* registry) {
 }
 bool HairWorld::setPreset(HairPreset preset) {
     Physics::HairGeneratorParams p;
+    p.variation = generationParams_;
     auto settings = params();
     // Style presets include their solver settings, independent of previous edits.
     if (preset == HairPreset::LongHair || preset == HairPreset::ShortFur) {
@@ -53,6 +54,7 @@ bool HairWorld::setPreset(HairPreset preset) {
         if (!next.initialize(inputs)) return false;
     } else if (preset == HairPreset::LongHair || preset == HairPreset::ShortFur) {
         Physics::HairSurfaceParams surface;
+        surface.variation = generationParams_;
         surface.strands = p.strands;
         surface.particlesPerStrand = p.particlesPerStrand;
         surface.length = p.length;
@@ -91,6 +93,11 @@ bool HairWorld::setPreset(HairPreset preset) {
                    std::to_string(followers_.strandCount()) + " followers";
         });
     }
+    return true;
+}
+bool HairWorld::setGenerationParams(const Physics::HairVariationParams& p) {
+    if (!Physics::validateHairVariation(p)) return false;
+    generationParams_ = p;
     return true;
 }
 void HairWorld::clear() {

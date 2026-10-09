@@ -18,6 +18,8 @@ public:
     ~HairWorld();
     void setComponentRegistry(SceneComponentRegistry* registry);
     bool setPreset(HairPreset preset);
+    bool setGenerationParams(const Physics::HairVariationParams& params);
+    const Physics::HairVariationParams& generationParams() const { return generationParams_; }
     void clear();
     void reset();
     bool stepOnce();
@@ -43,6 +45,7 @@ public:
     WireData buildWireData() const;
 
 private:
+    Physics::HairVariationParams generationParams_; // applies on next generated preset
     Physics::HairStrands strands_; // must outlive solver_
     Physics::HairSolver solver_;
     Physics::HairFollowers followers_;

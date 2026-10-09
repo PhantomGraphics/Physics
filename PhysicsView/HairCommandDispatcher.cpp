@@ -59,10 +59,33 @@ std::optional<std::string> HairCommandDispatcher::route(const std::string& cmd) 
         verb != "SetHairRunning" && verb != "IsHairRunning" && verb != "SetHairPage" &&
         verb != "IsHairPage" && verb != "SetHairParam" && verb != "GetHairParam" && verb != "GetHairStat" &&
         verb != "SetHairRootPose" && verb != "HairTeleport" && verb != "SetHairMotion" &&
-        verb != "IsHairMotion" && verb != "SetHairFriction")
+        verb != "IsHairMotion" && verb != "SetHairFriction" &&
+        verb != "SetHairGenerationParam" && verb != "GetHairGenerationParam")
         return std::nullopt;
     if (!world_) return "Error: hair world unavailable";
     auto& w = *world_;
+    if (verb == "SetHairGenerationParam" || verb == "GetHairGenerationParam") {
+        const bool set = verb == "SetHairGenerationParam";
+        const auto comma = arg.find(',');
+        const auto name = set ? arg.substr(0,comma) : arg;
+        double value = 0.;
+        if (set && (comma == std::string_view::npos || !parse(arg.substr(comma+1),value)))
+            return "Error: expected name,finite value";
+        auto p = w.generationParams();
+        if (name == "seed") {
+            if (set && (value != std::floor(value) || value < 0. || value > 4294967295.))
+                return "Error: invalid hair generation seed";
+            if (set) p.seed = static_cast<uint32_t>(value); else return std::to_string(p.seed);
+        } else {
+            float* field = name == "rootJitter" ? &p.rootJitter :
+                           name == "shapeVariation" ? &p.shapeVariation :
+                           name == "lengthVariation" ? &p.lengthVariation : nullptr;
+            if (!field) return "Error: unknown hair generation parameter";
+            if (set) *field = static_cast<float>(value); else value = *field;
+        }
+        if (!set) return number(value);
+        return w.setGenerationParams(p) ? "OK" : "Error: invalid hair generation parameter";
+    }
     if (verb == "SetHairRootPose" || verb == "HairTeleport") {
         double values[7];
         auto remaining = arg;

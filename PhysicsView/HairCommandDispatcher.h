@@ -10,6 +10,8 @@ class HairWorld;
 // HairClear, HairReset, HairStep[:1..1000],
 // SetHairRunning:true|false, IsHairRunning, SetHairPage:true|false, IsHairPage,
 // SetHairParam:name,value, GetHairParam:name, GetHairStat:name.
+// SetHairGenerationParam:name,value / GetHairGenerationParam:name stage
+// rootJitter, shapeVariation, lengthVariation and seed for the next preset.
 class HairCommandDispatcher {
 public:
     void setWorld(HairWorld* world) { world_ = world; }
