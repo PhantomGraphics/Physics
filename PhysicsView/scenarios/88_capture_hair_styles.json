@@ -1,0 +1,28 @@
+{
+  "name": "88_capture_hair_styles",
+  "tags": ["hair"],
+  "steps": [
+    { "command": "GetHairStat:particles", "expect": "0" },
+    { "command": "SetHairPage:true", "expect": "OK" },
+    { "command": "HairPreset:LongHair", "expect": "OK" },
+    { "command": "SetCameraTarget:0,0.9,0", "expect": "OK" },
+    { "command": "SetCameraOrbit:4,0.25,0.1", "expect": "OK" },
+    { "command": "HairStep:60", "expect": "OK" },
+    { "command": "GetHairStat:steps", "expect": "60" },
+    { "command": "GetHairStat:rootError", "expect": "0" },
+    { "command": "GetHairStat:lengthError", "expect_range": "0,0.01" },
+    { "command": "GetStatus", "expect": "OK", "repeat": 3 },
+    { "command": "SaveScreenshot:testdata/screenshots/88_capture_hair_long.png", "expect": "OK" },
+    { "command": "HairPreset:ShortFur", "expect": "OK" },
+    { "command": "SetCameraTarget:0,1.53,0", "expect": "OK" },
+    { "command": "SetCameraOrbit:0.7,0.3,0.2", "expect": "OK" },
+    { "command": "SetHairParam:windX,2", "expect": "OK" },
+    { "command": "SetHairParam:windDrag,1", "expect": "OK" },
+    { "command": "HairStep:60", "expect": "OK" },
+    { "command": "GetHairStat:particles", "expect": "384" },
+    { "command": "GetHairStat:nonFinite", "expect": "0" },
+    { "command": "GetHairStat:lengthError", "expect_range": "0,0.01" },
+    { "command": "GetStatus", "expect": "OK", "repeat": 3 },
+    { "command": "SaveScreenshot:testdata/screenshots/88_capture_hair_short.png", "expect": "OK" }
+  ]
+}

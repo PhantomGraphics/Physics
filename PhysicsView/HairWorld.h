@@ -5,7 +5,7 @@
 
 namespace Phantom {
 
-enum class HairPreset { Single, Bundle, Body, HeadShake, StrongWind };
+enum class HairPreset { Single, Bundle, Body, HeadShake, StrongWind, LongHair, ShortFur };
 
 class HairWorld {
 public:

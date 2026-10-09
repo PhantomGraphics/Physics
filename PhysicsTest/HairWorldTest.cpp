@@ -4,6 +4,82 @@
 
 using namespace Phantom;
 
+TEST(HairWorldTest, StylePresetsSetGeometryAndRestoreSolverSettings) {
+    HairWorld w;
+    ASSERT_TRUE(w.setPreset(HairPreset::StrongWind));
+    ASSERT_TRUE(w.setPreset(HairPreset::ShortFur));
+    EXPECT_EQ(w.strands().strandCount(), 96u);
+    EXPECT_EQ(w.strands().particleCount(), 384u);
+    EXPECT_EQ(w.colliderCount(), 0u);
+    EXPECT_FALSE(w.isRunning());
+    EXPECT_FALSE(w.motionEnabled());
+    EXPECT_FLOAT_EQ(w.params().windDrag, 0.f);
+    EXPECT_FLOAT_EQ(glm::length(w.params().windVelocity), 0.f);
+    const float furShape = w.params().shapeCompliance;
+    for (const auto& r : w.strands().ranges()) {
+        float length = 0.f;
+        for (size_t j = 1; j < r.count; ++j)
+            length += glm::length(w.strands().particles().positions[r.offset+j] -
+                                  w.strands().particles().positions[r.offset+j-1]);
+        EXPECT_NEAR(length, 0.06f, 1.e-6f);
+        EXPECT_GT(w.strands().particles().positions[r.offset+r.count-1].y, r.root.position.y);
+    }
+    ASSERT_TRUE(w.setPreset(HairPreset::LongHair));
+    EXPECT_EQ(w.strands().strandCount(), 48u);
+    EXPECT_EQ(w.strands().particleCount(), 1152u);
+    EXPECT_GT(w.params().shapeCompliance, furShape);
+    EXPECT_EQ(w.params().numIterations, 8);
+    const auto& r = w.strands().ranges().front();
+    float length = 0.f;
+    for (size_t j = 1; j < r.count; ++j)
+        length += glm::length(w.strands().particles().positions[r.offset+j] -
+                              w.strands().particles().positions[r.offset+j-1]);
+    EXPECT_NEAR(length, 1.2f, 1.e-5f);
+    EXPECT_LT(w.strands().particles().positions[r.offset+r.count-1].y, r.root.position.y);
+}
+
+TEST(HairWorldTest, StylePresetsRemainStableInWindAndResetToRest) {
+    for (const auto preset : {HairPreset::LongHair, HairPreset::ShortFur}) {
+        HairWorld w;
+        ASSERT_TRUE(w.setPreset(preset));
+        const auto initial = w.strands().particles().positions;
+        auto p = w.params();
+        p.windVelocity = {2.f, 0.f, 0.f};
+        p.windDrag = 1.f;
+        ASSERT_TRUE(w.setParams(p));
+        for (int i = 0; i < 60; ++i) {
+            ASSERT_TRUE(w.stepOnce());
+            EXPECT_LT(w.stats().maxRelativeLengthError, 0.01f);
+            EXPECT_EQ(w.stats().nonFiniteCount, 0u);
+            EXPECT_FLOAT_EQ(w.maxRootError(), 0.f);
+        }
+        EXPECT_GT(glm::length(w.strands().particles().positions.back()-initial.back()), 1.e-5f);
+        w.reset();
+        EXPECT_EQ(w.stats().steps, 0u);
+        EXPECT_FLOAT_EQ(w.stats().maxSpeed, 0.f);
+        for (size_t i = 0; i < initial.size(); ++i)
+            EXPECT_LT(glm::length(w.strands().particles().positions[i]-initial[i]), 1.e-6f);
+    }
+}
+
+TEST(HairCommandDispatcherTest, StylePresetSwitchClearsMotionWindAndClock) {
+    HairWorld w;
+    HairCommandDispatcher d;
+    d.setWorld(&w);
+    EXPECT_EQ(d.route("HairPreset:StrongWind"), "OK");
+    EXPECT_EQ(d.route("SetHairMotion:true"), "OK");
+    EXPECT_EQ(d.route("HairStep"), "OK");
+    EXPECT_EQ(d.route("HairPreset:ShortFur"), "OK");
+    EXPECT_EQ(d.route("GetHairStat:particles"), "384");
+    EXPECT_EQ(d.route("GetHairStat:colliders"), "0");
+    EXPECT_EQ(d.route("GetHairStat:steps"), "0");
+    EXPECT_EQ(d.route("IsHairMotion"), "false");
+    EXPECT_EQ(d.route("GetHairParam:windX"), "0");
+    EXPECT_EQ(d.route("HairPreset:LongHair"), "OK");
+    EXPECT_EQ(d.route("GetHairStat:particles"), "1152");
+    EXPECT_EQ(d.route("GetHairParam:iterations"), "8");
+}
+
 TEST(HairWorldTest, FixedClockPauseStepResetAndCatchup) {
     HairWorld w;
     ASSERT_TRUE(w.setPreset(HairPreset::Single));

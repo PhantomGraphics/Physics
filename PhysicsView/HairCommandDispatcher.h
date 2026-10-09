@@ -6,7 +6,8 @@
 namespace Phantom {
 class HairWorld;
 // nullopt means not a hair command. Invalid hair commands return Error:.
-// HairPreset:Single|Bundle, HairClear, HairReset, HairStep[:1..1000],
+// HairPreset:Single|Bundle|Body|HeadShake|StrongWind|LongHair|ShortFur,
+// HairClear, HairReset, HairStep[:1..1000],
 // SetHairRunning:true|false, IsHairRunning, SetHairPage:true|false, IsHairPage,
 // SetHairParam:name,value, GetHairParam:name, GetHairStat:name.
 class HairCommandDispatcher {
