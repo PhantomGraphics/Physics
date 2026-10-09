@@ -70,6 +70,7 @@ void HairControlPanel::drawContents() {
     const auto& s = w.stats();
     Im::separator();
     Im::text("Guides: %zu  Particles: %zu", w.strands().strandCount(), s.particleCount);
+    Im::text("Followers: %zu  Vertices: %zu", w.followers().strandCount(), w.followers().particleCount());
     Im::text("Time: %.3f s  Steps: %llu", s.simulatedTime, static_cast<unsigned long long>(s.steps));
     Im::text("Max speed: %.4f m/s", s.maxSpeed);
     Im::text("Max length error: %.3f %%", 100.f*s.maxRelativeLengthError);

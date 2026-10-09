@@ -31,6 +31,7 @@ bool HairWorld::setPreset(HairPreset preset) {
     }
     if (preset == HairPreset::Single) p.strands = 1;
     Physics::HairStrands next;
+    std::vector<Physics::HairRootPose> followerRoots;
     const bool body = preset == HairPreset::Body || preset == HairPreset::HeadShake || preset == HairPreset::StrongWind;
     if (body) {
         std::vector<Physics::HairStrandInput> inputs;
@@ -60,11 +61,18 @@ bool HairWorld::setPreset(HairPreset preset) {
             surface.radius = 0.22f;
         }
         if (!Physics::generateHairSurface(next, surface)) return false;
+        surface.strands *= 8;
+        surface.particlesPerStrand = 2;
+        Physics::HairStrands seeds;
+        if (!Physics::generateHairSurface(seeds, surface)) return false;
+        for (const auto& r : seeds.ranges()) followerRoots.push_back(r.root);
     } else if (!Physics::generateHairBundle(next, p)) return false;
     clear();
     solver_.setParams(settings);
     strands_ = std::move(next);
     solver_.setStrands(&strands_);
+    if (!followerRoots.empty() && !followers_.initialize(strands_, followerRoots, p.particlesPerStrand))
+        return false;
     for (const auto& r : strands_.ranges()) baseRoots_.push_back(r.root);
     if (body) {
         baseColliders_ = {{{0.f,1.05f,0.f}, {0.f,1.05f,0.f}, 0.28f, 0.3f},
@@ -79,7 +87,8 @@ bool HairWorld::setPreset(HairPreset preset) {
     if (registry_) {
         componentId_ = registry_->add(SceneComponentKind::Hair, "Hair", [this] {
             return std::to_string(strands_.strandCount()) + " guides, " +
-                   std::to_string(strands_.particleCount()) + " particles";
+                   std::to_string(strands_.particleCount()) + " particles, " +
+                   std::to_string(followers_.strandCount()) + " followers";
         });
     }
     return true;
@@ -88,6 +97,7 @@ void HairWorld::clear() {
     removeComponent();
     solver_.setStrands(nullptr);
     solver_.setColliders({}, true);
+    followers_ = Physics::HairFollowers{};
     strands_ = Physics::HairStrands{};
     running_ = false;
     accumulator_ = 0.;
@@ -100,6 +110,7 @@ void HairWorld::clear() {
 void HairWorld::reset() {
     applyRig(rigPose_, true);
     solver_.reset();
+    followers_.update(strands_);
     accumulator_ = 0.;
     droppedTime_ = 0.;
 }
@@ -140,7 +151,10 @@ bool HairWorld::applyRig(const Physics::HairRootPose& pose, bool teleport) {
         root.rotation = pose.rotation*baseRoots_[s].rotation;
         if (!solver_.setRootPose(s, root, jumped)) return false;
     }
-    if (jumped) completedRig_ = pose;
+    if (jumped) {
+        completedRig_ = pose;
+        if (!followers_.update(strands_)) return false;
+    }
     return true;
 }
 bool HairWorld::setRigPose(const Physics::HairRootPose& pose, bool teleport) {
@@ -165,7 +179,7 @@ bool HairWorld::advanceOnce() {
     const auto pose = animatedRig(stats().simulatedTime+params().timeStep);
     if (!applyRig(pose, false) || !solver_.step()) return false;
     completedRig_ = pose;
-    return true;
+    return followers_.update(strands_);
 }
 bool HairWorld::update(double elapsedSeconds) {
     if (!running_ || strands_.particleCount() == 0 || !std::isfinite(elapsedSeconds) || elapsedSeconds <= 0.)
@@ -211,6 +225,20 @@ HairWorld::WireData HairWorld::buildWireData() const {
                 out.indices.push_back(static_cast<uint32_t>(r.offset+j-1));
                 out.indices.push_back(static_cast<uint32_t>(r.offset+j));
             }
+        }
+    }
+    const auto& followerPositions = followers_.positions();
+    const size_t count = followers_.particlesPerStrand();
+    const auto first = static_cast<uint32_t>(out.positions.size()/3);
+    for (size_t i = 0; i < followerPositions.size(); ++i) {
+        const auto& point = followerPositions[i];
+        const size_t j = i%count;
+        const float t = static_cast<float>(j)/(count-1);
+        out.positions.insert(out.positions.end(), {point.x,point.y,point.z});
+        out.colors.insert(out.colors.end(), {0.8f,0.45f+0.3f*t,0.18f+0.25f*t,1.f});
+        if (j) {
+            out.indices.push_back(first+static_cast<uint32_t>(i-1));
+            out.indices.push_back(first+static_cast<uint32_t>(i));
         }
     }
     auto addLine = [&](const Math::Vector3df& a, const Math::Vector3df& b) {

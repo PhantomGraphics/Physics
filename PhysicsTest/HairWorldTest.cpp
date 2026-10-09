@@ -5,6 +5,50 @@
 
 using namespace Phantom;
 
+TEST(HairWorldTest, FollowersRenderSeparateStrandsAndTrackStepResetTeleportAndClear) {
+    for (auto preset : {HairPreset::LongHair,HairPreset::ShortFur}) {
+        HairWorld w;
+        ASSERT_TRUE(w.setPreset(preset));
+        const auto guideCount = w.strands().strandCount();
+        const auto guideParticles = w.strands().particleCount();
+        const auto initial = w.followers().positions();
+        const auto count = w.followers().particlesPerStrand();
+        ASSERT_EQ(w.followers().strandCount(),guideCount*8);
+        ASSERT_EQ(initial.size(),guideParticles*8);
+        const auto wire = w.buildWireData();
+        EXPECT_EQ(wire.positions.size(),guideParticles*9*3);
+        EXPECT_EQ(wire.colors.size(),guideParticles*9*4);
+        EXPECT_EQ(wire.indices.size(),guideCount*9*(count-1)*2);
+        for (size_t i = 0; i < wire.indices.size(); i += 2) {
+            EXPECT_EQ(wire.indices[i]/count,wire.indices[i+1]/count);
+            EXPECT_LT(wire.indices[i+1],guideParticles*9);
+        }
+        auto p = w.params();
+        p.windVelocity = {2.f,0.f,0.f}; p.windDrag = 1.f;
+        ASSERT_TRUE(w.setParams(p));
+        for (int i = 0; i < 5; ++i) ASSERT_TRUE(w.stepOnce());
+        EXPECT_GT(glm::length(w.followers().positions().back()-initial.back()),1.e-5f);
+        EXPECT_EQ(w.stats().particleCount,guideParticles);
+        w.reset();
+        for (size_t i = 0; i < initial.size(); ++i)
+            EXPECT_LT(glm::length(w.followers().positions()[i]-initial[i]),2.e-6f);
+        Physics::HairRootPose pose;
+        pose.position = {1.f,0.2f,0.f};
+        pose.rotation = glm::angleAxis(0.5f,Math::Vector3df(0.f,1.f,0.f));
+        ASSERT_TRUE(w.setRigPose(pose,true));
+        const Math::Vector3df pivot(0.f,1.05f,0.f);
+        for (size_t i = 0; i < initial.size(); ++i) {
+            const auto expected = pivot+pose.position+pose.rotation*(initial[i]-pivot);
+            EXPECT_LT(glm::length(w.followers().positions()[i]-expected),3.e-6f);
+        }
+        ASSERT_TRUE(w.setPreset(HairPreset::Single));
+        EXPECT_EQ(w.followers().strandCount(),0u);
+        EXPECT_EQ(w.followers().particleCount(),0u);
+        w.clear();
+        EXPECT_TRUE(w.buildWireData().positions.empty());
+    }
+}
+
 TEST(HairWorldTest, StylePresetsSetGeometryAndRestoreSolverSettings) {
     HairWorld w;
     ASSERT_TRUE(w.setPreset(HairPreset::StrongWind));
