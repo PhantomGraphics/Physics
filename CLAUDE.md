@@ -94,6 +94,8 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 - `slow`: 600 step 級の重いシナリオ（`17_fluid_pbsph_small_scale_regression` のみ）。日常のイテレーションで
   除外したい場合は `-ExcludeTag slow`。
 
+**ベースライン記録（Phase 0、2026-10-10）:** `record_physics_baseline.ps1`（Release 専用）が代表 25 本を繰り返し実行し、実時間の中央値・ばらつき・`Get*` 応答・スクリーンショットのハッシュを JSON に書く（`baseline_20261010.json`）。リファクタ前後の比較（数値の同一性と性能退行）に使う。更新が 3 秒以上のケースを 5 回の中央値で比べること。
+
 **コマンド網羅チェック:** `CommandDispatcher`/`RigidBodyCommandDispatcher`/`SoftBodyCommandDispatcher` の
 全コマンドが最低 1 本のシナリオから叩かれているかは、各ディスパッチャの `route()` 内のコマンド名リテラル
 （`grep -oE '"[A-Za-z]+:?' *CommandDispatcher.cpp`）と `scenarios/*.json` 内の `"command"` 値の差分を取れば
