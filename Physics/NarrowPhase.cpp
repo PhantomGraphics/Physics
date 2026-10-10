@@ -253,69 +253,11 @@ bool NarrowPhase::sphereBox(RigidBody& a, RigidBody& b, ContactManifold& out) {
 
 // --------------------------------------------------------------- OBB-OBB ---
 
+// A single centre-of-face contact gives no restoring torque, so stacks of boxes
+// tipped over (22_rigid_stacking). The shared SAT + face-clipping routine
+// returns up to 4 contacts for a face-face pair.
 bool NarrowPhase::boxBox(RigidBody& a, RigidBody& b, ContactManifold& out) {
-    auto* sa = static_cast<BoxShape*>(a.shape);
-    auto* sb = static_cast<BoxShape*>(b.shape);
-
-    Math::Matrix3df Ra = glm::mat3_cast(a.orientation);
-    Math::Matrix3df Rb = glm::mat3_cast(b.orientation);
-    Math::Vector3df hA = sa->halfExtents;
-    Math::Vector3df hB = sb->halfExtents;
-    Math::Vector3df T  = b.position - a.position;
-
-    float minPen = std::numeric_limits<float>::max();
-    Math::Vector3df bestAxis(0.f);
-
-    auto testAxis = [&](Math::Vector3df axis) -> bool {
-        float len = glm::length(axis);
-        if (len < 1e-6f) return false;
-        axis /= len;
-
-        float projT = std::abs(glm::dot(T, axis));
-
-        float rA = std::abs(hA.x * glm::dot(Ra[0], axis))
-                 + std::abs(hA.y * glm::dot(Ra[1], axis))
-                 + std::abs(hA.z * glm::dot(Ra[2], axis));
-
-        float rB = std::abs(hB.x * glm::dot(Rb[0], axis))
-                 + std::abs(hB.y * glm::dot(Rb[1], axis))
-                 + std::abs(hB.z * glm::dot(Rb[2], axis));
-
-        float pen = rA + rB - projT;
-        if (pen < 0.f) return true;  // separating axis
-
-        if (pen < minPen) {
-            minPen   = pen;
-            bestAxis = (glm::dot(T, axis) >= 0.f) ? -axis : axis;
-        }
-        return false;
-    };
-
-    // 3 face normals of A
-    for (int i = 0; i < 3; ++i)
-        if (testAxis(Ra[i])) return false;
-
-    // 3 face normals of B
-    for (int i = 0; i < 3; ++i)
-        if (testAxis(Rb[i])) return false;
-
-    // 9 edge-cross axes
-    for (int i = 0; i < 3; ++i)
-        for (int j = 0; j < 3; ++j)
-            if (testAxis(glm::cross(Ra[i], Rb[j]))) return false;
-
-    // Contact point: surface of B facing A
-    float rBn = std::abs(hB.x * glm::dot(Rb[0], bestAxis))
-              + std::abs(hB.y * glm::dot(Rb[1], bestAxis))
-              + std::abs(hB.z * glm::dot(Rb[2], bestAxis));
-
-    ContactPoint cp;
-    cp.normal      = bestAxis;
-    cp.penetration = minPen;
-    cp.position    = b.position + bestAxis * rBn;
-
-    out.contacts.push_back(cp);
-    return true;
+    return hullConvex(a, b, out);
 }
 
 // --------------------------------------------------------------- OBB-Plane --
