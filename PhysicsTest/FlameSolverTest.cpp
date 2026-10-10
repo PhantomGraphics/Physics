@@ -20,6 +20,7 @@ using namespace Phantom::Physics;
 
 TEST(FlameWorld, EmissionHistoryTracksSimulationStepsAndResetsWithPresets)
 {
+    SKIP_IN_DEBUG_SLOW();
   Phantom::FlameWorld world;
   ASSERT_TRUE(world.circulationPreset(true,0.3f,0.8f,0.08f));
   EXPECT_TRUE(world.emissionHistory().empty());
@@ -61,6 +62,7 @@ TEST(FlameSolverTest, ClosedCylinderClampsSideAndCapsWithoutRemovingTangentialVe
 
 TEST(FlameWorld, CylinderCirculationKeepsCarrierMassAndObservesSourceRegion)
 {
+    SKIP_IN_DEBUG_SLOW();
   Phantom::FlameWorld world;
   ASSERT_TRUE(world.circulationPreset(true,0.3f,0.8f,0.08f));
   EXPECT_NEAR(world.fluid().getEmitters().front().center.y,0.4f,1e-6f);
@@ -120,6 +122,7 @@ TEST(FlameSolverTest, SmallSceneRestoresCallingThreadsOpenMPConfiguration)
 
 TEST(FlameSolverTest, FixedSphereRetainsColdCarriersAndDisablesSources)
 {
+    SKIP_IN_DEBUG_SLOW();
   FlameFluid fluid; FlameSolver solver; seedClosedSphere(fluid,solver);
   FlameFluid::Emitter emitter; emitter.rate=1000; emitter.airRate=1000;
   emitter.pilotTemperature=2000; emitter.radius=1; emitter.pilotHeight=1;
@@ -153,6 +156,7 @@ TEST(FlameSolverTest, SphereProjectionKeepsTangentialVelocity)
 
 TEST(FlameSolverTest, ClosedSphereHeatAndChemicalDiffusionConserveTotals)
 {
+    SKIP_IN_DEBUG_SLOW();
   FlameFluid fluid; FlameSolver solver; seedClosedSphere(fluid,solver);
   solver.setGravity({0,0,0});
   auto& gas=fluid.getParticles();
@@ -172,6 +176,7 @@ TEST(FlameSolverTest, ClosedSphereHeatAndChemicalDiffusionConserveTotals)
 
 TEST(FlameSolverTest, WallCoolingAndFiniteHeatingCloseHeatBudget)
 {
+    SKIP_IN_DEBUG_SLOW();
   FlameFluid fluid; FlameSolver solver; seedClosedSphere(fluid,solver);
   solver.setGravity({0,0,0});
   FlameSolver::ThermalBoundary t; t.sourceCenter={0,-0.15f,0}; t.sourceRadius=0.12f;
@@ -186,6 +191,7 @@ TEST(FlameSolverTest, WallCoolingAndFiniteHeatingCloseHeatBudget)
 
 TEST(FlameSolverTest, ClosedSphereBuoyancyDrivesFlowWithoutNoise)
 {
+    SKIP_IN_DEBUG_SLOW();
   float kinetic[2]={};
   for(int trial=0;trial<2;++trial) {
     FlameFluid fluid; FlameSolver solver; seedClosedSphere(fluid,solver);
@@ -211,6 +217,7 @@ TEST(FlameSolverTest, ClosedSphereBuoyancyDrivesFlowWithoutNoise)
 
 TEST(FlameSolverTest, FiniteReactionRetainsParticlesAndClosesFuelBudget)
 {
+    SKIP_IN_DEBUG_SLOW();
   FlameFluid fluid; FlameSolver solver; seedClosedSphere(fluid,solver);
   solver.setGravity({0,0,0}); fluid.setBurnRate(10);
   auto& gas=fluid.getParticles(); fluid.initialHeat=0; fluid.initialOxygenMass=0;
@@ -229,6 +236,7 @@ TEST(FlameSolverTest, FiniteReactionRetainsParticlesAndClosesFuelBudget)
 
 TEST(FlameWorld, SpherePresetIgnitesAndRetainsFiniteCarriers)
 {
+    SKIP_IN_DEBUG_SLOW();
   Phantom::FlameWorld world;
   ASSERT_TRUE(world.sphericalPreset(true,0.3f,0.06f));
   const int count=world.fluid().getNumParticles();
@@ -245,6 +253,7 @@ TEST(FlameWorld, SpherePresetIgnitesAndRetainsFiniteCarriers)
 
 TEST(FlameWorld, ContinuousSourceReusesCarriersAfterStoppingAndRestarting)
 {
+    SKIP_IN_DEBUG_SLOW();
   Phantom::FlameWorld world;
   const int count = world.fluid().getNumParticles();
   ASSERT_GT(count,100);
@@ -301,6 +310,7 @@ TEST(FlameFluidTest, CarrierSourceOnlyAffectsItsConfiguredRegion)
 
 TEST(FlameWorld, SphereConvectionSurvivesTimeStepAndResolutionChanges)
 {
+    SKIP_IN_DEBUG_SLOW();
   float temperatures[3]={};
   for(int trial=0;trial<3;++trial) {
     Phantom::FlameWorld world;
@@ -498,6 +508,7 @@ TEST(FlameSolverTest, GetFluidsReturnsRegisteredFluids)
 
 TEST(FlameSolverTest, EmittedParticlesStayFiniteAndCapAtMaxParticles)
 {
+    SKIP_IN_DEBUG_SLOW();
   FlameFluid fluid;
   fluid.setMaxParticles(120);
   fluid.setEffectLength(0.15f);
@@ -697,6 +708,7 @@ PlumeSummary runPlume(const float dt, const float seconds)
 
 TEST(FlameSolverTest, PlumeHeightAndSpeedDoNotDependOnTimeStep)
 {
+    SKIP_IN_DEBUG_SLOW();
   // Before plan A1 the curl noise was a per-step velocity kick with no dt, so
   // halving dt doubled its effective acceleration; this pins that it is now a
   // proper acceleration. SPH at two step sizes is never bit-identical, so the

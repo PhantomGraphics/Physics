@@ -181,6 +181,7 @@ TEST(HairDynamicsTest, MovingBoundaryAndPinnedOverlapAreReported) {
     EXPECT_LT(glm::length(hair.particles().positions[0]-hair.ranges()[0].root.position), 1.e-6f);
 }
 TEST(HairDynamicsTest, HeadShakeAndBodyStayFinite) {
+    SKIP_IN_DEBUG_SLOW();
     Phantom::HairWorld world;
     ASSERT_TRUE(world.setPreset(Phantom::HairPreset::HeadShake));
     EXPECT_EQ(world.colliderCount(), 2u);

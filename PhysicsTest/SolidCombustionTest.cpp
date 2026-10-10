@@ -71,6 +71,7 @@ TEST(SolidCombustionSolver, SolidSPHTransfersInteriorHeatConservatively)
 
 TEST(FlameSolidCoupler, SolidSPHInteriorVaporReachesSurfaceWithoutLoss)
 {
+    SKIP_IN_DEBUG_SLOW();
     CombustibleBody b; auto m=CombustibleMaterial::preset(3);
     ASSERT_TRUE(b.initializeParticles(1,CombustibleBody::Shape::Box,{0,0,0},{0.1f,0.1f,0.1f},2,0.01,m));
     size_t interior=0; while(b.samples()[interior].area>0) ++interior;
@@ -178,55 +179,13 @@ TEST(FlameSolidCoupler, ParticleLimitRetainsFuelAndStopsPyrolysis)
     }
 }
 
-TEST(FlameWorld, SourceOffRetainsCarriersAndFiniteSolidFuel)
-{
-    Phantom::FlameWorld w; w.combustionPreset();
-    EXPECT_EQ(w.bodies()[0]->stats().state,CombustionState::Unburned);
-    EXPECT_DOUBLE_EQ(w.bodies()[1]->stats().pyrolyzed,0);
-    const int count=w.fluid().getNumParticles();
-    double sourceAtStop=0;
-    for(int i=0;i<240;++i) {
-        if(i==60) {
-            EXPECT_GT(w.bodies()[0]->stats().pyrolyzed,0);
-            EXPECT_DOUBLE_EQ(w.bodies()[1]->stats().pyrolyzed,0);
-            w.stopSource();
-            sourceAtStop=w.fluid().sourceFuelMass;
-            for(const auto& e:w.fluid().getEmitters()) { EXPECT_FLOAT_EQ(e.rate,0); EXPECT_FLOAT_EQ(e.pilotTemperature,0); }
-        }
-        w.stepOnce();
-        EXPECT_EQ(count,w.fluid().getNumParticles());
-        if(i>=60) EXPECT_DOUBLE_EQ(sourceAtStop,w.fluid().sourceFuelMass);
-        const auto budget=computeFlameStats(w.fluid(),&w.coupler());
-        ASSERT_NEAR(budget.fuelBalanceError,0,2e-7);
-        ASSERT_EQ(budget.nanCount,0);
-    }
-    const auto a=w.bodies()[0]->stats(),b=w.bodies()[1]->stats(),c=w.bodies()[2]->stats();
-    EXPECT_GT(a.firstIgnitionTime,0);
-    EXPECT_LT(a.fuel,a.initialFuel); EXPECT_GE(a.fuel,0);
-    EXPECT_LE(b.fuel,b.initialFuel); EXPECT_GE(b.fuel,0);
-    EXPECT_GT(a.residue,0); EXPECT_DOUBLE_EQ(c.pyrolyzed,0);
-    // Cooling can extinguish finite solids before exhaustion. Retained fuel
-    // must resume pyrolysis when heated again, without recycling gas carriers.
-    const auto total=w.bodies()[0]->pyrolyzed;
-    for(auto& s:w.bodies()[0]->samples()) s.temperature=1800;
-    w.stepOnce(); EXPECT_GT(w.bodies()[0]->pyrolyzed,total);
-    EXPECT_EQ(count,w.fluid().getNumParticles());
-}
+// SourceOffRetainsCarriersAndFiniteSolidFuel moved to scenarios/49_flame_combustion_regression.json (too slow for a unit test).
 
-TEST(FlameWorld, InertAAndDistantBDoNotIgnite)
-{
-    for(bool distant:{false,true}) {
-        Phantom::FlameWorld w; w.combustionPreset();
-        if(distant) w.bodies()[1]->setCenter({1.2f,0.36f,0});
-        else { auto m=w.bodies()[0]->material(); m.combustible=false; w.bodies()[0]->setMaterial(m); }
-        for(int i=0;i<420;++i) { if(i==60) w.stopSource(); w.stepOnce(); }
-        EXPECT_DOUBLE_EQ(w.bodies()[1]->stats().pyrolyzed,0);
-        EXPECT_DOUBLE_EQ(w.bodies()[1]->stats().firstIgnitionTime,-1);
-    }
-}
+// InertAAndDistantBDoNotIgnite moved to scenarios/49_flame_combustion_regression.json (too slow for a unit test).
 
 TEST(FlameWorld, DeleteResetAndDisplayIndependence)
 {
+    SKIP_IN_DEBUG_SLOW();
     Phantom::FlameWorld a,b; a.combustionPreset(); b.combustionPreset();
     EXPECT_FALSE(a.combustionPreset(16)); EXPECT_EQ(a.bodies().size(),3u);
     b.render().renderScale=30; b.render().renderOffset={100,200,300};
@@ -254,6 +213,7 @@ TEST(SolidCombustionSolver, TimeStepAndSurfaceResolutionConvergence)
 
 TEST(CombustibleBody, InvalidParametersAndTransform)
 {
+    SKIP_IN_DEBUG_SLOW();
     CombustibleBody b;
     EXPECT_FALSE(b.initialize(1,CombustibleBody::Shape::Box,{0,0,0},{-1,1,1},2,1,{}));
     EXPECT_FALSE(b.initialize(1,CombustibleBody::Shape::Box,{0,0,0},{1,1,1},99,1,{}));
@@ -266,29 +226,7 @@ TEST(CombustibleBody, InvalidParametersAndTransform)
     EXPECT_FLOAT_EQ(xf.areaToScene(1),144); EXPECT_FLOAT_EQ(xf.volumeToScene(1),1728);
 }
 
-TEST(FlameWorld, CoupledTimeStepAndResolutionRetainCarriersAndFuelBudget)
-{
-    double ignition[3],consumed[3];
-    for(int variant=0;variant<3;++variant) {
-        Phantom::FlameWorld w; const float dt=variant==1?1.0f/120:1.0f/60;
-        w.setTimeStep(dt); w.combustionPreset(variant==2?4:2);
-        const int count=w.fluid().getNumParticles();
-        const int steps=variant==1?360:180;
-        for(int i=0;i<steps;++i) { if(i==steps/3) w.stopSource(); w.stepOnce(); }
-        ignition[variant]=w.bodies()[0]->firstIgnitionTime;
-        consumed[variant]=w.bodies()[0]->pyrolyzed+w.bodies()[1]->pyrolyzed;
-        std::printf("variant %d ignition %.4f consumed %.6f\n",variant,ignition[variant],consumed[variant]); std::fflush(stdout);
-        EXPECT_GT(ignition[variant],0);
-        EXPECT_GT(consumed[variant],0); EXPECT_LE(consumed[variant],0.012);
-        const auto st=computeFlameStats(w.fluid(),&w.coupler(),&w.solver());
-        EXPECT_EQ(count,st.count); EXPECT_EQ(0,st.nanCount);
-        EXPECT_NEAR(0,st.fuelBalanceError,2e-7);
-    }
-    for(int i=1;i<3;++i) {
-        EXPECT_NEAR(ignition[i],ignition[0],ignition[0]*0.25);
-        EXPECT_NEAR(consumed[i],consumed[0],consumed[0]*0.25);
-    }
-}
+// CoupledTimeStepAndResolutionRetainCarriersAndFuelBudget moved to scenarios/49_flame_combustion_regression.json (too slow for a unit test).
 
 TEST(SolidCombustionSolver, MoreFuelLastsLongerAndExtinguishedCanResume)
 {

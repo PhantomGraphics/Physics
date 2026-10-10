@@ -99,6 +99,7 @@ TEST(FlameSolidCoupler, RotationPreservesLocalHeatExchange)
 
 TEST(FlameWorld, RigidClockFollowsRotationAndDoesNotDoubleStep)
 {
+    SKIP_IN_DEBUG_SLOW();
     PhysicsSolver physics; RigidBodyWorld rigid(physics); FlameWorld flame;
     flame.setRigidWorld(&rigid); rigid.getWorld().params().gravity={0,0,0};
     auto* moving=rigid.addBox({0,6,0},{1.2f,0.6f,0.96f},1);
@@ -142,6 +143,7 @@ TEST(FlameWorld, RigidHandlesDoNotRebindAfterPresetRebuild)
 
 TEST(FlameWorld, FastRotationRefinesCommonSubsteps)
 {
+    SKIP_IN_DEBUG_SLOW();
     PhysicsSolver physics; RigidBodyWorld rigid(physics); FlameWorld flame;
     flame.setRigidWorld(&rigid); rigid.getWorld().params().gravity={0,0,0};
     auto* moving=rigid.addBox({0,6,0},{1.2f,0.6f,0.96f},1);
@@ -155,6 +157,7 @@ TEST(FlameWorld, FastRotationRefinesCommonSubsteps)
 
 TEST(FlameWorld, FrameForceActsForWholeSharedInterval)
 {
+    SKIP_IN_DEBUG_SLOW();
     PhysicsSolver physics; RigidBodyWorld rigid(physics); FlameWorld flame;
     flame.setRigidWorld(&rigid); rigid.getWorld().params().gravity={0,0,0};
     auto* moving=rigid.addSphere({0,6,0},1.2f,2);

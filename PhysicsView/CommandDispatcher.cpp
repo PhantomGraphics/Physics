@@ -118,7 +118,7 @@ std::vector<CommandInfo> CommandDispatcher::commandCatalog() const {
         {"CloudStep", "", ""},
         {"ConvertToMesh", "", ""},
         {"ConvertToVolume", "", ""},
-        {"FlameCombustionPreset", "", ""},
+        {"FlameCombustionPreset", "", "e.g. FlameCombustionPreset:4 (resolution 1..8, default 2)"},
         {"FlameReset", "", ""},
         {"FlameCirculationPreset", "", "e.g. FlameCirculationPreset:cylinder,0.8,2.4,0.12"},
         {"FlameSpherePreset", "", "e.g. FlameSpherePreset:convection,0.3,0.06"},

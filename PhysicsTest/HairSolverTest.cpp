@@ -182,6 +182,7 @@ TEST(HairSolverTest, TimeStepAndSubstepsRemainStable) {
 }
 
 TEST(HairSolverTest, DefaultDisplayBundleRemainsWithinLengthBudget) {
+    SKIP_IN_DEBUG_SLOW();
     HairStrands hair;
     ASSERT_TRUE(generateHairBundle(hair, HairGeneratorParams{}));
     HairSolver solver;

@@ -703,6 +703,7 @@ float headOnCollisionPeakSpeed(const float spacing, const float viscosityCoe)
 
 TEST(WCSPHFluidTest, ViscousDampingIsResolutionIndependentForAFixedViscosityCoe)
 {
+    SKIP_IN_DEBUG_SLOW();
   constexpr float kViscosityCoe = 0.01f;
 
   const float coarse = headOnCollisionPeakSpeed(0.010f, kViscosityCoe);   //  432 particles

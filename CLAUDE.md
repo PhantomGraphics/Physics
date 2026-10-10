@@ -42,6 +42,8 @@ cmake --build --preset windows-debug
 ctest --preset windows-debug -R PhysicsTest
 ```
 
+**テスト時間の方針（2026-10-10）:** 数秒以上かかる長時間シミュレーションは gtest ではなくシナリオ（`debug-slow` タグ、Release で実行）に置く（例: `49_flame_combustion_*`）。gtest に残す重めのテストは先頭に `SKIP_IN_DEBUG_SLOW();`（`PhysicsTest/pch.h`）を入れ、Debug では skip して Release で実行する。実測: Release 約 50 秒（605 件）、Debug 約 31 秒（572 件実行・33 件 skip）。
+
 `PhysicsTest/PhysicsFluidFactory.h/.cpp` はテスト専用ヘルパー（`ISPHSolver` 実装をシナリオ別に構築する）。`Physics` 本体には存在しないので、プロダクションコードから参照しない。
 
 ### シナリオテスト（PhysicsView）

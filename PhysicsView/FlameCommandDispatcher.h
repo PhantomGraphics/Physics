@@ -33,6 +33,8 @@ class FlameWorld;
  *       are exposed by SetFlameParam. StopFlameSource stops spherical heating too.
  *       carrierDebug (0 radiance, 1 temperature, 2 velocity) and sphereWire
  *       are exposed by SetFlameRenderParam.
+ *   FlameCombustionPreset[:<resolution>]
+ *       Rebuild the closed-sphere solid-combustion scene (resolution 1..8, default 2).
  *   FlameStep / FlameStep:<n>
  *       Advance <n> fixed steps (independent of the Running flag). The steps are spread
  *       over frames within a time budget (tick()) so the window stays responsive during

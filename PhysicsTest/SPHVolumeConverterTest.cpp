@@ -298,6 +298,7 @@ VolumeSummary summarize(const SparseVolumef& sv)
 
 TEST(SPHVolumeConverterTest, AnisotropicLatticeIsDeterministic)
 {
+    SKIP_IN_DEBUG_SLOW();
     // calculateAnisotropy() used to move each particle to its smoothed centre
     // inside the OpenMP loop while other threads read it as a neighbour, so the
     // same input produced a different volume on every run.
@@ -320,6 +321,7 @@ TEST(SPHVolumeConverterTest, AnisotropicLatticeIsDeterministic)
 
 TEST(SPHVolumeConverterTest, AnisotropicUniformLatticeMatchesIsotropicScale)
 {
+    SKIP_IN_DEBUG_SLOW();
     // Inside a uniform lattice the weighted covariance is isotropic, so the
     // normalized stretch is 1 on every axis and G = I: the anisotropic volume
     // must cover the same region with the same magnitude as the isotropic one.
@@ -353,6 +355,7 @@ TEST(SPHVolumeConverterTest, AnisotropicUniformLatticeMatchesIsotropicScale)
 
 TEST(SPHVolumeConverterTest, AnisotropicIsScaleInvariant)
 {
+    SKIP_IN_DEBUG_SLOW();
     // G must be dimensionless: scaling the whole scene (positions, radius and
     // voxel size) by the same factor must reproduce the same voxel pattern.
     // The old G carried a 1/searchRadius factor plus the covariance's

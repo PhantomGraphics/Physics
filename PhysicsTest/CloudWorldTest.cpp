@@ -77,6 +77,7 @@ TEST(CloudWorldTest, OverloadIsCountedNotHidden)
 
 TEST(CloudWorldTest, FormGrowEvaporateReform)
 {
+    SKIP_IN_DEBUG_SLOW();
   CloudWorld w;
   smallDomain(w);
   const size_t s0 = w.addSource(moistSource(Vector3dd(150.0, 250.0, 300.0)));
@@ -123,6 +124,7 @@ TEST(CloudWorldTest, HumidityChangeIsLedgered)
 
 TEST(CloudWorldTest, TimeStepHalvingKeepsResultsClose)
 {
+    SKIP_IN_DEBUG_SLOW();
   auto run = [](double fixedDt) {
     CloudWorld w;
     smallDomain(w);
@@ -140,6 +142,7 @@ TEST(CloudWorldTest, TimeStepHalvingKeepsResultsClose)
 
 TEST(CloudWorldTest, ParticleSpacingSensitivityIsRecorded)
 {
+    SKIP_IN_DEBUG_SLOW();
   // Plan Phase 2: record how formation changes with particle spacing (values are logged, not tuned to).
   auto run = [](double spacing) {
     CloudWorld w;
