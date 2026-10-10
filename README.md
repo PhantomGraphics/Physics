@@ -1,6 +1,6 @@
 # Phantom Physics
 
-Phantom Physics is a C++17 physics simulation module. It provides SPH-based fluid,
+Phantom Physics is a C++20 physics simulation module. It provides SPH-based fluid,
 rigid-body, and XPBD soft-body solvers, coupled rigid/fluid/soft-body simulation,
 and standalone Vulkan viewers.
 
@@ -38,7 +38,7 @@ and standalone Vulkan viewers.
 
 ## Build
 
-CMake is the supported build system. The project requires C++17 and Ninja;
+CMake is the supported build system. The project requires C++20 and Ninja;
 viewer targets require Vulkan SDK 1.4.341.1 or later.
 
 ```powershell
@@ -84,7 +84,7 @@ ctest --preset windows-debug -R PhysicsTest
 
 ## Technology stack
 
-C++17, Vulkan, VMA, GLFW, Dear ImGui, GLM 0.9.9.8, Eigen 3.4.0, OpenMP,
+C++20, Vulkan, VMA, GLFW, Dear ImGui, GLM 0.9.9.8, Eigen 3.4.0, OpenMP,
 and GoogleTest.
 
 ## License

@@ -37,7 +37,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(PhysicsCoreLinux LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -91,11 +91,10 @@ if(PHYSICS_BUILD_EXAMPLES)
 endif()
 
 # ---------------------------------------------------------------------------
-# PhysicsTest (GoogleTest) -- PhysicsTest.vcxproj explicitly overrides
-# <LanguageStandard> to stdcpp20 (unlike PhysicsCore's Physics.vcxproj, which
-# doesn't and falls back to BuildConfig.props' repo-wide C++17 default) --
-# CXX_STANDARD is set per-target below rather than changing CMAKE_CXX_STANDARD
-# globally, so PhysicsCore itself stays C++17 exactly as before.
+# PhysicsTest (GoogleTest). The whole module is C++20 (the standalone build
+# sets CMAKE_CXX_STANDARD 20 above; the Phantom root build already does and
+# CGLib's *Core targets propagate cxx_std_20), so the per-target settings
+# below only restate it.
 # ---------------------------------------------------------------------------
 
 phantom_find_gtest()

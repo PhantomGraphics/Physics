@@ -19,7 +19,7 @@ if(NOT DEFINED PROJECT_NAME)
     project(PhantomPhysicsExamples LANGUAGES CXX)
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ---------------------------------------------------------------------------
@@ -87,5 +87,5 @@ foreach(_ex IN LISTS PHYSICS_EXAMPLES)
         "${PHYSICS_ROOT}/Physics"       # WCSPHFluid.h, ISPHSolver.h, ...
     )
     target_link_libraries(sph_example_${_ex} PRIVATE PhysicsCore)
-    set_target_properties(sph_example_${_ex} PROPERTIES CXX_STANDARD 17)
+    set_target_properties(sph_example_${_ex} PROPERTIES CXX_STANDARD 20)
 endforeach()
