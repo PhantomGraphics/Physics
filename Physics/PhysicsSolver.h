@@ -62,17 +62,39 @@ namespace Physics {
 class PhysicsSolver : private UnCopyable {
 public:
     /**
-     * @brief Installs the fluid solver to step every frame, discarding any
-     * previous registration.
-     * @param solver Non-owning; the caller creates and destroys it (same
-     *               convention as bindRigidBody()/bindSoftBody() and every
-     *               other add()/bind() API in this library -- see
-     *               Physics/CLAUDE.md's "非所有ポインタの寿命" section). Must
-     *               outlive this PhysicsSolver, or be replaced/cleared first.
+     * @brief Installs the fluid solver to step every frame.
+     *
+     * Registration lifetime contract (docs/todo/PLAN_physics_refactoring.md Phase 1):
+     *  - @p solver is non-owning (same convention as bindRigidBody()/bindSoftBody()
+     *    and every add()/bind() API in this library, see Physics/CLAUDE.md's
+     *    "非所有ポインタの寿命" section). The caller creates and destroys it.
+     *  - This object keeps its own list of what it registered (rigid boundaries,
+     *    rigid/soft boundary particles) and, on every switch, removes exactly
+     *    those entries from the old solver with ISPHSolver::remove*() -- it never
+     *    calls clear*(), so registrations that someone else made directly on the
+     *    old solver (e.g. a mesh boundary) are left alone. The same entries are
+     *    then registered on the new solver, after refreshing the new fluid's
+     *    kernel / rest density, the rigid boundary particles' psi and every
+     *    leftover reaction force (one attach path for first use and for a switch).
+     *  - Passing the solver that is already installed is a no-op; nullptr
+     *    detaches (bindings and lists are kept, so a later setFluidSolver()
+     *    re-attaches them).
+     *  - Call setFluidSolver(nullptr) (or switch to another solver) BEFORE
+     *    destroying the installed solver, and before destroying this object if the
+     *    solver outlives it: the destructor does not touch the solver, so a
+     *    still-installed solver would keep pointers into this object's bindings.
      */
-    // Detaches the old solver's coupling registrations and transfers this
-    // orchestrator's registrations. Call before destroying the old solver.
     void setFluidSolver(ISPHSolver* solver);
+
+    /**
+     * @brief Re-registers this object's entries on the installed solver.
+     *
+     * Registration is idempotent (no duplicates), so this repairs the case
+     * where somebody called clear*() directly on the installed solver and
+     * thereby dropped this object's registrations, and also refreshes psi and
+     * the cached kernel / rest density. No-op without an installed solver.
+     */
+    void resyncFluidRegistrations();
 
     ISPHSolver*       fluidSolver()       { return fluidSolver_; }
     const ISPHSolver* fluidSolver() const { return fluidSolver_; }
@@ -124,10 +146,26 @@ public:
      */
     RigidFluidBinding& bindRigidBody(RigidBody* body, ICollisionShape* shape, CouplingMode mode);
 
-    /** @brief Clears all bindings and the active fluid solver's boundary registrations. */
+    /**
+     * @brief Clears all rigid bindings. The matching boundaries / boundary
+     * particles are unregistered from the fluid solver first (only the ones this
+     * object registered), then the bindings are destroyed, so the solver never
+     * holds a pointer to a destroyed binding.
+     */
     void clearRigidBodyBindings();
 
-    void addRigidBoundaryParticles(RigidBoundaryParticles* p);
+    /**
+     * @brief Registers / unregisters an extra rigid boundary or Two-Way boundary
+     * particle set through this object, so its lifetime follows setFluidSolver()
+     * (re-registered on a switch, removed on a switch). Null and duplicates are
+     * ignored. Use these instead of calling the fluid solver directly when the
+     * registration should survive replacing the fluid; pointers are non-owning.
+     * @return add: true if newly registered; remove: true if it was registered here.
+     */
+    bool addRigidBoundary(RigidBoundary* b);
+    bool removeRigidBoundary(RigidBoundary* b);
+    bool addRigidBoundaryParticles(RigidBoundaryParticles* p);
+    bool removeRigidBoundaryParticles(RigidBoundaryParticles* p);
     void clearRigidBoundaryParticles();
 
     /**
@@ -143,7 +181,7 @@ public:
      */
     SoftFluidBinding& bindSoftBody(ISoftBody* body);
 
-    /** @brief Clears all SoftBody bindings and the active fluid solver's SoftBody boundary registrations. */
+    /** @brief Clears all SoftBody bindings; unregisters this object's SoftBody boundary particles from the fluid solver first. */
     void clearSoftBodyBindings();
 
     /**
@@ -196,8 +234,8 @@ private:
     int   maxIter_  = 3;
 
     void stepFluid();
-    void addRigidBoundary(RigidBoundary* b);
-    void clearRigidBoundaries();
+    void attachToFluid();
+    void detachFromFluid();
 };
 
 } // namespace Physics
