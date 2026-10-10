@@ -236,6 +236,7 @@ TEST(DFSPHFluidTest, ClearOutflowRegionsRemovesRegisteredRegions)
 
 TEST(DFSPHSolverTest, EmittedParticlesAtSceneRadiusStayFiniteWhileFallingIntoExistingFluid)
 {
+    SKIP_IN_DEBUG_SLOW();
   const float radius = 1.0f;
   const float effectLength = 2.25f;
   const float diameter = radius * 2.0f;

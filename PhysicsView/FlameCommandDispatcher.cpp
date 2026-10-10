@@ -353,6 +353,10 @@ std::optional<std::string> FlameCommandDispatcher::route(const std::string& cmd)
         body->beginMotionStep(); notifyChanged(); return "OK";
     }
 	if (cmd == "FlameCombustionPreset") { w.combustionPreset(); notifyChanged(); return "OK"; }
+	if (startsWith(sv,"FlameCombustionPreset:")) {
+		int resolution; if(!parseInt(sv.substr(22),resolution) || !w.combustionPreset(resolution)) return "Error:expected resolution 1..8";
+		notifyChanged(); return "OK";
+	}
 	if (cmd == "StopFlameSource") { w.stopSource(); notifyChanged(); return "OK"; }
 	if (cmd == "GetFlameBodyCount") return std::to_string(w.bodies().size());
 	if (cmd == "GetFlameFuelBudget") {

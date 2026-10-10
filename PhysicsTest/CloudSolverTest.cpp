@@ -46,6 +46,7 @@ double maxSpeed(const CloudParticleSoA& s)
 
 TEST(CloudSolverTest, RestLatticeStaysAtRest)
 {
+    SKIP_IN_DEBUG_SLOW();
   Scene s;
   ASSERT_EQ(s.soa.size(), 8u * 8u * 16u);
   s.run(60.0);
@@ -67,6 +68,7 @@ TEST(CloudSolverTest, StableTimeStepIsPositiveAndBounded)
 
 TEST(CloudSolverTest, HeatedAirRisesAndClosedWaterIsConserved)
 {
+    SKIP_IN_DEBUG_SLOW();
   Scene s;
   CloudSourceParams src;
   src.center = Vector3dd(250.0, 250.0, 150.0);
@@ -91,6 +93,7 @@ TEST(CloudSolverTest, HeatedAirRisesAndClosedWaterIsConserved)
 
 TEST(CloudSolverTest, MoistSourceFormsCloudInsideClosedDomain)
 {
+    SKIP_IN_DEBUG_SLOW();
   Scene s;
   CloudSourceParams src;
   src.center = Vector3dd(250.0, 250.0, 300.0);
@@ -108,6 +111,7 @@ TEST(CloudSolverTest, MoistSourceFormsCloudInsideClosedDomain)
 
 TEST(CloudSolverTest, SameSetupIsReproducible)
 {
+    SKIP_IN_DEBUG_SLOW();
   auto run = [] {
     Scene s;
     CloudSourceParams src;

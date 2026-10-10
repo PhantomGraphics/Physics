@@ -74,6 +74,7 @@ TEST(CloudParticleTest, MixPairConservesAndStaysBounded)
 
 TEST(CloudParticleTest, ClosedMixingConservesWaterOver1000Steps)
 {
+    SKIP_IN_DEBUG_SLOW();
   CloudWaterLedger ledger;
   CloudParticleSoA soa = makeLattice(ledger);
   // Perturb a blob so there is something to mix (including cloud water).

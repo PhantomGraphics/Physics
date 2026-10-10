@@ -1,0 +1,122 @@
+{
+  "name": "49_flame_combustion_timestep",
+  "_comment": "Ignition and fuel budget stay in range at dt=1/60 and 1/120. Moved from PhysicsTest SolidCombustionTest (each took tens of seconds in Release).",
+  "tags": [
+    "flame-object",
+    "debug-slow"
+  ],
+  "steps": [
+    {
+      "command": "SetFlamePage:true",
+      "expect": "OK"
+    },
+    {
+      "command": "SetFlameRunning:false",
+      "expect": "OK"
+    },
+    {
+      "command": "SetFlameParam:timeStep,0.0166667",
+      "expect": "OK"
+    },
+    {
+      "command": "FlameCombustionPreset:2",
+      "expect": "OK"
+    },
+    {
+      "command": "GetFlameStat:count",
+      "store_as": "count"
+    },
+    {
+      "command": "FlameStep:60",
+      "expect": "OK"
+    },
+    {
+      "command": "StopFlameSource",
+      "expect": "OK"
+    },
+    {
+      "command": "FlameStep:120",
+      "expect": "OK"
+    },
+    {
+      "command": "GetFlameBodyStat:0,firstIgnitionTime",
+      "expect_range": "0.13,0.27"
+    },
+    {
+      "command": "GetFlameBodyStat:0,pyrolyzed",
+      "expect_range": "0.000001,0.012"
+    },
+    {
+      "command": "GetFlameBodyStat:1,pyrolyzed",
+      "expect_range": "0,0.012"
+    },
+    {
+      "command": "GetFlameStat:count",
+      "expect": "${count}"
+    },
+    {
+      "command": "GetFlameStat:nanCount",
+      "expect_range": "0,0"
+    },
+    {
+      "command": "GetFlameStat:fuelBalanceError",
+      "expect_range": "-2e-7,2e-7"
+    },
+    {
+      "command": "SetFlameParam:timeStep,0.00833333",
+      "expect": "OK"
+    },
+    {
+      "command": "FlameCombustionPreset:2",
+      "expect": "OK"
+    },
+    {
+      "command": "GetFlameStat:count",
+      "store_as": "count"
+    },
+    {
+      "command": "FlameStep:120",
+      "expect": "OK"
+    },
+    {
+      "command": "StopFlameSource",
+      "expect": "OK"
+    },
+    {
+      "command": "FlameStep:240",
+      "expect": "OK"
+    },
+    {
+      "command": "GetFlameBodyStat:0,firstIgnitionTime",
+      "expect_range": "0.13,0.27"
+    },
+    {
+      "command": "GetFlameBodyStat:0,pyrolyzed",
+      "expect_range": "0.000001,0.012"
+    },
+    {
+      "command": "GetFlameBodyStat:1,pyrolyzed",
+      "expect_range": "0,0.012"
+    },
+    {
+      "command": "GetFlameStat:count",
+      "expect": "${count}"
+    },
+    {
+      "command": "GetFlameStat:nanCount",
+      "expect_range": "0,0"
+    },
+    {
+      "command": "GetFlameStat:fuelBalanceError",
+      "expect_range": "-2e-7,2e-7"
+    },
+    {
+      "command": "SetFlameParam:timeStep,0.0166667",
+      "expect": "OK"
+    },
+    {
+      "command": "SetFlamePage:false",
+      "expect": "OK"
+    }
+  ]
+}
