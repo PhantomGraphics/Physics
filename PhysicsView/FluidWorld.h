@@ -155,9 +155,14 @@ public:
     // neither (no CPU solver instance to register with) -- these calls are a
     // silent no-op for it, so callers should check supportsOneWayCoupling()/
     // supportsTwoWayCoupling() before relying on registration having taken effect.
+    // Prefer remove*() over clear*(): clear*() also drops registrations made by
+    // other owners (the mesh boundary, other couplings). add*() ignores nullptr
+    // and duplicates (ISPHSolver's registration contract).
     void addRigidBoundary(Phantom::Physics::RigidBoundary* b);
+    bool removeRigidBoundary(Phantom::Physics::RigidBoundary* b);
     void clearRigidBoundaries();
     void addRigidBoundaryParticles(Phantom::Physics::RigidBoundaryParticles* p);
+    bool removeRigidBoundaryParticles(Phantom::Physics::RigidBoundaryParticles* p);
     void clearRigidBoundaryParticles();
     bool supportsOneWayCoupling() const { return type_ != SimulationType::GPU_CSPH; }
     // Delegates to the active ISPHSolver instead of a type_ switch (WCSPH

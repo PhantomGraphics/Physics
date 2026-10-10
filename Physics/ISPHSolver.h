@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <vector>
 #include <memory>
 
@@ -194,11 +195,30 @@ public:
 	/** @brief Returns particle densities in the same order as positions. */
 	virtual std::vector<float> getParticleDensities() const = 0;
 
+	// ---- Boundary registration lifetime contract -------------------------
+	// Every pointer given to add*() is NON-OWNING. The registrant must call the
+	// matching remove*() (or clear*()) before the pointee dies, and a pointee
+	// must not be destroyed while a solver can still step. add*() ignores
+	// nullptr and a pointer that is already registered (no duplicates, so a
+	// boundary can never be applied twice per step); remove*() drops exactly
+	// that pointer and returns whether it was registered. clear*() drops every
+	// registration, including ones made by other owners -- prefer remove*()
+	// unless you own the whole list (PhysicsSolver and FluidWorld use remove*()
+	// so that each owner only unregisters its own entries). Solvers that do not
+	// support a kind of boundary keep the no-op defaults (add ignored, remove
+	// returns false, count 0).
+
 	/**
 	 * @brief Registers a rigid-body boundary for One-Way SDF penalty coupling.
-	 * @param b Non-owning pointer to the boundary; must outlive the solver.
+	 * @param b Non-owning pointer to the boundary; must outlive its registration.
 	 */
 	virtual void addRigidBoundary(RigidBoundary* b) = 0;
+
+	/** @brief Unregisters one rigid-body boundary. @return true if it was registered. */
+	virtual bool removeRigidBoundary(RigidBoundary* b) { (void)b; return false; }
+
+	/** @brief Number of registered rigid-body boundaries. */
+	virtual size_t getRigidBoundaryCount() const { return 0; }
 
 	/** @brief Removes all registered rigid-body boundaries. */
 	virtual void clearRigidBoundaries() = 0;
@@ -209,6 +229,12 @@ public:
 	 * @param r Non-owning pointer; must outlive the solver.
 	 */
 	virtual void addRigidBoundaryParticles(RigidBoundaryParticles* r) { (void)r; }
+
+	/** @brief Unregisters one rigid boundary particle set. @return true if it was registered. */
+	virtual bool removeRigidBoundaryParticles(RigidBoundaryParticles* r) { (void)r; return false; }
+
+	/** @brief Number of registered rigid boundary particle sets. */
+	virtual size_t getRigidBoundaryParticlesCount() const { return 0; }
 
 	/** @brief Removes all registered Two-Way rigid-body boundary particle sets. No-op where unsupported. */
 	virtual void clearRigidBoundaryParticles() {}
@@ -225,6 +251,12 @@ public:
 	 * @param s Non-owning pointer; must outlive the solver.
 	 */
 	virtual void addSoftBoundaryParticles(SoftBoundaryParticles* s) { (void)s; }
+
+	/** @brief Unregisters one SoftBody boundary particle set. @return true if it was registered. */
+	virtual bool removeSoftBoundaryParticles(SoftBoundaryParticles* s) { (void)s; return false; }
+
+	/** @brief Number of registered SoftBody boundary particle sets. */
+	virtual size_t getSoftBoundaryParticlesCount() const { return 0; }
 
 	/** @brief Removes all registered SoftBody boundary particle sets. No-op where unsupported. */
 	virtual void clearSoftBoundaryParticles() {}

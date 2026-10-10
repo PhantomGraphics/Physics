@@ -12,6 +12,7 @@
 #include "SoftBoundaryParticles.h"
 #include "IBoundaryParticles.h"
 #include "ISPHSolver.h"
+#include "BoundaryRegistry.h"
 #include "WCSPHParticle.h"
 #include <vector>
 
@@ -160,7 +161,9 @@ public:
 	 * @brief Registers a rigid-body boundary for One-Way SDF penalty coupling.
 	 * @param b Non-owning pointer to the boundary; must outlive the solver.
 	 */
-	void addRigidBoundary(RigidBoundary* b) override { rigidBoundaries_.push_back(b); }
+	void addRigidBoundary(RigidBoundary* b) override { registerBoundary(rigidBoundaries_, b); }
+	bool removeRigidBoundary(RigidBoundary* b) override { return unregisterBoundary(rigidBoundaries_, b); }
+	size_t getRigidBoundaryCount() const override { return rigidBoundaries_.size(); }
 
 	/** @brief Removes all registered rigid-body boundaries. */
 	void clearRigidBoundaries() override { rigidBoundaries_.clear(); }
@@ -181,7 +184,9 @@ public:
 	 * @brief Registers a rigid-body boundary particle set for Two-Way (Track B) coupling.
 	 * @param r Non-owning pointer; must outlive the solver.
 	 */
-	void addRigidBoundaryParticles(RigidBoundaryParticles* r) override { rigidBoundaryParticles_.push_back(r); }
+	void addRigidBoundaryParticles(RigidBoundaryParticles* r) override { registerBoundary(rigidBoundaryParticles_, r); }
+	bool removeRigidBoundaryParticles(RigidBoundaryParticles* r) override { return unregisterBoundary(rigidBoundaryParticles_, r); }
+	size_t getRigidBoundaryParticlesCount() const override { return rigidBoundaryParticles_.size(); }
 
 	/** @brief Removes all registered Two-Way rigid-body boundary particle sets. */
 	void clearRigidBoundaryParticles() override { rigidBoundaryParticles_.clear(); }
@@ -190,7 +195,9 @@ public:
 	 * @brief Registers a SoftBody boundary particle set for Two-Way coupling.
 	 * @param s Non-owning pointer; must outlive the solver.
 	 */
-	void addSoftBoundaryParticles(SoftBoundaryParticles* s) override { softBoundaryParticles_.push_back(s); }
+	void addSoftBoundaryParticles(SoftBoundaryParticles* s) override { registerBoundary(softBoundaryParticles_, s); }
+	bool removeSoftBoundaryParticles(SoftBoundaryParticles* s) override { return unregisterBoundary(softBoundaryParticles_, s); }
+	size_t getSoftBoundaryParticlesCount() const override { return softBoundaryParticles_.size(); }
 
 	/** @brief Removes all registered SoftBody boundary particle sets. */
 	void clearSoftBoundaryParticles() override { softBoundaryParticles_.clear(); }

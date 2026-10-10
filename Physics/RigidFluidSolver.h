@@ -90,6 +90,9 @@ public:
     /** @brief Returns all registered bindings. */
     const std::deque<RigidFluidBinding>& getBindings() const { return bindings_; }
 
+    /** @brief Mutable access, e.g. to pass &binding.boundary to ISPHSolver::remove*() before clearBindings(). */
+    std::deque<RigidFluidBinding>& getBindings() { return bindings_; }
+
     /**
      * @brief Refreshes every binding's RigidBoundary/particles pose from its
      * RigidBody and clears Two-Way accumForce. Call once per step, before

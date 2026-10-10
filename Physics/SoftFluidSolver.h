@@ -63,6 +63,9 @@ public:
     /** @brief Returns all registered bindings. */
     const std::deque<SoftFluidBinding>& getBindings() const { return bindings_; }
 
+    /** @brief Mutable access, e.g. to pass &binding.particles to ISPHSolver::remove*() before clearBindings(). */
+    std::deque<SoftFluidBinding>& getBindings() { return bindings_; }
+
     /**
      * @brief Refreshes every binding's boundary-particle world positions and
      * recomputes psi, and clears accumForce. Call once per step, before

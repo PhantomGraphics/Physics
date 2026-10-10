@@ -316,14 +316,17 @@ void FluidWorld::setCouplingMode(CouplingMode mode)
 
 void FluidWorld::teardownCoupling()
 {
-    physicsSolver_.rigidFluidSolver().clearBindings();
-    clearRigidBoundaries();
-    clearRigidBoundaryParticles();
-    // clearRigidBoundaries() above is a blanket clear on the solver (no
-    // selective-remove API exists -- see ISPHSolver::clearRigidBoundaries()'s
-    // doc comment), so it also drops meshBoundary_'s registration even though
-    // the mesh boundary is independent of rigid-fluid coupling. Restore it.
-    reregisterMeshBoundary();
+    // Unregister exactly the entries this coupling made (before the bindings that
+    // own them are destroyed). Other registrations on the solver -- the mesh
+    // boundary in particular -- are untouched, so nothing has to be re-added.
+    auto& rfw = physicsSolver_.rigidFluidSolver();
+    if (fluidSolver_) {
+        for (auto& binding : rfw.getBindings()) {
+            fluidSolver_->removeRigidBoundary(&binding.boundary);
+            fluidSolver_->removeRigidBoundaryParticles(&binding.particles);
+        }
+    }
+    rfw.clearBindings();
 }
 
 void FluidWorld::refreshCoupling()
@@ -389,8 +392,12 @@ void FluidWorld::setSoftCouplingEnabled(bool v)
 
 void FluidWorld::teardownSoftCoupling()
 {
-    if (softWorld_) physicsSolver_.softFluidSolver().clearBindings();
-    clearSoftBoundaryParticles();
+    auto& sfw = physicsSolver_.softFluidSolver();
+    if (fluidSolver_) {
+        for (auto& binding : sfw.getBindings())
+            fluidSolver_->removeSoftBoundaryParticles(&binding.particles);
+    }
+    if (softWorld_) sfw.clearBindings();
 }
 
 void FluidWorld::refreshSoftCoupling()
@@ -478,12 +485,20 @@ void FluidWorld::addRigidBoundary(RigidBoundary* b) {
     if (fluidSolver_) fluidSolver_->addRigidBoundary(b);
 }
 
+bool FluidWorld::removeRigidBoundary(RigidBoundary* b) {
+    return fluidSolver_ && fluidSolver_->removeRigidBoundary(b);
+}
+
 void FluidWorld::clearRigidBoundaries() {
     if (fluidSolver_) fluidSolver_->clearRigidBoundaries();
 }
 
 void FluidWorld::addRigidBoundaryParticles(RigidBoundaryParticles* p) {
     if (fluidSolver_) fluidSolver_->addRigidBoundaryParticles(p);
+}
+
+bool FluidWorld::removeRigidBoundaryParticles(RigidBoundaryParticles* p) {
+    return fluidSolver_ && fluidSolver_->removeRigidBoundaryParticles(p);
 }
 
 void FluidWorld::clearRigidBoundaryParticles() {
@@ -519,10 +534,10 @@ bool FluidWorld::loadMeshBoundary(const std::filesystem::path& stlPath, float vo
 
 void FluidWorld::clearMeshBoundary()
 {
-    // No selective-remove API on ISPHSolver (see teardownCoupling()'s comment) --
-    // clearing the shape makes getBoundaryForce() a permanent no-op instead
-    // (RigidBoundary::getBoundaryForce() returns zero when shape_ == nullptr),
-    // so the still-registered meshBoundary_ pointer stays harmless.
+    // Unregister first, then drop the shape (a boundary without a shape is a
+    // no-op anyway, so a stale registration could never have hurt, but the
+    // solver should not keep a pointer it has no use for).
+    if (fluidSolver_) fluidSolver_->removeRigidBoundary(&meshBoundary_);
     meshBoundary_.setShape(nullptr);
     meshBoundaryShape_.reset();
     syncComponents();

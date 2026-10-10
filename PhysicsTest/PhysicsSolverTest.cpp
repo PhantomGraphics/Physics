@@ -5,6 +5,7 @@
 #include "../Physics/DFSPHParticle.h"
 #include "../Physics/DFSPHSolver.h"
 #include "PhysicsFluidFactory.h"
+#include <algorithm>
 #include <cmath>
 
 using namespace Phantom::Physics;
@@ -18,7 +19,16 @@ public:
     std::vector<RigidBoundary*> boundaries;
     std::vector<RigidBoundaryParticles*> rigidParticles;
     std::vector<SoftBoundaryParticles*> softParticles;
+    static bool erase(auto& list, auto* p) {
+        const auto it = std::find(list.begin(), list.end(), p);
+        if (it == list.end()) return false;
+        list.erase(it);
+        return true;
+    }
     void addRigidBoundary(RigidBoundary* p) override { boundaries.push_back(p); }
+    bool removeRigidBoundary(RigidBoundary* p) override { return erase(boundaries, p); }
+    bool removeRigidBoundaryParticles(RigidBoundaryParticles* p) override { return erase(rigidParticles, p); }
+    bool removeSoftBoundaryParticles(SoftBoundaryParticles* p) override { return erase(softParticles, p); }
     void clearRigidBoundaries() override { boundaries.clear(); }
     void addRigidBoundaryParticles(RigidBoundaryParticles* p) override { rigidParticles.push_back(p); }
     void clearRigidBoundaryParticles() override { rigidParticles.clear(); }

@@ -1,28 +1,68 @@
 #include "pch.h"
 #include "PhysicsSolver.h"
 
+#include <algorithm>
+
 namespace Phantom {
 namespace Physics {
+
+namespace {
+template <class T>
+bool contains(const std::vector<T*>& list, const T* p)
+{
+    return std::find(list.begin(), list.end(), p) != list.end();
+}
+template <class T>
+bool erase(std::vector<T*>& list, const T* p)
+{
+    const auto it = std::find(list.begin(), list.end(), p);
+    if (it == list.end()) return false;
+    list.erase(it);
+    return true;
+}
+} // namespace
 
 void PhysicsSolver::setFluidSolver(ISPHSolver* solver)
 {
     if (solver == fluidSolver_) return;
-    if (fluidSolver_) {
-        fluidSolver_->clearRigidBoundaries();
-        fluidSolver_->clearRigidBoundaryParticles();
-        fluidSolver_->clearSoftBoundaryParticles();
-    }
+    detachFromFluid();
     fluidSolver_ = solver;
-    softFluidKernel_ = solver ? solver->getKernel() : nullptr;
-    softFluidRestDensity_ = solver ? solver->getRestDensity() : 0.f;
-    if (!solver) return;
-    for (auto* boundary : rigidBoundaries_) solver->addRigidBoundary(boundary);
+    attachToFluid();
+}
+
+void PhysicsSolver::resyncFluidRegistrations()
+{
+    attachToFluid();
+}
+
+// Removes only the entries this object registered; entries registered on the
+// solver by other owners stay.
+void PhysicsSolver::detachFromFluid()
+{
+    if (!fluidSolver_) return;
+    for (auto* boundary : rigidBoundaries_) fluidSolver_->removeRigidBoundary(boundary);
+    for (auto* particles : rigidParticles_) fluidSolver_->removeRigidBoundaryParticles(particles);
+    for (auto* particles : softParticles_) fluidSolver_->removeSoftBoundaryParticles(particles);
+}
+
+// Single path used for the first attach, for a fluid switch and for a resync:
+// refresh what depends on the fluid (kernel / rest density, psi, stale reaction
+// forces), then register. Registration is idempotent.
+void PhysicsSolver::attachToFluid()
+{
+    softFluidKernel_      = fluidSolver_ ? fluidSolver_->getKernel() : nullptr;
+    softFluidRestDensity_ = fluidSolver_ ? fluidSolver_->getRestDensity() : 0.f;
+    if (!fluidSolver_) return;
+    for (auto* boundary : rigidBoundaries_) fluidSolver_->addRigidBoundary(boundary);
     for (auto* particles : rigidParticles_) {
         if (softFluidKernel_) particles->computePsi(*softFluidKernel_, softFluidRestDensity_);
         particles->clearAccumForce();
-        solver->addRigidBoundaryParticles(particles);
+        fluidSolver_->addRigidBoundaryParticles(particles);
     }
-    for (auto* particles : softParticles_) solver->addSoftBoundaryParticles(particles);
+    for (auto* particles : softParticles_) {
+        particles->clearAccumForce();
+        fluidSolver_->addSoftBoundaryParticles(particles);
+    }
 }
 
 RigidFluidBinding& PhysicsSolver::bindRigidBody(RigidBody* body, ICollisionShape* shape, CouplingMode mode)
@@ -34,33 +74,56 @@ RigidFluidBinding& PhysicsSolver::bindRigidBody(RigidBody* body, ICollisionShape
 
 void PhysicsSolver::clearRigidBodyBindings()
 {
-    clearRigidBoundaries();
-    clearRigidBoundaryParticles();
+    // Unregister before the bindings (which own the registered objects) die.
+    if (fluidSolver_) {
+        for (auto* boundary : rigidBoundaries_) fluidSolver_->removeRigidBoundary(boundary);
+        for (auto* particles : rigidParticles_) fluidSolver_->removeRigidBoundaryParticles(particles);
+    }
+    rigidBoundaries_.clear();
+    rigidParticles_.clear();
     rigidFluid_.clearBindings();
 }
 
-void PhysicsSolver::addRigidBoundary(RigidBoundary* b)
+bool PhysicsSolver::addRigidBoundary(RigidBoundary* b)
 {
+    if (b == nullptr || contains(rigidBoundaries_, b)) return false;
     rigidBoundaries_.push_back(b);
     if (fluidSolver_) fluidSolver_->addRigidBoundary(b);
+    return true;
 }
 
-void PhysicsSolver::clearRigidBoundaries()
+bool PhysicsSolver::removeRigidBoundary(RigidBoundary* b)
 {
-    rigidBoundaries_.clear();
-    if (fluidSolver_) fluidSolver_->clearRigidBoundaries();
+    if (!erase(rigidBoundaries_, b)) return false;
+    if (fluidSolver_) fluidSolver_->removeRigidBoundary(b);
+    return true;
 }
 
-void PhysicsSolver::addRigidBoundaryParticles(RigidBoundaryParticles* p)
+bool PhysicsSolver::addRigidBoundaryParticles(RigidBoundaryParticles* p)
 {
+    if (p == nullptr || contains(rigidParticles_, p)) return false;
     rigidParticles_.push_back(p);
-    if (fluidSolver_) fluidSolver_->addRigidBoundaryParticles(p);
+    if (fluidSolver_) {
+        if (softFluidKernel_) p->computePsi(*softFluidKernel_, softFluidRestDensity_);
+        p->clearAccumForce();
+        fluidSolver_->addRigidBoundaryParticles(p);
+    }
+    return true;
+}
+
+bool PhysicsSolver::removeRigidBoundaryParticles(RigidBoundaryParticles* p)
+{
+    if (!erase(rigidParticles_, p)) return false;
+    if (fluidSolver_) fluidSolver_->removeRigidBoundaryParticles(p);
+    return true;
 }
 
 void PhysicsSolver::clearRigidBoundaryParticles()
 {
+    if (fluidSolver_) {
+        for (auto* particles : rigidParticles_) fluidSolver_->removeRigidBoundaryParticles(particles);
+    }
     rigidParticles_.clear();
-    if (fluidSolver_) fluidSolver_->clearRigidBoundaryParticles();
 }
 
 SoftFluidBinding& PhysicsSolver::bindSoftBody(ISoftBody* body)
@@ -73,7 +136,9 @@ SoftFluidBinding& PhysicsSolver::bindSoftBody(ISoftBody* body)
 
 void PhysicsSolver::clearSoftBodyBindings()
 {
-    if (fluidSolver_) fluidSolver_->clearSoftBoundaryParticles();
+    if (fluidSolver_) {
+        for (auto* particles : softParticles_) fluidSolver_->removeSoftBoundaryParticles(particles);
+    }
     softParticles_.clear();
     softFluid_.clearBindings();
 }
