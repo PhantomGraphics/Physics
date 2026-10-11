@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include "FlameWorld.h"
+#include "CommandParse.h"
 #include "RigidBodyWorld.h"
 
 #include "../Physics/FlameStats.h"
@@ -17,17 +18,8 @@ namespace Phantom {
 
 namespace {
 
-bool parseFloat(std::string_view sv, float& out)
-{
-	auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
-	return ec == std::errc{} && ptr == sv.data() + sv.size() && std::isfinite(out);
-}
-
-bool parseInt(std::string_view sv, int& out)
-{
-	auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
-	return ec == std::errc{} && ptr == sv.data() + sv.size();
-}
+using CommandParse::parseFloat;
+using CommandParse::parseInt;
 
 std::string formatFloat(float v)
 {

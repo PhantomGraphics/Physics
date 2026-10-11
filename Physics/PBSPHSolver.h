@@ -11,6 +11,7 @@
 #include "PlateBoundary.h"
 #include "CylinderBoundary.h"
 #include "IShapeBoundary.h"
+#include "ShapeBoundarySet.h"
 #include "RigidBoundary.h"
 #include "RigidBoundaryParticles.h"
 #include "SoftBoundaryParticles.h"
@@ -89,7 +90,7 @@ public:
 	 */
 	void setBoundary(const Math::Box3df& box, const float timeStep) override {
 		this->boundaryTimeStep = timeStep;
-		this->boundaryPlanes_ = ownShapeBoundaries(makeBoxPlaneBoundaries(box));
+		shapeBoundaries_.setBox(box);
 	}
 
 	/**
@@ -99,7 +100,7 @@ public:
 	 */
 	void setBoundaryPlanes(std::vector<PlaneBoundary> planes, const float timeStep) override {
 		this->boundaryTimeStep = timeStep;
-		this->boundaryPlanes_ = ownShapeBoundaries(std::move(planes));
+		shapeBoundaries_.setPlanes(std::move(planes));
 	}
 
 	/**
@@ -110,7 +111,7 @@ public:
 	 */
 	void setBoundarySpheres(std::vector<SphereBoundary> spheres, const float timeStep) override {
 		this->boundaryTimeStep = timeStep;
-		this->boundarySpheres_ = ownShapeBoundaries(std::move(spheres));
+		shapeBoundaries_.setSpheres(std::move(spheres));
 	}
 
 	/**
@@ -121,11 +122,11 @@ public:
 	 */
 	void setBoundaryPlates(std::vector<PlateBoundary> plates, const float timeStep) override {
 		this->boundaryTimeStep = timeStep;
-		this->boundaryPlates_ = ownShapeBoundaries(std::move(plates));
+		shapeBoundaries_.setPlates(std::move(plates));
 	}
 	void setBoundaryCylinders(std::vector<CylinderBoundary> cylinders, const float timeStep) override {
 		this->boundaryTimeStep = timeStep;
-		this->boundaryCylinders_ = ownShapeBoundaries(std::move(cylinders));
+		shapeBoundaries_.setCylinders(std::move(cylinders));
 	}
 
 	/**
@@ -140,21 +141,17 @@ public:
 	void setShapeBoundaries(std::vector<std::shared_ptr<IShapeBoundary>> boundaries,
 	                        const float timeStep) override {
 		this->boundaryTimeStep = timeStep;
-		this->boundaryShapes_ = std::move(boundaries);
+		shapeBoundaries_.setShapes(std::move(boundaries));
 	}
 
 	/** Adds one analytic boundary without replacing those already registered. */
 	void addShapeBoundary(std::shared_ptr<IShapeBoundary> boundary) override {
-		if (boundary) boundaryShapes_.push_back(std::move(boundary));
+		shapeBoundaries_.add(std::move(boundary));
 	}
 
 	/** Clears every analytic boundary registered through typed or generic APIs. */
 	void clearShapeBoundaries() override {
-		boundaryPlanes_.clear();
-		boundarySpheres_.clear();
-		boundaryPlates_.clear();
-		boundaryCylinders_.clear();
-		boundaryShapes_.clear();
+		shapeBoundaries_.clear();
 	}
 
 	/**
@@ -338,8 +335,7 @@ private:
 
 	/** True while at least one analytic shape boundary of any kind is registered. */
 	bool hasShapeBoundaries() const {
-		return !boundaryPlanes_.empty() || !boundarySpheres_.empty() ||
-		       !boundaryPlates_.empty() || !boundaryCylinders_.empty() || !boundaryShapes_.empty();
+		return !shapeBoundaries_.empty();
 	}
 
 	void addRigidBoundaryPressure(std::vector<PBSPHParticle>& particles);
@@ -355,11 +351,7 @@ private:
 	// evaluated through the identical penalty / hard-clamp / paired
 	// density-and-constraint-gradient path (addBoundadryPressure(),
 	// clampToBoundary(), addShapeBoundaryConstraint()).
-	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlanes_;
-	std::vector<std::shared_ptr<IShapeBoundary>> boundarySpheres_;
-	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlates_;
-	std::vector<std::shared_ptr<IShapeBoundary>> boundaryCylinders_;
-	std::vector<std::shared_ptr<IShapeBoundary>> boundaryShapes_;
+	ShapeBoundarySet shapeBoundaries_;
 	// Fallback used only before setBoundary()/setBoundaryPlanes() is called
 	// (both overwrite it); see DFSPHSolver.h's identical field for the
 	// default-scene calibration note.

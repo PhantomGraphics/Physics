@@ -2,33 +2,20 @@
 #include "RigidBodyCommandDispatcher.h"
 #include "RigidBodyWorld.h"
 
-#include <charconv>
+#include "CommandParse.h"
 
 namespace Phantom {
 
 namespace {
 
-bool parseFlt(const char* begin, const char* end, float& out) {
-    auto [ptr, ec] = std::from_chars(begin, end, out);
-    return ec == std::errc{};
-}
+using CommandParse::parseFloat;
+using CommandParse::parseFloats;
+using CommandParse::parseInt;
+using CommandParse::parseIntIn;
+using CommandParse::split;
 
-bool parseInt(const char* begin, const char* end, int& out) {
-    auto [ptr, ec] = std::from_chars(begin, end, out);
-    return ec == std::errc{};
-}
-
-std::vector<std::string_view> split(std::string_view sv, char delim) {
-    std::vector<std::string_view> parts;
-    size_t start = 0;
-    while (true) {
-        size_t pos = sv.find(delim, start);
-        if (pos == std::string_view::npos) { parts.push_back(sv.substr(start)); break; }
-        parts.push_back(sv.substr(start, pos - start));
-        start = pos + 1;
-    }
-    return parts;
-}
+// Upper bound for a single "Step:N" so a typo cannot hang the viewer.
+constexpr int kMaxStepCount = 1000000;
 
 } // namespace
 
@@ -70,7 +57,7 @@ std::string RigidBodyCommandDispatcher::route(const std::string& cmd) {
 
     if (sv.rfind("GetBodyPositionY:", 0) == 0) {
         int index = -1;
-        parseInt(cmd.data() + 17, cmd.data() + cmd.size(), index);
+        if (!parseInt(sv.substr(17), index)) return "Error:bad body index";
         const auto& bodies = world_->getWorld().getBodies();
         if (index < 0 || static_cast<size_t>(index) >= bodies.size())
             return "Error:BodyIndexOutOfRange:" + std::to_string(index);
@@ -79,7 +66,7 @@ std::string RigidBodyCommandDispatcher::route(const std::string& cmd) {
 
     if (sv.rfind("GetBodyVelocityY:", 0) == 0) {
         int index = -1;
-        parseInt(cmd.data() + 17, cmd.data() + cmd.size(), index);
+        if (!parseInt(sv.substr(17), index)) return "Error:bad body index";
         const auto& bodies = world_->getWorld().getBodies();
         if (index < 0 || static_cast<size_t>(index) >= bodies.size())
             return "Error:BodyIndexOutOfRange:" + std::to_string(index);
@@ -100,15 +87,16 @@ std::string RigidBodyCommandDispatcher::route(const std::string& cmd) {
 
     if (sv.rfind("Step:", 0) == 0) {
         int n = 1;
-        parseInt(cmd.data() + 5, cmd.data() + cmd.size(), n);
+        if (!parseIntIn(sv.substr(5), 0, kMaxStepCount, n)) return "Error:bad step count";
         for (int i = 0; i < n; ++i) world_->stepForced();
         if (onWorldChanged_) onWorldChanged_();
         return "OK";
     }
 
     if (sv.rfind("SetRunning:", 0) == 0) {
-        std::string_view val = sv.substr(11);
-        world_->setRunning(val == "true" || val == "1");
+        bool on = false;
+        if (!CommandParse::parseBool(sv.substr(11), on)) return "Error:expected true|false|1|0";
+        world_->setRunning(on);
         return "OK";
     }
 
@@ -134,27 +122,22 @@ std::string RigidBodyCommandDispatcher::route(const std::string& cmd) {
     }
 
     if (sv.rfind("SetGravity:", 0) == 0) {
-        auto parts = split(sv.substr(11), ':');
-        float x = 0.f, y = -9.8f, z = 0.f;
-        if (parts.size() >= 3) {
-            parseFlt(parts[0].data(), parts[0].data() + parts[0].size(), x);
-            parseFlt(parts[1].data(), parts[1].data() + parts[1].size(), y);
-            parseFlt(parts[2].data(), parts[2].data() + parts[2].size(), z);
-        }
-        world_->getWorld().params().gravity = {x, y, z};
+        float g[3];
+        if (!parseFloats(split(sv.substr(11), ':'), 3, g)) return "Error:expected x:y:z";
+        world_->getWorld().params().gravity = {g[0], g[1], g[2]};
         return "OK";
     }
 
     if (sv.rfind("SetTimeStep:", 0) == 0) {
-        float dt = 0.016f;
-        parseFlt(cmd.data() + 12, cmd.data() + cmd.size(), dt);
+        float dt = 0.0f;
+        if (!parseFloat(sv.substr(12), dt) || dt <= 0.0f) return "Error:timeStep must be positive";
         world_->getWorld().timeStep = dt;
         return "OK";
     }
 
     if (sv.rfind("SetSolverIter:", 0) == 0) {
-        int n = 10;
-        parseInt(cmd.data() + 14, cmd.data() + cmd.size(), n);
+        int n = 0;
+        if (!parseIntIn(sv.substr(14), 1, 1000, n)) return "Error:expected an integer in [1, 1000]";
         world_->getWorld().params().solverIterations = n;
         return "OK";
     }
@@ -163,46 +146,34 @@ std::string RigidBodyCommandDispatcher::route(const std::string& cmd) {
 
     if (sv.rfind("SetBaumgarteBeta:", 0) == 0) {
         float v = 0.0f;
-        if (!parseFlt(cmd.data() + 17, cmd.data() + cmd.size(), v)) return "Error:bad float";
+        if (!parseFloat(sv.substr(17), v)) return "Error:bad float";
         world_->getWorld().params().baumgarteBeta = v;
         return "OK";
     }
 
     if (sv.rfind("AddSphere:", 0) == 0) {
-        auto parts = split(sv.substr(10), ':');
-        float px = 0.f, py = 3.f, pz = 0.f, r = 0.5f, mass = 1.f;
-        if (parts.size() >= 5) {
-            parseFlt(parts[0].data(), parts[0].data() + parts[0].size(), px);
-            parseFlt(parts[1].data(), parts[1].data() + parts[1].size(), py);
-            parseFlt(parts[2].data(), parts[2].data() + parts[2].size(), pz);
-            parseFlt(parts[3].data(), parts[3].data() + parts[3].size(), r);
-            parseFlt(parts[4].data(), parts[4].data() + parts[4].size(), mass);
-        }
-        world_->addSphere({px, py, pz}, r, mass);
+        float v[5];  // px, py, pz, radius, mass
+        if (!parseFloats(split(sv.substr(10), ':'), 5, v)) return "Error:expected px:py:pz:radius:mass";
+        if (v[3] <= 0.0f) return "Error:radius must be positive";
+        if (v[4] < 0.0f) return "Error:mass must be non-negative (0 = static)";
+        world_->addSphere({v[0], v[1], v[2]}, v[3], v[4]);
         if (onWorldChanged_) onWorldChanged_();
         return "OK";
     }
 
     if (sv.rfind("AddBox:", 0) == 0) {
-        auto parts = split(sv.substr(7), ':');
-        float px = 0.f, py = 3.f, pz = 0.f, hx = 0.5f, hy = 0.5f, hz = 0.5f, mass = 1.f;
-        if (parts.size() >= 7) {
-            parseFlt(parts[0].data(), parts[0].data() + parts[0].size(), px);
-            parseFlt(parts[1].data(), parts[1].data() + parts[1].size(), py);
-            parseFlt(parts[2].data(), parts[2].data() + parts[2].size(), pz);
-            parseFlt(parts[3].data(), parts[3].data() + parts[3].size(), hx);
-            parseFlt(parts[4].data(), parts[4].data() + parts[4].size(), hy);
-            parseFlt(parts[5].data(), parts[5].data() + parts[5].size(), hz);
-            parseFlt(parts[6].data(), parts[6].data() + parts[6].size(), mass);
-        }
-        world_->addBox({px, py, pz}, {hx, hy, hz}, mass);
+        float v[7];  // px, py, pz, hx, hy, hz, mass
+        if (!parseFloats(split(sv.substr(7), ':'), 7, v)) return "Error:expected px:py:pz:hx:hy:hz:mass";
+        if (v[3] <= 0.0f || v[4] <= 0.0f || v[5] <= 0.0f) return "Error:half extents must be positive";
+        if (v[6] < 0.0f) return "Error:mass must be non-negative (0 = static)";
+        world_->addBox({v[0], v[1], v[2]}, {v[3], v[4], v[5]}, v[6]);
         if (onWorldChanged_) onWorldChanged_();
         return "OK";
     }
 
     if (sv.rfind("AddFloor:", 0) == 0) {
         float y = 0.f;
-        parseFlt(cmd.data() + 9, cmd.data() + cmd.size(), y);
+        if (!parseFloat(sv.substr(9), y)) return "Error:bad float";
         world_->addFloor(y);
         if (onWorldChanged_) onWorldChanged_();
         return "OK";

@@ -2,6 +2,8 @@
 
 #include "CGLib/Math/Box3d.h"
 
+#include <vector>
+
 namespace Phantom {
 	namespace Physics {
 
@@ -19,5 +21,36 @@ struct OutflowRegion {
 	Math::Box3df bounds;
 };
 
+/**
+ * @brief Deletes every particle whose position lies inside any region (swap-and-pop, so the
+ * order of the survivors is not preserved) -- the loop shared by the three fluids'
+ * removeOutflowParticles(). A no-op for an empty region list.
+ *
+ * @tparam SoA Particle storage exposing `positions`, `size()` and `swapAndPop(i)`.
+ */
+template <class SoA>
+void removeParticlesInRegions(const std::vector<OutflowRegion>& regions, SoA& particles)
+{
+	if (regions.empty()) {
+		return;
+	}
+
+	for (size_t i = 0; i < particles.size();) {
+		const Math::Vector3df& pos = particles.positions[i];
+		bool remove = false;
+		for (const auto& r : regions) {
+			if (r.bounds.contains(pos, 0.0f)) {
+				remove = true;
+				break;
+			}
+		}
+
+		if (remove) {
+			particles.swapAndPop(i);
+			continue;
+		}
+		++i;
+	}
+}
 	}
 }

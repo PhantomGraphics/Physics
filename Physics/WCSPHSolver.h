@@ -4,6 +4,7 @@
 #include "CGLib/Math/Box3d.h"
 #include "CGLib/Util/UnCopyable.h"
 #include "PlaneBoundary.h"
+#include "ShapeBoundarySet.h"
 #include "SphereBoundary.h"
 #include "PlateBoundary.h"
 #include "CylinderBoundary.h"
@@ -76,7 +77,7 @@ public:
 	 */
 	void setBoundary(const Math::Box3df& box, const float timeStep) override {
 		(void)timeStep;
-		this->boundaryPlanes_ = ownShapeBoundaries(makeBoxPlaneBoundaries(box));
+		shapeBoundaries_.setBox(box);
 	}
 
 	/**
@@ -95,7 +96,7 @@ public:
 	 */
 	void setBoundaryPlanes(std::vector<PlaneBoundary> planes, const float timeStep) override {
 		(void)timeStep;
-		this->boundaryPlanes_ = ownShapeBoundaries(std::move(planes));
+		shapeBoundaries_.setPlanes(std::move(planes));
 	}
 
 	/**
@@ -113,43 +114,43 @@ public:
 	 */
 	void setBoundarySpheres(std::vector<SphereBoundary> spheres, const float timeStep) override {
 		(void)timeStep;
-		this->boundarySpheres_ = ownShapeBoundaries(std::move(spheres));
+		shapeBoundaries_.setSpheres(std::move(spheres));
 	}
 
 	/**
 	 * @brief Sets additional finite-plate container walls (see ISPHSolver's
-	 * doc comment). Held by value -- like boundarySpheres_, the Python side
-	 * does not have to keep the list alive. Same reason as boundarySpheres_
+	 * doc comment). Held by value -- like the sphere list, the Python side
+	 * does not have to keep the list alive. Same reason as the sphere list
 	 * for why DFSPH/PBSPH do not implement this.
 	 * @param plates Finite plate boundaries; each plate's valid region is its exterior.
 	 * @param timeStep Ignored -- see setBoundaryPlanes() above.
 	 */
 	void setBoundaryPlates(std::vector<PlateBoundary> plates, const float timeStep) override {
 		(void)timeStep;
-		this->boundaryPlates_ = ownShapeBoundaries(std::move(plates));
+		shapeBoundaries_.setPlates(std::move(plates));
 	}
 	void setBoundaryCylinders(std::vector<CylinderBoundary> cylinders, const float timeStep) override {
 		(void)timeStep;
-		boundaryCylinders_ = ownShapeBoundaries(std::move(cylinders));
+		shapeBoundaries_.setCylinders(std::move(cylinders));
 	}
 
 	void setShapeBoundaries(std::vector<std::shared_ptr<IShapeBoundary>> boundaries,
 	                        const float timeStep) override {
 		(void)timeStep;
-		this->boundaryShapes_ = std::move(boundaries);
+		shapeBoundaries_.setShapes(std::move(boundaries));
 	}
 	void addShapeBoundary(std::shared_ptr<IShapeBoundary> boundary) override {
-		if (boundary) boundaryShapes_.push_back(std::move(boundary));
+		shapeBoundaries_.add(std::move(boundary));
 	}
 	void clearShapeBoundaries() override {
-		boundaryPlanes_.clear(); boundarySpheres_.clear(); boundaryPlates_.clear(); boundaryCylinders_.clear(); boundaryShapes_.clear();
+		shapeBoundaries_.clear();
 	}
 	SPHSolveStats getLastSolveStats() const override { return lastSolveStats_; }
 
 	/**
 	 * @brief Sets how much of a particle's wall-normal velocity the domain
 	 * walls absorb on contact (see ISPHSolver::setBoundaryDampingRatio()).
-	 * Applies to boundaryPlanes_, boundarySpheres_ and boundaryPlates_.
+	 * Applies to every list in shapeBoundaries_.
 	 * @param ratio Damping ratio in [0, 0.5]; 0 (default) = historical
 	 *        undamped penalty spring.
 	 */
@@ -265,11 +266,7 @@ public:
 private:
 	std::vector<WCSPHFluid*> fluids;
 	Math::Vector3df externalForce;
-	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlanes_;
-	std::vector<std::shared_ptr<IShapeBoundary>> boundarySpheres_;
-	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlates_;
-	std::vector<std::shared_ptr<IShapeBoundary>> boundaryCylinders_;
-	std::vector<std::shared_ptr<IShapeBoundary>> boundaryShapes_;
+	ShapeBoundarySet shapeBoundaries_;
 	// No boundaryTimeStep member on purpose: addBoundaryForce() uses timeStep,
 	// the step simulate() is integrating. See setBoundaryPlanes().
 	// 0 == the historical undamped penalty spring, so every existing scene
@@ -285,8 +282,7 @@ private:
 	SPHSolveStats lastSolveStats_;
 
 	/**
-	 * @brief Adds the density the domain walls (boundaryPlanes_ and
-	 * boundarySpheres_) contribute to fluid particles within one kernel
+	 * @brief Adds the density the domain walls (shapeBoundaries_) contribute to fluid particles within one kernel
 	 * support of them.
 	 *
 	 * Without this, a particle resting on a wall only ever sums the fluid

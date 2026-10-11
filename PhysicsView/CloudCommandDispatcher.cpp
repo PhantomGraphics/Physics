@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "CloudCommandDispatcher.h"
 #include "CloudWorld.h"
+#include "CommandParse.h"
 
 #include <charconv>
 #include <cmath>
@@ -15,16 +16,15 @@ namespace Phantom {
 
 namespace {
 
-bool parseDouble(std::string_view sv, double& out)
-{
-	auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
-	return ec == std::errc{} && ptr == sv.data() + sv.size() && std::isfinite(out);
-}
+using CommandParse::parseDouble;
 
 bool parseInt64(std::string_view sv, long long& out)
 {
-	auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
-	return ec == std::errc{} && ptr == sv.data() + sv.size();
+	long long v = 0;
+	const auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), v);
+	if (ec != std::errc{} || ptr != sv.data() + sv.size()) return false;
+	out = v;
+	return true;
 }
 
 std::vector<std::string_view> splitComma(std::string_view s)

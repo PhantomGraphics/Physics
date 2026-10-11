@@ -13,6 +13,7 @@
 #include "GltfSoftRenderer.h"
 #include "SSFRSettings.h"
 #include "FluidRenderer.h"
+#include "CommandParse.h"
 
 #include <glm/glm.hpp>
 
@@ -26,15 +27,29 @@ using namespace Phantom;
 
 namespace {
 
-bool parseFlt(std::string_view sv, float& out) {
-    auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
-    return ec == std::errc{};
+using CommandParse::parseBool;
+using CommandParse::parseInt;
+using CommandParse::parseIntIn;
+
+// Whole-text, finite floats only (see CommandParse.h).
+bool parseFlt(std::string_view sv, float& out) { return CommandParse::parseFloat(sv, out); }
+
+// Scalar setter values: finite, and strictly positive / non-negative.
+bool parsePositive(std::string_view sv, float& out) {
+    float v = 0.0f;
+    if (!CommandParse::parseFloat(sv, v) || !(v > 0.0f)) return false;
+    out = v;
+    return true;
+}
+bool parseNonNegative(std::string_view sv, float& out) {
+    float v = 0.0f;
+    if (!CommandParse::parseFloat(sv, v) || !(v >= 0.0f)) return false;
+    out = v;
+    return true;
 }
 
-bool parseInt(std::string_view sv, int& out) {
-    auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
-    return ec == std::errc{};
-}
+// Upper bound for a single "Step:N" so a typo cannot hang the viewer.
+constexpr int kMaxStepCount = 1000000;
 
 // SSFR anisotropic-kernel settings addressable by SetSSFRKernelParam /
 // GetSSFRKernelParam, with their accepted ranges.
@@ -239,10 +254,12 @@ std::vector<CommandInfo> CommandDispatcher::commandCatalog() const {
         {"SetFlameRigidVelocity", "", "e.g. SetFlameRigidVelocity:1,nan,0,0,0,0,0"},
         {"SetFlameRunning", "", "e.g. SetFlameRunning:false"},
         {"SetFluidBoundary", "", "e.g. SetFluidBoundary:-8:-8:-8:8:14:8"},
+        {"SetFluidBoundaryDamping", "", "e.g. SetFluidBoundaryDamping:0.35 (range [0, 0.5])"},
         {"SetFluidBounds", "", "e.g. SetFluidBounds:-2:8:-2:2:12:2"},
         {"SetFluidDensity", "", "e.g. SetFluidDensity:1.0"},
         {"SetFluidEffectLength", "", "e.g. SetFluidEffectLength:1.0"},
         {"SetFluidGravity", "", "e.g. SetFluidGravity:0:0:0"},
+        {"SetFluidMaxParticles", "", "e.g. SetFluidMaxParticles:50000"},
         {"SetFluidPressureCoeScale", "", "e.g. SetFluidPressureCoeScale:1960.0"},
         {"SetFluidRadius", "", "e.g. SetFluidRadius:0.15"},
         {"SetFluidStiffness", "", "e.g. SetFluidStiffness:0.001"},
@@ -292,7 +309,7 @@ std::vector<CommandInfo> CommandDispatcher::commandCatalog() const {
 void CommandDispatcher::stepSimulation() {
     world_->stepOnce();
     // Coupled fluid stepping already advances the soft world exactly once.
-    if (softWorld_ && !world_->isSoftCouplingEnabled()) softWorld_->stepForced();
+    if (softWorld_ && !world_->planFor(true).softOwnedByFluid) softWorld_->stepForced();
 }
 
 void CommandDispatcher::processQueue() {
@@ -430,7 +447,7 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
         // simulation regardless of SetRunning: state.
         if (softWorld_) {
             int n = 1;
-            parseInt(sv.substr(5), n);
+            if (!parseIntIn(sv.substr(5), 0, kMaxStepCount, n)) return std::string("Error:bad step count");
             for (int i = 0; i < n; ++i) softWorld_->stepForced();
         }
         return std::nullopt;
@@ -440,8 +457,8 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
         // applied to all three worlds directly (bypassing the sub-
         // dispatchers) since they don't interact. IsRunning (below) queries
         // world_ (fluid) alone, so it must be kept in sync here too.
-        std::string_view val = sv.substr(11);
-        const bool running = (val == "true" || val == "1");
+        bool running = false;
+        if (!parseBool(sv.substr(11), running)) return std::string("Error:expected true|false|1|0");
         world_->setRunning(running);
         if (rigidWorld_) rigidWorld_->setRunning(running);
         if (softWorld_)  softWorld_->setRunning(running);
@@ -533,6 +550,11 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
         for (size_t i = 0; i < 9; ++i) {
             if (!parseFlt(parts[i], vals[i])) return std::string("Error:bad float");
         }
+        if (!(vals[3] > 0.0f)) return std::string("Error:emitter radius must be positive");
+        if (vals[4] < 0.0f) return std::string("Error:emitter rate must be non-negative");
+        if (vals[8] < 0.0f) return std::string("Error:emitter speed must be non-negative");
+        if (vals[8] > 0.0f && vals[5] == 0.0f && vals[6] == 0.0f && vals[7] == 0.0f)
+            return std::string("Error:emitter direction must be non-zero");
         Phantom::Physics::Emitter e;
         e.center    = Phantom::Math::Vector3df(vals[0], vals[1], vals[2]);
         e.radius    = vals[3];
@@ -560,6 +582,8 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
         for (size_t i = 0; i < 6; ++i) {
             if (!parseFlt(parts[i], vals[i])) return std::string("Error:bad float");
         }
+        if (vals[3] < vals[0] || vals[4] < vals[1] || vals[5] < vals[2])
+            return std::string("Error:outflow region max must be >= min");
         Phantom::Physics::OutflowRegion r;
         r.bounds = Phantom::Math::Box3df(
             Phantom::Math::Vector3df(vals[0], vals[1], vals[2]),
@@ -599,13 +623,13 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
     }
     if (sv.rfind("SetFluidEffectLength:", 0) == 0) {
         float v;
-        if (!parseFlt(sv.substr(21), v)) return std::string("Error:bad float");
+        if (!parsePositive(sv.substr(21), v)) return std::string("Error:effectLength must be positive");
         world_->params().effectLength = v;
         return std::string("OK");
     }
     if (sv.rfind("SetFluidStiffness:", 0) == 0) {
         float v;
-        if (!parseFlt(sv.substr(18), v)) return std::string("Error:bad float");
+        if (!parsePositive(sv.substr(18), v)) return std::string("Error:stiffness must be positive");
         world_->params().stiffness = v;
         return std::string("OK");
     }
@@ -615,7 +639,7 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
     // pressureCoeScale * effectLength instead.
     if (sv.rfind("SetFluidPressureCoeScale:", 0) == 0) {
         float v;
-        if (!parseFlt(sv.substr(25), v)) return std::string("Error:bad float");
+        if (!parsePositive(sv.substr(25), v)) return std::string("Error:pressureCoeScale must be positive");
         world_->params().pressureCoeScale = v;
         return std::string("OK");
     }
@@ -626,19 +650,20 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
     // spray. Takes effect on the next Reset, like the other params() setters.
     if (sv.rfind("SetFluidBoundaryDamping:", 0) == 0) {
         float v;
-        if (!parseFlt(sv.substr(24), v)) return std::string("Error:bad float");
+        if (!CommandParse::parseFloatIn(sv.substr(24), 0.0f, 0.5f, v))
+            return std::string("Error:boundary damping must be in [0, 0.5]");
         world_->params().boundaryDampingRatio = v;
         return std::string("OK");
     }
     if (sv.rfind("SetFluidDensity:", 0) == 0) {
         float v;
-        if (!parseFlt(sv.substr(16), v)) return std::string("Error:bad float");
+        if (!parsePositive(sv.substr(16), v)) return std::string("Error:density must be positive");
         world_->params().density = v;
         return std::string("OK");
     }
     if (sv.rfind("SetFluidViscosity:", 0) == 0) {
         float v;
-        if (!parseFlt(sv.substr(18), v)) return std::string("Error:bad float");
+        if (!parseNonNegative(sv.substr(18), v)) return std::string("Error:viscosity must be non-negative");
         world_->params().viscosity = v;
         return std::string("OK");
     }
@@ -647,6 +672,7 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
         const auto parts = split(sv.substr(19), ',');
         float v = 0.0f;
         if (parts.size() != 2 || !parseFlt(parts[1], v)) return std::string("Error:expected name,value");
+        if (v < 0.0f) return std::string("Error:white water parameters must be non-negative");
         auto& w = world_->whiteWaterParams();
         const std::string_view n = parts[0];
         if      (n == "sprayVelThreshold")  w.sprayVelThreshold = v;
@@ -677,56 +703,48 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
     }
     if (sv.rfind("SetFluidTension:", 0) == 0) {
         float v;
-        if (!parseFlt(sv.substr(16), v)) return std::string("Error:bad float");
+        if (!parseNonNegative(sv.substr(16), v)) return std::string("Error:tension must be non-negative");
         world_->params().tension = v;
         return std::string("OK");
     }
     if (sv.rfind("SetFluidRadius:", 0) == 0) {
         float v;
-        if (!parseFlt(sv.substr(15), v)) return std::string("Error:bad float");
+        if (!parsePositive(sv.substr(15), v)) return std::string("Error:radius must be positive");
         world_->params().radius = v;
         return std::string("OK");
     }
     if (sv.rfind("SetFluidTimeStep:", 0) == 0) {
         float v;
-        if (!parseFlt(sv.substr(17), v)) return std::string("Error:bad float");
+        if (!parsePositive(sv.substr(17), v)) return std::string("Error:timeStep must be positive");
         world_->params().timeStep = v;
         return std::string("OK");
     }
     if (sv.rfind("SetFluidGravity:", 0) == 0) {
         auto parts = split(sv.substr(16), ':');
-        float x, y, z;
-        if (parts.size() < 3 ||
-            !parseFlt(parts[0], x) || !parseFlt(parts[1], y) || !parseFlt(parts[2], z)) {
-            return std::string("Error:bad SetFluidGravity args");
-        }
-        world_->params().gravity = { x, y, z };
+        float g[3];
+        if (!CommandParse::parseFloats(parts, 3, g)) return std::string("Error:bad SetFluidGravity args");
+        world_->params().gravity = { g[0], g[1], g[2] };
         return std::string("OK");
     }
     if (sv.rfind("SetFluidBounds:", 0) == 0) {
         auto parts = split(sv.substr(15), ':');
-        float xmin, ymin, zmin, xmax, ymax, zmax;
-        if (parts.size() < 6 ||
-            !parseFlt(parts[0], xmin) || !parseFlt(parts[1], ymin) || !parseFlt(parts[2], zmin) ||
-            !parseFlt(parts[3], xmax) || !parseFlt(parts[4], ymax) || !parseFlt(parts[5], zmax)) {
-            return std::string("Error:bad SetFluidBounds args");
-        }
+        float b[6];
+        if (!CommandParse::parseFloats(parts, 6, b)) return std::string("Error:bad SetFluidBounds args");
         world_->params().fluidBounds = Phantom::Math::Box3df(
-            Phantom::Math::Vector3df(xmin, ymin, zmin),
-            Phantom::Math::Vector3df(xmax, ymax, zmax));
+            Phantom::Math::Vector3df(b[0], b[1], b[2]),
+            Phantom::Math::Vector3df(b[3], b[4], b[5]));
         return std::string("OK");
     }
     if (sv.rfind("SetFluidBoundary:", 0) == 0) {
         auto parts = split(sv.substr(17), ':');
-        float xmin, ymin, zmin, xmax, ymax, zmax;
-        if (parts.size() < 6 ||
-            !parseFlt(parts[0], xmin) || !parseFlt(parts[1], ymin) || !parseFlt(parts[2], zmin) ||
-            !parseFlt(parts[3], xmax) || !parseFlt(parts[4], ymax) || !parseFlt(parts[5], zmax)) {
-            return std::string("Error:bad SetFluidBoundary args");
-        }
+        float b[6];
+        if (!CommandParse::parseFloats(parts, 6, b)) return std::string("Error:bad SetFluidBoundary args");
+        // The domain must enclose something; the seeding box (SetFluidBounds) may be
+        // degenerate on purpose (an empty seed).
+        if (!(b[0] < b[3] && b[1] < b[4] && b[2] < b[5])) return std::string("Error:bad SetFluidBoundary args");
         world_->params().boundary = Phantom::Math::Box3df(
-            Phantom::Math::Vector3df(xmin, ymin, zmin),
-            Phantom::Math::Vector3df(xmax, ymax, zmax));
+            Phantom::Math::Vector3df(b[0], b[1], b[2]),
+            Phantom::Math::Vector3df(b[3], b[4], b[5]));
         return std::string("OK");
     }
     if (cmd == "GetMaxParticlePositionY") {
@@ -920,7 +938,7 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
 
     if (sv.rfind("SetFluidMaxParticles:", 0) == 0) {
         int v;
-        if (!parseInt(sv.substr(21), v)) return std::string("Error:bad int");
+        if (!parseIntIn(sv.substr(21), 1, 100000000, v)) return std::string("Error:bad int");
         world_->params().maxParticles = v;
         return std::string("OK");
     }
@@ -946,7 +964,7 @@ std::optional<std::string> CommandDispatcher::route(const std::string& cmd) {
             return std::string("Error:bad substep count");
         for (int i = 0; i < substeps; ++i) {
             world_->stepOnce();
-            if (softWorld_ && !world_->isSoftCouplingEnabled()) softWorld_->stepForced();
+            if (softWorld_ && !world_->planFor(true).softOwnedByFluid) softWorld_->stepForced();
             if (onWorldChanged_) onWorldChanged_();
         }
         char name[32];

@@ -273,7 +273,7 @@ void CSPHSolver::addBoundaryDensity(const std::vector<CSPHParticle*>& particles)
 // than by sampling the walls with Akinci boundary particles.
 void WCSPHSolver::addBoundaryDensity(std::vector<WCSPHParticle>& particles)
 {
-	if ((boundaryPlanes_.empty() && boundarySpheres_.empty() && boundaryPlates_.empty() && boundaryCylinders_.empty() && boundaryShapes_.empty()) || particles.empty()) return;
+	if (shapeBoundaries_.empty() || particles.empty()) return;
 
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
@@ -292,19 +292,16 @@ void WCSPHSolver::addBoundaryDensity(std::vector<WCSPHParticle>& particles)
 				contribution += restDensity * poly6HalfSpaceFraction(
 					sample.densityDistance, effectLength) * sample.densityWeight;
 		};
-		for (const auto& plane : boundaryPlanes_) if (plane) addShapeDensity(*plane);
-		for (const auto& sphere : boundarySpheres_) if (sphere) addShapeDensity(*sphere);
-		// A finite plate contributes like a plane's half-space integral off its
+		// Planes, spheres, plates, cylinders, then generic shapes -- the fixed ShapeBoundarySet order.
+		// (A finite plate contributes like a plane's half-space integral off its
 		// large (normal-facing) face, but tapered toward the rim: near an edge
 		// most of that half-space is air, not solid, so handing the particle a
 		// full plane's worth would lift the water unnaturally at the weir lip
 		// (internal design notes section 3.4). Added into the
 		// same accumulator and subject to the one headroom clamp below, exactly
 		// like planes and spheres -- the clamp is what keeps overlapping plates
-		// at a 9-plate seam from summing past rest density.
-		for (const auto& plate : boundaryPlates_) if (plate) addShapeDensity(*plate);
-		for (const auto& cylinder : boundaryCylinders_) if (cylinder) addShapeDensity(*cylinder);
-		for (const auto& shape : boundaryShapes_) if (shape) addShapeDensity(*shape);
+		// at a 9-plate seam from summing past rest density.)
+		shapeBoundaries_.forEach(addShapeDensity);
 		// The wall stands in for the neighbors a particle is *missing* because
 		// the wall is where they would have been -- so it may only ever fill
 		// the deficit, never push the particle past rest density. Clamping to
@@ -335,7 +332,7 @@ void WCSPHSolver::addBoundaryDensity(std::vector<WCSPHParticle>& particles)
 }
 
 void WCSPHSolver::addBoundaryForce(std::vector<WCSPHParticle>& particles) {
-	if (boundaryPlanes_.empty() && boundarySpheres_.empty() && boundaryPlates_.empty() && boundaryCylinders_.empty() && boundaryShapes_.empty()) return;
+	if (shapeBoundaries_.empty()) return;
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
 		Vector3df force(0.0f, 0.0f, 0.0f);
@@ -349,13 +346,9 @@ void WCSPHSolver::addBoundaryForce(std::vector<WCSPHParticle>& particles) {
 			if (boundary.sample(pos, 0.0f).active)
 				force += boundary.getBoundaryForce(pos, vel, timeStep, boundaryDampingRatio_);
 		};
-		for (const auto& plane : boundaryPlanes_) if (plane) addShapeForce(*plane);
-		for (const auto& sphere : boundarySpheres_) if (sphere) addShapeForce(*sphere);
-		// isActiveAt(pos, 0) exactly bounds the plate's OBB; getBoundaryForce()
-		// still does the precise inside test, so this is only an early-out.
-		for (const auto& plate : boundaryPlates_) if (plate) addShapeForce(*plate);
-		for (const auto& cylinder : boundaryCylinders_) if (cylinder) addShapeForce(*cylinder);
-		for (const auto& shape : boundaryShapes_) if (shape) addShapeForce(*shape);
+		// isActiveAt(pos, 0) exactly bounds a plate's OBB; getBoundaryForce() still does the
+		// precise inside test, so the sample() above is only an early-out.
+		shapeBoundaries_.forEach(addShapeForce);
 		particles[i].addForce(force * particles[i].getDensity());
 	}
 }

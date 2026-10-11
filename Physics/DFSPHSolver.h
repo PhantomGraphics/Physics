@@ -13,6 +13,7 @@
 #include "SoftBoundaryParticles.h"
 #include "IBoundaryParticles.h"
 #include "ISPHSolver.h"
+#include "ShapeBoundarySet.h"
 #include "BoundaryRegistry.h"
 #include "DFSPHParticle.h"
 #include "CGLib/Space/Space/NeighborList.h"
@@ -61,7 +62,7 @@ public:
 	 */
 	void setBoundary(const Math::Box3df& box, const float timeStep) override {
 		(void)timeStep;
-		this->boundaryPlanes_ = ownShapeBoundaries(makeBoxPlaneBoundaries(box));
+		shapeBoundaries_.setBox(box);
 	}
 
 	/**
@@ -77,27 +78,27 @@ public:
 	 */
 	void setBoundaryPlanes(std::vector<PlaneBoundary> planes, const float timeStep) override {
 		(void)timeStep;
-		this->boundaryPlanes_ = ownShapeBoundaries(std::move(planes));
+		shapeBoundaries_.setPlanes(std::move(planes));
 	}
 
 	void setBoundarySpheres(std::vector<SphereBoundary> spheres, const float timeStep) override {
 		(void)timeStep;
-		boundarySpheres_ = ownShapeBoundaries(std::move(spheres));
+		shapeBoundaries_.setSpheres(std::move(spheres));
 	}
 
 	void setBoundaryPlates(std::vector<PlateBoundary> plates, const float timeStep) override {
 		(void)timeStep;
-		boundaryPlates_ = ownShapeBoundaries(std::move(plates));
+		shapeBoundaries_.setPlates(std::move(plates));
 	}
 	void setBoundaryCylinders(std::vector<CylinderBoundary> cylinders, const float timeStep) override {
 		(void)timeStep;
-		boundaryCylinders_ = ownShapeBoundaries(std::move(cylinders));
+		shapeBoundaries_.setCylinders(std::move(cylinders));
 	}
 
 	void setShapeBoundaries(std::vector<std::shared_ptr<IShapeBoundary>> boundaries,
 	                        const float timeStep) override {
 		(void)timeStep;
-		boundaryShapes_ = std::move(boundaries);
+		shapeBoundaries_.setShapes(std::move(boundaries));
 	}
 
 	/**
@@ -219,10 +220,10 @@ public:
 	void setEffectLength(const float length) override;
 
 	void addShapeBoundary(std::shared_ptr<IShapeBoundary> boundary) override {
-		if (boundary) boundaryShapes_.push_back(std::move(boundary));
+		shapeBoundaries_.add(std::move(boundary));
 	}
 	void clearShapeBoundaries() override {
-		boundaryPlanes_.clear(); boundarySpheres_.clear(); boundaryPlates_.clear(); boundaryCylinders_.clear(); boundaryShapes_.clear();
+		shapeBoundaries_.clear();
 	}
 	SPHSolveStats getLastSolveStats() const override { return lastSolveStats_; }
 
@@ -300,11 +301,7 @@ private:
 	// proportionally to the scene's length scale if radius moves away from
 	// that default (internal design notes Phase 6).
 	float maxTimeStep;
-	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlanes_;
-	std::vector<std::shared_ptr<IShapeBoundary>> boundarySpheres_;
-	std::vector<std::shared_ptr<IShapeBoundary>> boundaryPlates_;
-	std::vector<std::shared_ptr<IShapeBoundary>> boundaryCylinders_;
-	std::vector<std::shared_ptr<IShapeBoundary>> boundaryShapes_;
+	ShapeBoundarySet shapeBoundaries_;
 	// Duration requested by the current simulate() call. Used to average
 	// two-way reactions and to cap passive-wall recovery across substeps.
 	float frameTimeStep_ = 0.0f;

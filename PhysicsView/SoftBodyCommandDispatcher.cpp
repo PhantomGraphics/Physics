@@ -2,22 +2,20 @@
 #include "SoftBodyCommandDispatcher.h"
 #include "SoftBodyWorld.h"
 
-#include <charconv>
+#include "CommandParse.h"
 #include <cmath>
 
 namespace Phantom {
 
 namespace {
 
-bool parseFlt(const char* begin, const char* end, float& out) {
-    auto [ptr, ec] = std::from_chars(begin, end, out);
-    return ec == std::errc{} && ptr == end && std::isfinite(out);
-}
+using CommandParse::parseFloat;
+using CommandParse::parseInt;
+using CommandParse::parseIntIn;
+using CommandParse::parseBool;
 
-bool parseInt(const char* begin, const char* end, int& out) {
-    auto [ptr, ec] = std::from_chars(begin, end, out);
-    return ec == std::errc{} && ptr == end;
-}
+// Upper bound for a single "Step:N" so a typo cannot hang the viewer.
+constexpr int kMaxStepCount = 1000000;
 
 } // namespace
 
@@ -70,14 +68,14 @@ std::string SoftBodyCommandDispatcher::route(const std::string& cmd) {
         auto colon = rest.find(':');
         if (colon == std::string_view::npos) return "Error:missing particle index";
         int bodyIdx = 0, particleIdx = 0;
-        if (!parseInt(rest.data(), rest.data() + colon, bodyIdx)) return "Error:bad body index";
-        if (!parseInt(rest.data() + colon + 1, rest.data() + rest.size(), particleIdx)) return "Error:bad particle index";
+        if (!parseInt(rest.substr(0, colon), bodyIdx)) return "Error:bad body index";
+        if (!parseInt(rest.substr(colon + 1), particleIdx)) return "Error:bad particle index";
         return std::to_string(world_->getParticlePositionY(bodyIdx, particleIdx));
     }
 
     if (sv.rfind("GetSoftTotalVolume:", 0) == 0) {
         int bodyIdx = 0;
-        if (!parseInt(cmd.data() + 19, cmd.data() + cmd.size(), bodyIdx)) return "Error:bad body index";
+        if (!parseInt(sv.substr(19), bodyIdx)) return "Error:bad body index";
         return std::to_string(world_->getBodyTotalVolume(bodyIdx));
     }
 
@@ -86,21 +84,22 @@ std::string SoftBodyCommandDispatcher::route(const std::string& cmd) {
         auto colon = rest.find(':');
         if (colon == std::string_view::npos) return "Error:missing second body index";
         int idxA = 0, idxB = 0;
-        if (!parseInt(rest.data(), rest.data() + colon, idxA)) return "Error:bad body index A";
-        if (!parseInt(rest.data() + colon + 1, rest.data() + rest.size(), idxB)) return "Error:bad body index B";
+        if (!parseInt(rest.substr(0, colon), idxA)) return "Error:bad body index A";
+        if (!parseInt(rest.substr(colon + 1), idxB)) return "Error:bad body index B";
         return std::to_string(world_->getMinInterBodyDistance(idxA, idxB));
     }
 
     if (sv.rfind("GetSoftMinNonEdgeDistance:", 0) == 0) {
         int bodyIdx = 0;
-        if (!parseInt(cmd.data() + 26, cmd.data() + cmd.size(), bodyIdx)) return "Error:bad body index";
+        if (!parseInt(sv.substr(26), bodyIdx)) return "Error:bad body index";
         return std::to_string(world_->getMinNonEdgeDistance(bodyIdx));
     }
 
     if (sv.rfind("SetCrossBodyCollisionEnabled:", 0) == 0) {
-        std::string_view val = sv.substr(29);
+        bool on = false;
+        if (!parseBool(sv.substr(29), on)) return "Error:expected true|false|1|0";
         auto& sp = world_->getWorld().params();
-        sp.crossBodyCollisionEnabled = (val == "true" || val == "1");
+        sp.crossBodyCollisionEnabled = on;
         sp.crossBodyCollisionThickness = 0.05f;
         sp.crossBodyCollisionCellSize  = 0.1f;
         return "OK";
@@ -122,7 +121,7 @@ std::string SoftBodyCommandDispatcher::route(const std::string& cmd) {
 
     if (sv.rfind("Step:", 0) == 0) {
         int n = 1;
-        parseInt(cmd.data() + 5, cmd.data() + cmd.size(), n);
+        if (!parseIntIn(sv.substr(5), 0, kMaxStepCount, n)) return "Error:bad step count";
         world_->getWorld().setRunning(true);
         for (int i = 0; i < n; ++i) world_->step();
         world_->getWorld().setRunning(false);
@@ -131,8 +130,9 @@ std::string SoftBodyCommandDispatcher::route(const std::string& cmd) {
     }
 
     if (sv.rfind("SetRunning:", 0) == 0) {
-        std::string_view val = sv.substr(11);
-        world_->setRunning(val == "true" || val == "1");
+        bool on = false;
+        if (!parseBool(sv.substr(11), on)) return "Error:expected true|false|1|0";
+        world_->setRunning(on);
         return "OK";
     }
 
@@ -160,8 +160,9 @@ std::string SoftBodyCommandDispatcher::route(const std::string& cmd) {
     }
 
     if (sv.rfind("SetSelfCollision:", 0) == 0) {
-        std::string_view val = sv.substr(17);
-        world_->getWorld().solverParams().selfCollisionEnabled = (val == "true" || val == "1");
+        bool on = false;
+        if (!parseBool(sv.substr(17), on)) return "Error:expected true|false|1|0";
+        world_->getWorld().solverParams().selfCollisionEnabled = on;
         return "OK";
     }
 
@@ -191,12 +192,16 @@ std::string SoftBodyCommandDispatcher::route(const std::string& cmd) {
         const std::string_view name = rest.substr(0, comma);
         const std::string_view val  = rest.substr(comma + 1);
         float f = 0.0f;
-        if (!parseFlt(val.data(), val.data() + val.size(), f)) return "Error:bad value";
+        if (!parseFloat(val, f)) return "Error:bad value";
         if (name == "timeStep" && f <= 0.f) return "Error:timeStep must be positive";
+        if (name == "selfCollisionThickness" && f < 0.f) return "Error:selfCollisionThickness must be non-negative";
+        if (name == "sphereRadius" && f <= 0.f) return "Error:sphereRadius must be positive";
+        if ((name == "selfCollisionEnabled" || name == "sphereEnabled") && f != 0.0f && f != 1.0f)
+            return "Error:" + std::string(name) + " must be 0 or 1";
         int count = 0;
         if (name == "numSubsteps" || name == "numIterations") {
-            if (!parseInt(val.data(), val.data() + val.size(), count) || count <= 0)
-                return "Error:expected a positive integer";
+            if (!parseIntIn(val, 1, 1000, count))
+                return "Error:expected an integer in [1, 1000]";
         }
         auto& sp = world_->getWorld().solverParams();
         auto& wp = world_->getWorld().params();

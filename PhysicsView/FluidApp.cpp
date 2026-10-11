@@ -561,7 +561,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     // is enabled (see FluidWorld::setSoftCouplingEnabled()), in which
     // case world_.step() above already advanced it -- stepping it again
     // here would double-step it.
-    if (softRunning && !world_.isSoftCouplingEnabled()) softWorld_.step();
+    if (softRunning && !world_.planFor(false).softOwnedByFluid) softWorld_.step();
 
     if (fluidRunning) {
         if (world_.getSimulationType() == FluidWorld::SimulationType::GPU_CSPH) {

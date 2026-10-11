@@ -195,5 +195,45 @@ inline Math::Vector3df nextDiskLatticeOffset(Emitter& e, const Math::Vector3df& 
 	return offset;
 }
 
+/**
+ * @brief Runs every emitter for one step and spawns its particles -- the control flow shared by
+ * WCSPHFluid/DFSPHFluid/PBSPHFluid::updateEmitters().
+ *
+ * What stays with the caller is only what differs per particle type: how many particles exist
+ * (`particleCount`), how one is created (`create`, which may derive e.g. a mass from the emitter)
+ * and how the newest one gets its velocity (`setLastVelocity`). The order of work is part of the
+ * contract and must not change, because the RNG stream and the emitters' lattice/accumulator
+ * state depend on it: emitters in registration order; the remaining capacity
+ * (`maxParticles - particleCount()`) re-read before each emitter, emitters at capacity skipped
+ * without touching their accumulator; per particle the lattice offset, then `create`, then one
+ * jitter draw for the velocity.
+ *
+ * @param rng Engine of the owning fluid (seeded deterministically, see RandomSeed.h).
+ */
+template <class Rng, class CountFn, class CreateFn, class VelocityFn>
+void emitFromEmitters(std::vector<Emitter>& emitters, const float dt, const int maxParticles,
+	Rng& rng, CountFn particleCount, CreateFn create, VelocityFn setLastVelocity)
+{
+	std::uniform_real_distribution<float> jitterDist(-1.0f, 1.0f);
+
+	for (auto& e : emitters) {
+		const int remaining = maxParticles - static_cast<int>(particleCount());
+		if (remaining <= 0) {
+			continue;
+		}
+
+		const int n = accumulateEmission(e, dt, remaining);
+		const float dirLenSq = Math::getLengthSquared(e.direction);
+		const Math::Vector3df dir = dirLenSq > 1.0e-12f
+			? e.direction / std::sqrt(dirLenSq)
+			: Math::Vector3df(0.0f, 1.0f, 0.0f);
+
+		for (int i = 0; i < n; ++i) {
+			const Math::Vector3df pos = e.center + nextDiskLatticeOffset(e, dir);
+			create(pos, e);
+			setLastVelocity(dir * (e.speed + e.speedJitter * jitterDist(rng)));
+		}
+	}
+}
 	}
 }
