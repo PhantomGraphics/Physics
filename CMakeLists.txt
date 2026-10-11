@@ -1,37 +1,33 @@
-# Cross-platform CMake build for the Physics core library (Phantom::Physics),
-# its GoogleTest suite (PhysicsTest), and PhysicsView (Vulkan app).
+# Cross-platform CMake build for the Physics module: the core library (PhysicsCore), the
+# CPU-side world / conversion code shared by the viewer and the tests (PhysicsWorldCore), the
+# GoogleTest suite (PhysicsTest), the headless examples, and PhysicsView (Vulkan + ImGui app).
 #
-# This is a standalone CMake build, separate from the MSBuild/.vcxproj-based
-# Windows build (Physics/Physics/Physics.vcxproj + Physics/PhysicsTest/
-# PhysicsTest.vcxproj, driven by Phantom2026.sln). MathCore/SpaceCore/
-# VolumeCore/NumericsCore/VkAppBaseCore/etc. are now defined once in
-# ../cmake/PhantomCoreLibs.cmake and ../cmake/PhantomVulkanApp.cmake
-# (Phase 4 §5.4 item 1 dedup, internal design notes)
-# -- this file just calls them (PhysicsCore itself links against those
-# instead of bundling their raw sources, same behavior, cleaner) and adds
-# PhysicsTest/PhysicsView on top, so it also works standalone
-# (`cmake -S Physics -B ...`) exactly as before, and identically when
-# add_subdirectory()'d from the root CMakeLists.txt.
+# CMake is the only build system (the .vcxproj files are gone). Shared library targets
+# (MathCore, SpaceCore, VolumeCore, NumericsCore, VkAppBaseCore, ...) are defined once in
+# CGLib/cmake (PhantomCoreLibs.cmake, PhantomVulkanApp.cmake); this file calls them. It works
+# standalone (`cmake -S Physics -B ...`) and identically when add_subdirectory()'d from the
+# Phantom root CMakeLists.txt.
+#
+# Targets and what each needs:
+#   PhysicsCore       static, CPU only. Public contract for CGApp / PyFluid / examples.
+#   PhysicsWorldCore  static, CPU only, internal (not installed, not linked by CGApp). The
+#                     UI- and Vulkan-free parts of PhysicsView: the worlds (rigid, flame, cloud,
+#                     hair), glTF/wire conversion, command dispatchers without rendering.
+#                     PhysicsView and PhysicsTest link the same objects.
+#   PhysicsTest       needs GoogleTest only (so it builds with no Vulkan SDK).
+#   PhysicsView       needs the Vulkan headers + loader and GLFW; skipped with a warning
+#                     otherwise. FluidRendererCore and FluidGPUVkCore are leaf libraries only
+#                     PhysicsView links.
+#   examples/         headless programs linking PhysicsCore only (examples/README.md).
 #
 # Usage (from WSL, in a Linux-native checkout -- avoid /mnt/c/... for speed):
-#   cmake -S Physics -B Physics/build_linux \
-#       -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang \
-#       -DCMAKE_BUILD_TYPE=Debug
+#   cmake -S Physics -B Physics/build_linux #       -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang #       -DCMAKE_BUILD_TYPE=Debug
 #   cmake --build Physics/build_linux -j
 #   ctest --test-dir Physics/build_linux --output-on-failure
 #
-# PhysicsView.vcxproj's real <ProjectReference> list (verified, not the plan
-# doc's dependency sketch) is: Math, VulkanGraphics, Space, VkAppBase,
-# VkRenderer, UIWidgets, FluidRenderer, Physics, Numerics, Fluid_GPU_Vk,
-# Volume, File -- no Phantom::Scene. FluidRenderer and Fluid_GPU_Vk have NO
-# <ProjectReference> of their own (header-only include paths onto Math/
-# VulkanGraphics/imgui/glm/VMA) -- they're leaf static libs PhysicsView links.
-#
-# FlameRenderer/FlamePipeline/FlameSmokePipeline/FlamePBVRPipeline (folded in
-# from the former standalone FlameView) are self-contained point-sprite
-# pipelines, not built atop VkRenderer or SSFR -- they compile straight into
-# PhysicsView now. Flame optionally couples to static finite-fuel solids while
-# remaining independent of ISPHSolver and rigid/soft-body dynamics.
+# Flame (folded in from the former FlameView) is self-contained: point-sprite pipelines inside
+# PhysicsView, independent of ISPHSolver and rigid/soft dynamics, optionally coupled to static
+# finite-fuel solids.
 
 cmake_minimum_required(VERSION 3.20)
 
@@ -73,12 +69,44 @@ add_library(PhysicsCore STATIC ${PHYSICS_SOURCES})
 target_include_directories(PhysicsCore PRIVATE ${REPO_ROOT})
 target_link_libraries(PhysicsCore PUBLIC MathCore SpaceCore VolumeCore NumericsCore)
 
+# OpenMP is an implementation detail of the solvers (`#pragma omp` lives in .cpp files only, no
+# public header uses it), so it is not part of PhysicsCore's interface. Targets that use OpenMP
+# themselves (PhysicsTest's FlameSolverTest) link it explicitly below.
 find_package(OpenMP)
 if(OpenMP_CXX_FOUND)
-    target_link_libraries(PhysicsCore PUBLIC OpenMP::OpenMP_CXX)
+    target_link_libraries(PhysicsCore PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
 target_compile_options(PhysicsCore PRIVATE ${PHANTOM_WARN_FLAGS})
+
+# ---------------------------------------------------------------------------
+# PhysicsWorldCore -- the CPU-side part of PhysicsView, compiled once and linked by both
+# PhysicsView and PhysicsTest (previously PhysicsTest recompiled a hand-picked subset of
+# PhysicsView's .cpp files, which then had to be kept in sync by hand). No Vulkan, ImGui or GLFW:
+# the worlds, glTF / wire data builders and command dispatchers that do not draw.
+# Add a PhysicsView .cpp here (not to PhysicsView below) when it stays free of those APIs.
+# ---------------------------------------------------------------------------
+add_library(PhysicsWorldCore STATIC
+    ${PHYSICS_ROOT}/PhysicsView/PrimitiveGltf.cpp
+    ${PHYSICS_ROOT}/PhysicsView/SoftMeshGltf.cpp
+    ${PHYSICS_ROOT}/PhysicsView/SoftBodyWireData.cpp
+    ${PHYSICS_ROOT}/PhysicsView/CombustibleGltf.cpp
+    ${PHYSICS_ROOT}/PhysicsView/FlameBlackbody.cpp
+    ${PHYSICS_ROOT}/PhysicsView/FlameWorld.cpp
+    ${PHYSICS_ROOT}/PhysicsView/CloudWorld.cpp
+    ${PHYSICS_ROOT}/PhysicsView/HairWorld.cpp
+    ${PHYSICS_ROOT}/PhysicsView/HairCommandDispatcher.cpp
+    ${PHYSICS_ROOT}/PhysicsView/RigidBodyWorld.cpp
+    ${PHYSICS_ROOT}/PhysicsView/SceneComponentRegistry.cpp)
+target_include_directories(PhysicsWorldCore PRIVATE
+    ${REPO_ROOT}
+    ${CGLIB_ROOT}/ThirdParty/glm-0.9.9.8)
+target_link_libraries(PhysicsWorldCore PUBLIC PhysicsCore)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(PhysicsWorldCore PRIVATE OpenMP::OpenMP_CXX)
+endif()
+target_compile_options(PhysicsWorldCore PRIVATE ${PHANTOM_WARN_FLAGS})
+target_compile_features(PhysicsWorldCore PUBLIC cxx_std_20)
 
 # ---------------------------------------------------------------------------
 # examples/ -- headless (no Vulkan/ImGui) sample programs linking only
@@ -91,10 +119,9 @@ if(PHYSICS_BUILD_EXAMPLES)
 endif()
 
 # ---------------------------------------------------------------------------
-# PhysicsTest (GoogleTest). The whole module is C++20 (the standalone build
-# sets CMAKE_CXX_STANDARD 20 above; the Phantom root build already does and
-# CGLib's *Core targets propagate cxx_std_20), so the per-target settings
-# below only restate it.
+# PhysicsTest (GoogleTest). The whole module is C++20: the standalone build sets
+# CMAKE_CXX_STANDARD 20 above, the Phantom root build does the same, and CGLib's *Core targets
+# propagate cxx_std_20. The per-target properties below only restate it.
 # ---------------------------------------------------------------------------
 
 phantom_find_gtest()
@@ -109,53 +136,28 @@ if(PHANTOM_GTEST_FOUND)
     list(FILTER PHYSICSTEST_SOURCES EXCLUDE REGEX
         "(FluidPoolStabilityTest|WaterSphereEmitterStabilityTest|SPHScaleInvarianceTest)\\.cpp$")
 
-    # PrimitiveGltf.cpp / SoftMeshGltf.cpp / FlameBlackbody.cpp (PhysicsView) are pure logic --
-    # GltfRenderer's header-only GltfDocument/GltfAccessorBuilder + glm (+
-    # PhysicsCore's SoftMesh.h for the soft one), no Vulkan. Compiled straight
-    # into PhysicsTest so PrimitiveGltfTest.cpp / SoftMeshGltfTest.cpp can
-    # exercise them without a GltfRendererCore link
-    # (PLAN_physicsview_gltf_rendering.md Phase 2/3 / §6).
-    add_executable(PhysicsTest ${PHYSICSTEST_SOURCES}
-        ${PHYSICS_ROOT}/PhysicsView/PrimitiveGltf.cpp
-        ${PHYSICS_ROOT}/PhysicsView/SoftMeshGltf.cpp
-        ${PHYSICS_ROOT}/PhysicsView/FlameBlackbody.cpp
-        ${PHYSICS_ROOT}/PhysicsView/CloudWorld.cpp)
-    target_sources(PhysicsTest PRIVATE ${PHYSICS_ROOT}/PhysicsView/FlameWorld.cpp
-        ${PHYSICS_ROOT}/PhysicsView/RigidBodyWorld.cpp
-        ${PHYSICS_ROOT}/PhysicsView/SceneComponentRegistry.cpp)
-    target_sources(PhysicsTest PRIVATE
-        ${PHYSICS_ROOT}/PhysicsView/HairWorld.cpp
-        ${PHYSICS_ROOT}/PhysicsView/HairCommandDispatcher.cpp
-        ${PHYSICS_ROOT}/PhysicsView/SoftBodyWireData.cpp)
-    target_sources(PhysicsTest PRIVATE ${PHYSICS_ROOT}/PhysicsView/CombustibleGltf.cpp)
+    # The CPU-side PhysicsView code under test (glTF builders, worlds, hair dispatcher) comes
+    # from PhysicsWorldCore, the same objects PhysicsView links.
+    # cglib_add_test (CGLib/cmake/PhantomGTest.cmake) creates the executable, puts REPO_ROOT on
+    # the include path, links gtest_main and registers it with CTest.
+    cglib_add_test(PhysicsTest
+        SOURCES ${PHYSICSTEST_SOURCES}
+        LINK PhysicsWorldCore PhysicsCore
+        INCLUDES ${PHYSICS_ROOT}/PhysicsTest ${CGLIB_ROOT}/ThirdParty/glm-0.9.9.8)
     set_target_properties(PhysicsTest PROPERTIES
         CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS OFF
     )
-
-    target_include_directories(PhysicsTest PRIVATE
-        ${REPO_ROOT}
-        ${PHYSICS_ROOT}/PhysicsTest
-        ${CGLIB_ROOT}/ThirdParty/glm-0.9.9.8
-    )
-
-    target_link_libraries(PhysicsTest PRIVATE
-        PhysicsCore
-        GTest::gtest
-        GTest::gtest_main
-    )
-
-    target_compile_options(PhysicsTest PRIVATE ${PHANTOM_WARN_FLAGS})
-
-    include(GoogleTest)
-    gtest_discover_tests(PhysicsTest)
+    if(OpenMP_CXX_FOUND)
+        target_link_libraries(PhysicsTest PRIVATE OpenMP::OpenMP_CXX)   # FlameSolverTest uses OpenMP
+    endif()
 else()
     message(WARNING "GTest not found -- skipping PhysicsTest target")
 endif()
 
 # ---------------------------------------------------------------------------
-# PhysicsView (Vulkan/ImGui app) -- Phase 2.
+# PhysicsView (Vulkan/ImGui app).
 # ---------------------------------------------------------------------------
 
 phantom_find_vulkan_headers()
@@ -236,35 +238,24 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/VolumeRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/FluidMeshRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/RenderBackground.cpp
-    ${PHYSICS_ROOT}/PhysicsView/PrimitiveGltf.cpp
     ${PHYSICS_ROOT}/PhysicsView/GltfBodyRenderer.cpp
-    ${PHYSICS_ROOT}/PhysicsView/SoftMeshGltf.cpp
     ${PHYSICS_ROOT}/PhysicsView/GltfSoftRenderer.cpp
-    ${PHYSICS_ROOT}/PhysicsView/SceneComponentRegistry.cpp
     ${PHYSICS_ROOT}/PhysicsView/ObjectListPanel.cpp
     ${PHYSICS_ROOT}/PhysicsView/CommandDispatcher.cpp
-    ${PHYSICS_ROOT}/PhysicsView/RigidBodyWorld.cpp
     ${PHYSICS_ROOT}/PhysicsView/RigidBodyWireRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/RigidBodyCommandDispatcher.cpp
     ${PHYSICS_ROOT}/PhysicsView/SoftBodyWorld.cpp
-    ${PHYSICS_ROOT}/PhysicsView/SoftBodyWireData.cpp
     ${PHYSICS_ROOT}/PhysicsView/SoftBodyWireRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/SoftBodyCommandDispatcher.cpp
-    ${PHYSICS_ROOT}/PhysicsView/FlameWorld.cpp
     ${PHYSICS_ROOT}/PhysicsView/CombustibleRenderer.cpp
-    ${PHYSICS_ROOT}/PhysicsView/CombustibleGltf.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameCommandDispatcher.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlamePointPipeline.cpp
-    ${PHYSICS_ROOT}/PhysicsView/FlameBlackbody.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameFullscreenPass.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameHazePass.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlamePBVRPass.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameStreamBuffer.cpp
-    ${PHYSICS_ROOT}/PhysicsView/CloudWorld.cpp
     ${PHYSICS_ROOT}/PhysicsView/CloudCommandDispatcher.cpp
-    ${PHYSICS_ROOT}/PhysicsView/HairWorld.cpp
-    ${PHYSICS_ROOT}/PhysicsView/HairCommandDispatcher.cpp
     ${PHYSICS_ROOT}/PhysicsView/CloudVolumeRenderer.cpp
 )
 target_include_directories(PhysicsView PRIVATE
@@ -275,6 +266,7 @@ target_include_directories(PhysicsView PRIVATE
     ${PHYSICS_ROOT}/Physics
 )
 target_link_libraries(PhysicsView PRIVATE
+    PhysicsWorldCore
     PhysicsCore
     FluidRendererCore
     FluidGPUVkCore
@@ -339,13 +331,6 @@ if(PHYSICS_GENERATE_DEFAULT_ENVMAP)
         VERBATIM)
 endif()
 
-# FlameView (the former standalone flame-SPH viewer) was folded into PhysicsView
-# on 2026-09-08: FlameRenderer/FlamePipeline/FlameSmokePipeline/FlamePBVRPipeline
-# and the flame_*.{vert,frag} shaders moved under PhysicsView/, and FlameApp's
-# scene and commands became PhysicsView's FlameWorld + FlameCommandDispatcher.
-# FlameSolidCoupler supports static object combustion; FlameSolver deliberately
-# does not implement ISPHSolver.
-
 else()
     message(WARNING "Physics: Vulkan and/or GLFW loader not found -- PhysicsView is skipped (Physics/PhysicsTest still build). Pass -DVULKAN_LIBRARY=... -DGLFW_LIBRARY=... to enable it.")
 endif()
@@ -360,5 +345,6 @@ endif()
 include(PhantomPch)
 phantom_use_pch_headers(PhysicsCore ${PHANTOM_PCH_STL})
 phantom_use_pch_headers(PhysicsTest ${PHANTOM_PCH_GTEST})
+phantom_use_pch(PhysicsWorldCore ${PHYSICS_ROOT}/PhysicsView/pch.h)
 phantom_use_pch(FluidGPUVkCore ${PHYSICS_ROOT}/Fluid_GPU_Vk/pch.h)
 phantom_use_pch(PhysicsView    ${PHYSICS_ROOT}/PhysicsView/pch.h)

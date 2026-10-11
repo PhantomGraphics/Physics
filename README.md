@@ -51,16 +51,22 @@ cmake --preset windows-debug
 cmake --build --preset windows-debug
 ```
 
-Main targets are `PhysicsCore`, `PhysicsTest`, `PhysicsView`,
-`Fluid_GPU_Vk` (`FluidGPUVkCore`), and `FluidRenderer` (`FluidRendererCore`).
+Main targets:
+
+| Target | Needs | Notes |
+|---|---|---|
+| `PhysicsCore` | C++20 compiler | Static library; the public interface other projects link. |
+| `PhysicsWorldCore` | C++20 compiler | Internal static library: the UI- and Vulkan-free parts of the viewer (worlds, glTF / wire builders, command dispatchers). `PhysicsView` and `PhysicsTest` link the same objects. |
+| `PhysicsTest` | GoogleTest | Builds without the Vulkan SDK. |
+| `PhysicsView` | Vulkan SDK, GLFW, `glslc` | The viewer. Also needs `Fluid_GPU_Vk` (`FluidGPUVkCore`) and `FluidRenderer` (`FluidRendererCore`). |
 
 If Vulkan headers, the Vulkan loader, or GLFW cannot be found, CMake skips
 `PhysicsView` with a warning while retaining the core and test targets. On
 Linux, provide `VULKAN_INCLUDE_DIR`, `VULKAN_LIBRARY`, and `GLFW_LIBRARY` to
 enable the viewer.
 
-Precompiled SPIR-V shaders are included. Run a project's
-`shaders/compile_shaders.bat` only after changing GLSL sources.
+The viewer's SPIR-V shaders are compiled from their GLSL sources by CMake (`glslc`, part of the
+Vulkan SDK) and copied next to the executable; they are not stored in the repository.
 
 ## Tests
 
