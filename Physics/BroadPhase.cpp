@@ -27,8 +27,14 @@ void BroadPhase::detect(const std::vector<RigidBody*>& bodies,
 
     if (objPtrs.size() < 2) return;
 
+    // Per-thread work buffers: detect() is called every step, so the pair list and the traversal
+    // stack keep their capacity instead of being reallocated.
+    thread_local std::vector<std::pair<int, int>> bvhPairs;
+    thread_local std::vector<std::pair<int, int>> bvhStack;
+
     Space::BVH bvh(objPtrs);
-    for (auto& [ia, ib] : bvh.findAllPairs()) {
+    bvh.findAllPairs(bvhPairs, bvhStack);
+    for (auto& [ia, ib] : bvhPairs) {
         if (bodies[ia]->isStatic() && bodies[ib]->isStatic()) continue;
         outPairs.emplace_back(ia, ib);
     }
