@@ -24,6 +24,7 @@
 #include "../../CGLib/VulkanGraphics/VulkanOffscreen.h"
 #include "../../CGLib/VulkanGraphics/VulkanSampler.h"
 #include "RenderBackground.h"
+#include "RenderDomainPolicy.h"
 #include "GltfBodyRenderer.h"
 #include "GltfSoftRenderer.h"
 
@@ -212,6 +213,13 @@ private:
     void syncGpuCsphBufferToRenderer();
     void updateAnisotropicKernel(const std::vector<glm::vec3>& positions);
     void syncBackgroundCamera();
+    // Inputs for planRenderDomains() from the current app state, and the application of its plan to
+    // the sub-renderers (RenderDomainPolicy.h holds the rules).
+    RenderDomainInputs renderDomainInputs(bool useSSFR, bool cloudActive, bool flameInScene) const;
+    void applyRenderDomains(const RenderDomainPlan& plan);
+    // Feeds the FluidRenderer camera (the single source of truth) and the shared light to every
+    // other renderer, wire and glTF alike.
+    void syncSceneCameras();
     void refreshShadowLightVP();
     bool createHdrTargets();
     void destroyHdrTargets();

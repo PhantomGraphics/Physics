@@ -8,53 +8,6 @@
 namespace Phantom {
 namespace Physics {
 
-namespace {
-
-// center を中心とする半径 radius の円（axis1-axis2 平面）をラインリストとして追加
-void appendCircleWire(SoftBodySolver::WireData& data,
-                       const Math::Vector3df& center, float radius,
-                       const glm::vec3& axis1, const glm::vec3& axis2,
-                       const glm::vec4& color, int segments = 32) {
-    for (int i = 0; i < segments; ++i) {
-        constexpr float kTwoPi = 6.28318530717958647692f;
-        float t0 = kTwoPi * static_cast<float>(i)     / static_cast<float>(segments);
-        float t1 = kTwoPi * static_cast<float>(i + 1) / static_cast<float>(segments);
-        glm::vec3 p0 = glm::vec3(center) + radius * (std::cos(t0) * axis1 + std::sin(t0) * axis2);
-        glm::vec3 p1 = glm::vec3(center) + radius * (std::cos(t1) * axis1 + std::sin(t1) * axis2);
-        data.positions.push_back(p0);
-        data.positions.push_back(p1);
-        data.colors.push_back(color);
-        data.colors.push_back(color);
-    }
-}
-
-// 3 枚の直交する大円でワイヤーフレーム球を表現する
-void appendSphereWire(SoftBodySolver::WireData& data,
-                       const Math::Vector3df& center, float radius) {
-    const glm::vec4 color{ 0.7f, 0.7f, 0.8f, 1.f };
-    appendCircleWire(data, center, radius, { 1.f, 0.f, 0.f }, { 0.f, 1.f, 0.f }, color);  // XY
-    appendCircleWire(data, center, radius, { 1.f, 0.f, 0.f }, { 0.f, 0.f, 1.f }, color);  // XZ
-    appendCircleWire(data, center, radius, { 0.f, 1.f, 0.f }, { 0.f, 0.f, 1.f }, color);  // YZ
-}
-
-// 8 頂点（BoxShape::getWorldCorners の並び）から 12 辺のワイヤーボックスを追加する
-void appendBoxWire(SoftBodySolver::WireData& data,
-                    const std::array<Math::Vector3df, 8>& c) {
-    static constexpr int edges[12][2] = {
-        { 0, 1 }, { 0, 2 }, { 0, 4 }, { 1, 3 }, { 1, 5 }, { 2, 3 },
-        { 2, 6 }, { 3, 7 }, { 4, 5 }, { 4, 6 }, { 5, 7 }, { 6, 7 },
-    };
-    const glm::vec4 color{ 0.6f, 0.5f, 0.9f, 1.f };
-    for (const auto& e : edges) {
-        data.positions.push_back(glm::vec3(c[e[0]]));
-        data.positions.push_back(glm::vec3(c[e[1]]));
-        data.colors.push_back(color);
-        data.colors.push_back(color);
-    }
-}
-
-} // namespace
-
 void SoftBodySolver::clearBodies() {
     bodies_.clear();
     solvers_.clear();
@@ -136,41 +89,6 @@ float SoftBodySolver::getMaxSpeed() const {
         for (const auto& v : b->getMesh().particles.velocities)
             m = std::max(m, glm::length(v));
     return m;
-}
-
-SoftBodySolver::WireData SoftBodySolver::buildWireData() const {
-    WireData data;
-    for (const auto& body : bodies_) {
-        const auto& mesh = body->getMesh();
-        for (const auto& edge : mesh.edges) {
-            const auto& pa = mesh.particles.positions[edge.a];
-            const auto& pb = mesh.particles.positions[edge.b];
-            data.positions.push_back(glm::vec3(pa));
-            data.positions.push_back(glm::vec3(pb));
-
-            float stretch = (edge.restLength > 1e-8f)
-                ? glm::length(pb - pa) / edge.restLength : 1.f;
-            float r = glm::clamp(stretch - 1.f, 0.f, 1.f);
-            float b = glm::clamp(1.f - stretch, 0.f, 1.f);
-            glm::vec4 col = { r, 1.f - r - b, b, 1.f };
-            data.colors.push_back(col);
-            data.colors.push_back(col);
-        }
-    }
-
-    if (params_.sphereEnabled)
-        appendSphereWire(data, params_.sphereCenter, params_.sphereRadius);
-
-    for (const auto& rc : rigidColliders_) {
-        RigidBody* rb = rc->getBody();
-        if (!rb || !rb->shape) continue;
-        if (rb->shape->getType() == ShapeType::Box) {
-            auto* box = static_cast<BoxShape*>(rb->shape);
-            appendBoxWire(data, box->getWorldCorners(rb->position, rb->orientation));
-        }
-    }
-
-    return data;
 }
 
 void SoftBodySolver::rebuildEntry(size_t idx) {

@@ -81,11 +81,16 @@ public:
     size_t getParticleCount() const;
     float  getMaxSpeed()      const;  // 全粒子中の最大速度（デバッグ・回帰検証用）
 
-    struct WireData {
-        std::vector<glm::vec3> positions;  // line-list vertex pairs
-        std::vector<glm::vec4> colors;
-    };
-    WireData buildWireData() const;
+    /** @brief The registered soft bodies (non-owning), for read-only consumers such as the view. */
+    const std::vector<ISoftBody*>& bodies() const { return bodies_; }
+
+    /** @brief The rigid bodies registered through addRigidBodyCollider() (non-owning). */
+    std::vector<RigidBody*> rigidColliderBodies() const {
+        std::vector<RigidBody*> out;
+        out.reserve(rigidColliders_.size());
+        for (const auto& rc : rigidColliders_) out.push_back(rc->getBody());
+        return out;
+    }
 
 private:
     Params                                   params_;

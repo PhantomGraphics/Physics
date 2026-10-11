@@ -125,7 +125,8 @@ if(PHANTOM_GTEST_FOUND)
         ${PHYSICS_ROOT}/PhysicsView/SceneComponentRegistry.cpp)
     target_sources(PhysicsTest PRIVATE
         ${PHYSICS_ROOT}/PhysicsView/HairWorld.cpp
-        ${PHYSICS_ROOT}/PhysicsView/HairCommandDispatcher.cpp)
+        ${PHYSICS_ROOT}/PhysicsView/HairCommandDispatcher.cpp
+        ${PHYSICS_ROOT}/PhysicsView/SoftBodyWireData.cpp)
     target_sources(PhysicsTest PRIVATE ${PHYSICS_ROOT}/PhysicsView/CombustibleGltf.cpp)
     set_target_properties(PhysicsTest PROPERTIES
         CXX_STANDARD 20
@@ -246,6 +247,7 @@ add_executable(PhysicsView
     ${PHYSICS_ROOT}/PhysicsView/RigidBodyWireRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/RigidBodyCommandDispatcher.cpp
     ${PHYSICS_ROOT}/PhysicsView/SoftBodyWorld.cpp
+    ${PHYSICS_ROOT}/PhysicsView/SoftBodyWireData.cpp
     ${PHYSICS_ROOT}/PhysicsView/SoftBodyWireRenderer.cpp
     ${PHYSICS_ROOT}/PhysicsView/SoftBodyCommandDispatcher.cpp
     ${PHYSICS_ROOT}/PhysicsView/FlameWorld.cpp
