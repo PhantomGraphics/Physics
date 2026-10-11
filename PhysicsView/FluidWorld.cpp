@@ -873,10 +873,19 @@ void FluidWorld::updateWhiteWater(float dt)
         whiteWater_.clear();
         return;
     }
+    const float restDensity = getActiveRestDensity();
+
+    // Neither kind of white water is wanted: generate() only has to drop what exists. Skip the
+    // three full-size particle snapshots (positions, velocities, densities) it would otherwise
+    // be handed every step for nothing.
+    if (!whiteWater_.params.enableSpray && !whiteWater_.params.enableFoam) {
+        whiteWater_.generate({}, {}, {}, restDensity, dt);
+        return;
+    }
+
     const auto pos = fluidSolver_->getParticlePositions();
     const auto vel = fluidSolver_->getParticleVelocities();
     const auto density = fluidSolver_->getParticleDensities();
-    const float restDensity = getActiveRestDensity();
 
     if (!pos.empty()) {
         whiteWater_.generate(pos, vel, density, restDensity, dt);

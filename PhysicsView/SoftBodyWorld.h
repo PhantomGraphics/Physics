@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SoftBodyWireData.h"
+
 #include "Physics/Physics/SoftBodySolver.h"
 #include "Physics/Physics/PhysicsSolver.h"
 #include "Physics/Physics/ISoftBody.h"
@@ -35,11 +37,7 @@ enum class SoftBodyPreset {
 
 class SoftBodyWorld {
 public:
-    struct WireData {
-        std::vector<float>    positions;
-        std::vector<float>    colors;
-        std::vector<uint32_t> indices;
-    };
+    using WireData = SoftBodyWireData;
 
     // solver must outlive this SoftBodyWorld (typically owned by the same FluidWorld that
     // constructs this). SoftBody-Fluid coupling (mirrors RigidBodyWorld) reaches

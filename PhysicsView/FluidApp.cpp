@@ -599,8 +599,6 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     // The pre-pass targets are transitioned to SHADER_READ_ONLY_OPTIMAL once at
     // init (initializeSSFRTargetLayouts), so the composite can sample them in
     // passthrough mode without the pre-pass having run this frame.
-    ssfrRenderer_.setEnabled(useSSFR);
-    fluidRenderer_.setEnabled(!useSSFR);
     ssfrRenderer_.setMode(static_cast<SSFluidRenderer::Mode>(ssfrSettings_.getModeIndex()));
     {
         // White-water visibility follows the command-controlled parameters.
@@ -622,8 +620,6 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         syncFlameRenderer();
         if(flameWorld_.hasRigidBindings()) syncRigidRenderer();
     }
-    flameRenderer_.setEnabled(flameInScene && !cloudActive);
-    flameDebugRenderer_.setEnabled(flameInScene && !cloudActive && flameWorld_.fluid().fixedCarriers);
     // Cloud page: the air particles replace the fluid display in the shared
     // FluidRenderer (Phase 2 diagnostic view); every other scene renderer is off.
     if (cloudActive) {
@@ -634,9 +630,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         cloudWorld_.update(realDt);
         if (world_.isRunning()) cloudDirty_ = true;   // the fluid sync above may have overwritten the particles
         syncCloudRenderer();
-        ssfrRenderer_.setEnabled(false);
         fluidRenderer_.clearDirectGpuBuffer();
-        fluidRenderer_.setEnabled(!cloudWorld_.render().volumeMode);
     } else {
         cloudLastTime_ = -1.0;
         if (prevCloudActive_) {
@@ -650,52 +644,9 @@ void FluidApp::onUpdate(uint32_t frameIndex)
         }
     }
     prevCloudActive_ = cloudActive;
-    cloudVolumeRenderer_.setEnabled(cloudActive && cloudWorld_.render().volumeMode);
-    const bool ownsViewport = cloudActive;
-    hairRenderer_.setEnabled(!ownsViewport);
-    // Rigid / soft body: wire (RigidBodyWireRenderer / SoftBodyWireRenderer) vs
-    // shaded (GltfBodyRenderer / GltfSoftRenderer) vs both, per SetRigidRenderMode
-    // / SetSoftRenderMode / the "glTF Rendering" panel. Flame still takes the
-    // whole viewport.
-    {
-        const auto rm = rigidGltfRenderer_.mode();
-        rigidRenderer_.setEnabled(!ownsViewport && bodyRenderModeWantsWire(rm));
-        rigidGltfRenderer_.setEnabled(!ownsViewport && bodyRenderModeWantsShaded(rm));
-        const auto sm = softGltfRenderer_.mode();
-        softRenderer_.setEnabled(!ownsViewport && bodyRenderModeWantsWire(sm));
-        softGltfRenderer_.setEnabled(!ownsViewport && bodyRenderModeWantsShaded(sm));
-    }
-    // Only the Cloud page owns the viewport; hide the glTF background there too,
-    // matching rigid/soft/fluid.
-    bgGltfRenderer_.setVisible(!ownsViewport);
+    applyRenderDomains(planRenderDomains(renderDomainInputs(useSSFR, cloudActive, flameInScene)));
+    syncSceneCameras();
 
-    ssfrRenderer_.setCamera(fluidRenderer_.getProjMatrix(), fluidRenderer_.getViewMatrix());
-    rigidRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
-    flameDebugRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
-    softRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
-    hairRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
-    volumeRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
-    meshRenderer_.setMVP(fluidRenderer_.getProjMatrix() * fluidRenderer_.getViewMatrix());
-
-    // FluidRenderer is the single source of truth for the camera; feed the
-    // same view/proj to the glTF background + shaded rigid bodies so they
-    // compose with the fluid (plan §3.5). Runs before the base onUpdate() below
-    // drives their sub-renderer onUpdate().
-    syncBackgroundCamera();
-    {
-        const glm::mat4 view = fluidRenderer_.getViewMatrix();
-        const glm::mat4 proj = fluidRenderer_.getProjMatrix();
-        const glm::vec3 eye  = glm::vec3(glm::inverse(view)[3]);
-        const glm::vec3 ld   = renderBackground_.lightDirection();
-        const glm::vec4 lightDir(glm::normalize(ld), 0.0f);
-        const glm::vec4 lightCol(renderBackground_.lightColor(), renderBackground_.lightIntensity());
-        rigidGltfRenderer_.setCamera(view, proj, eye);
-        combustibleRenderer_.setCamera(view,proj,eye);
-        combustibleRenderer_.setLight(lightDir,lightCol);
-        rigidGltfRenderer_.setLight(lightDir, lightCol);
-        softGltfRenderer_.setCamera(view, proj, eye);
-        softGltfRenderer_.setLight(lightDir, lightCol);
-    }
     // Shadow light VP tracks the (possibly changed) light direction each frame
     // (Phase 4). The caster geometry is recorded in onPreRender().
     if (shadowPass_.isValid()) refreshShadowLightVP();
@@ -916,6 +867,64 @@ void FluidApp::syncBackgroundCamera()
     const glm::mat4 proj = fluidRenderer_.getProjMatrix();
     const glm::vec3 eye  = glm::vec3(glm::inverse(view)[3]);
     bgGltfRenderer_.setCamera(view, proj, eye);
+}
+
+RenderDomainInputs FluidApp::renderDomainInputs(bool useSSFR, bool cloudActive, bool flameInScene) const
+{
+    RenderDomainInputs in;
+    in.useSSFR = useSSFR;
+    in.cloudPageActive = cloudActive;
+    in.cloudVolumeMode = cloudWorld_.render().volumeMode;
+    in.flameInScene = flameInScene;
+    in.flameFixedCarriers = flameWorld_.fluid().fixedCarriers;
+    in.rigidMode = rigidGltfRenderer_.mode();
+    in.softMode = softGltfRenderer_.mode();
+    return in;
+}
+
+void FluidApp::applyRenderDomains(const RenderDomainPlan& plan)
+{
+    ssfrRenderer_.setEnabled(plan.ssfr);
+    fluidRenderer_.setEnabled(plan.fluidPoints);
+    flameRenderer_.setEnabled(plan.flame);
+    flameDebugRenderer_.setEnabled(plan.flameDebug);
+    cloudVolumeRenderer_.setEnabled(plan.cloudVolume);
+    hairRenderer_.setEnabled(plan.hair);
+    rigidRenderer_.setEnabled(plan.rigidWire);
+    rigidGltfRenderer_.setEnabled(plan.rigidShaded);
+    softRenderer_.setEnabled(plan.softWire);
+    softGltfRenderer_.setEnabled(plan.softShaded);
+    bgGltfRenderer_.setVisible(plan.background);
+}
+
+void FluidApp::syncSceneCameras()
+{
+    const glm::mat4 view = fluidRenderer_.getViewMatrix();
+    const glm::mat4 proj = fluidRenderer_.getProjMatrix();
+    const glm::mat4 viewProj = proj * view;
+
+    ssfrRenderer_.setCamera(proj, view);
+    rigidRenderer_.setMVP(viewProj);
+    flameDebugRenderer_.setMVP(viewProj);
+    softRenderer_.setMVP(viewProj);
+    hairRenderer_.setMVP(viewProj);
+    volumeRenderer_.setMVP(viewProj);
+    meshRenderer_.setMVP(viewProj);
+
+    // The glTF background and shaded bodies compose with the fluid through the same view/proj
+    // and the shared directional light. Runs before the base onUpdate() drives their
+    // sub-renderer onUpdate().
+    syncBackgroundCamera();
+    const glm::vec3 eye  = glm::vec3(glm::inverse(view)[3]);
+    const glm::vec3 ld   = renderBackground_.lightDirection();
+    const glm::vec4 lightDir(glm::normalize(ld), 0.0f);
+    const glm::vec4 lightCol(renderBackground_.lightColor(), renderBackground_.lightIntensity());
+    rigidGltfRenderer_.setCamera(view, proj, eye);
+    combustibleRenderer_.setCamera(view, proj, eye);
+    combustibleRenderer_.setLight(lightDir, lightCol);
+    rigidGltfRenderer_.setLight(lightDir, lightCol);
+    softGltfRenderer_.setCamera(view, proj, eye);
+    softGltfRenderer_.setLight(lightDir, lightCol);
 }
 
 void FluidApp::syncRigidRenderer()
@@ -1257,7 +1266,9 @@ void FluidApp::syncParticlesToRenderer()
     ssfrRenderer_.setFoamParticles(foam);
     updateAnisotropicKernel(fluidPositions);
 
-    auto merged = fluidPositions;
+    std::vector<glm::vec3> merged;
+    merged.reserve(fluidPositions.size() + spray.size() + foam.size());
+    merged.insert(merged.end(), fluidPositions.begin(), fluidPositions.end());
     merged.insert(merged.end(), spray.begin(), spray.end());
     merged.insert(merged.end(), foam.begin(), foam.end());
     std::vector<float> densityDeviations;

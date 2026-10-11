@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "SoftBodyWorld.h"
+#include "SoftBodyWireData.h"
 
 #include <algorithm>
 #include <set>
@@ -398,29 +399,7 @@ void SoftBodyWorld::applyPreset() {
 }
 
 SoftBodyWorld::WireData SoftBodyWorld::buildWireData() const {
-    auto raw = getWorld().buildWireData();
-
-    WireData out;
-    const auto n = static_cast<uint32_t>(raw.positions.size());
-    out.positions.reserve(n * 3);
-    out.colors.reserve(n * 4);
-    out.indices.reserve(n);
-
-    for (const auto& v : raw.positions) {
-        out.positions.push_back(v.x);
-        out.positions.push_back(v.y);
-        out.positions.push_back(v.z);
-    }
-    for (const auto& c : raw.colors) {
-        out.colors.push_back(c.r);
-        out.colors.push_back(c.g);
-        out.colors.push_back(c.b);
-        out.colors.push_back(c.a);
-    }
-    for (uint32_t i = 0; i < n; ++i)
-        out.indices.push_back(i);
-
-    return out;
+    return buildSoftBodyWireData(getWorld());
 }
 
 } // namespace Phantom
