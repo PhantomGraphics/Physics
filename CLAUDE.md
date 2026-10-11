@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Overview
 
 流体・剛体・軟体（クロス／ゼリー／ロープ）シミュレーションと SPH ベースの三者結合（Rigid↔Fluid↔SoftBody）を提供するモジュール群。
-`Physics`（コアライブラリ）、`PhysicsTest`（GoogleTest）、`PhysicsView`（スタンドアロン ImGui + Vulkan ビューア。炎 SPH を含む——下記 Flame 節）、`Fluid_GPU_Vk`（GPU Compute CSPH）、`FluidRenderer`（Screen Space Fluid Rendering）の 5 プロジェクトで構成される。単独の `.sln` は持たず、すべて上位の `Phantom2026.sln` でビルドする。旧 `FlameView`（炎 SPH の独立スタンドアロンビューア）は 2026-09-08 に PhysicsView へ統合済み。
+`Physics`（コアライブラリ）、`PhysicsWorldCore`（ビューアの UI/Vulkan 非依存部分を集めた内部ライブラリ。`PhysicsView` と `PhysicsTest` が同じオブジェクトをリンクする）、`PhysicsTest`（GoogleTest）、`PhysicsView`（スタンドアロン ImGui + Vulkan ビューア。炎 SPH を含む——下記 Flame 節）、`Fluid_GPU_Vk`（GPU Compute CSPH）、`FluidRenderer`（Screen Space Fluid Rendering）で構成される。単独の `.sln` は持たない。CMake でビルドし、CGApp は `PhysicsCore` / `FluidRendererCore` の `.lib` を直接リンクする。旧 `FlameView`（炎 SPH の独立スタンドアロンビューア）は 2026-09-08 に PhysicsView へ統合済み。
 
 親リポジトリの CLAUDE.md（`../CLAUDE.md`）にビルド方法・全体アーキテクチャ・命名規則が記載されているのであわせて参照すること。
 
@@ -24,9 +24,18 @@ cmake --preset windows-debug
 cmake --build --preset windows-debug
 ```
 
-ターゲット: `PhysicsCore`, `PhysicsTest`, `PhysicsView`, `Fluid_GPU_Vk`(`FluidGPUVkCore`),
-`FluidRenderer`(`FluidRendererCore`)。実行ファイル名は CMake ターゲット名基準で `PhysicsView.exe`
-（`RootNamespace` が旧名 `VkFluidView` だった vcxproj 時代の名残はもう関係ない）。
+ターゲット: `PhysicsCore`、`PhysicsWorldCore`（内部。CPU のみ）、`PhysicsTest`（GoogleTest だけで
+ビルドでき Vulkan SDK 不要）、`PhysicsView`（Vulkan・GLFW・`glslc` が必要。見つからないと警告つきでスキップ）、
+`Fluid_GPU_Vk`(`FluidGPUVkCore`)、`FluidRenderer`(`FluidRendererCore`)。実行ファイル名は CMake ターゲット名基準で
+`PhysicsView.exe`。
+
+**CPU 側のコードの置き場所:** `PhysicsView/` の `.cpp` が Vulkan・ImGui・GLFW に触れないなら
+`PhysicsWorldCore`（`CMakeLists.txt` のリスト）に入れる。テストが直接コンパイルするファイルを増やす必要はなく、
+`PhysicsTest` は `PhysicsWorldCore` をリンクする。`PhysicsCore` は OpenMP を PRIVATE にリンクする
+（公開ヘッダーは `#pragma omp` を使わない）ので、OpenMP を自分で使うターゲットは明示的にリンクすること。
+
+**シェーダ:** `PhysicsView` の SPIR-V は CMake が `glslc` で GLSL から生成して実行ファイル横の `shaders/` へ
+コピーする（`.spv` は git 管理外）。
 
 ## Tests
 

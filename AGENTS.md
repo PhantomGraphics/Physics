@@ -26,9 +26,18 @@ cmake --preset windows-debug
 cmake --build --preset windows-debug
 ```
 
-ターゲット: `PhysicsCore`, `PhysicsTest`, `PhysicsView`, `Fluid_GPU_Vk`(`FluidGPUVkCore`),
-`FluidRenderer`(`FluidRendererCore`)。実行ファイル名は CMake ターゲット名基準で `PhysicsView.exe`
-（`RootNamespace` が旧名 `VkFluidView` だった vcxproj 時代の名残はもう関係ない）。
+ターゲット: `PhysicsCore`、`PhysicsWorldCore`（内部。CPU のみ）、`PhysicsTest`（GoogleTest だけで
+ビルドでき Vulkan SDK 不要）、`PhysicsView`（Vulkan・GLFW・`glslc` が必要。見つからないと警告つきでスキップ）、
+`Fluid_GPU_Vk`(`FluidGPUVkCore`)、`FluidRenderer`(`FluidRendererCore`)。実行ファイル名は CMake ターゲット名基準で
+`PhysicsView.exe`。
+
+**CPU 側のコードの置き場所:** `PhysicsView/` の `.cpp` が Vulkan・ImGui・GLFW に触れないなら
+`PhysicsWorldCore`（`CMakeLists.txt` のリスト）に入れる。テストが直接コンパイルするファイルを増やす必要はなく、
+`PhysicsTest` は `PhysicsWorldCore` をリンクする。`PhysicsCore` は OpenMP を PRIVATE にリンクする
+（公開ヘッダーは `#pragma omp` を使わない）ので、OpenMP を自分で使うターゲットは明示的にリンクすること。
+
+**シェーダ:** `PhysicsView` の SPIR-V は CMake が `glslc` で GLSL から生成して実行ファイル横の `shaders/` へ
+コピーする（`.spv` は git 管理外）。
 
 ## Tests
 
