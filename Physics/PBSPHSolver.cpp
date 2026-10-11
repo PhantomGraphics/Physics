@@ -313,19 +313,13 @@ void PBSPHSolver::addBoundadryPressure(std::vector<PBSPHParticle>& particles)
 	// shrinks between iterations and the same full correction gets re-added
 	// every iteration, amplifying the correction by ~maxIter.
 	const float dt2 = maxTimeStep * maxTimeStep;
-	const std::vector<std::shared_ptr<IShapeBoundary>>* lists[] = {
-		&boundaryPlanes_, &boundarySpheres_, &boundaryPlates_, &boundaryCylinders_, &boundaryShapes_
-	};
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
 		const auto pos = particles[i].getPredictPosition();
 		Vector3df force(0.0f, 0.0f, 0.0f);
-		for (const auto* list : lists) {
-			for (const auto& shape : *list) {
-				if (!shape) continue;
-				force += shape->getBoundaryForce(pos, maxTimeStep);
-			}
-		}
+		shapeBoundaries_.forEach([&](const IShapeBoundary& shape) {
+			force += shape.getBoundaryForce(pos, maxTimeStep);
+		});
 		particles[i].addPositionCorrection(force * dt2);
 	}
 }
@@ -335,18 +329,10 @@ void PBSPHSolver::clampToBoundary(std::vector<PBSPHParticle>& particles)
 	if (!hasShapeBoundaries()) {
 		return;
 	}
-	const std::vector<std::shared_ptr<IShapeBoundary>>* lists[] = {
-		&boundaryPlanes_, &boundarySpheres_, &boundaryPlates_, &boundaryCylinders_, &boundaryShapes_
-	};
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
 		auto pos = particles[i].getPredictPosition();
-		for (const auto* list : lists) {
-			for (const auto& shape : *list) {
-				if (!shape) continue;
-				pos = shape->clampPosition(pos);
-			}
-		}
+		shapeBoundaries_.forEach([&](const IShapeBoundary& shape) { pos = shape.clampPosition(pos); });
 		particles[i].setPredictPosition(pos);
 	}
 }
@@ -362,9 +348,6 @@ void PBSPHSolver::addShapeBoundaryConstraint(std::vector<PBSPHParticle>& particl
 {
 	if (!hasShapeBoundaries() || particles.empty()) return;
 
-	const std::vector<std::shared_ptr<IShapeBoundary>>* lists[] = {
-		&boundaryPlanes_, &boundarySpheres_, &boundaryPlates_, &boundaryCylinders_, &boundaryShapes_
-	};
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
 		auto& p = particles[i];
@@ -399,11 +382,7 @@ void PBSPHSolver::addShapeBoundaryConstraint(std::vector<PBSPHParticle>& particl
 					kernel->getPoly6KernelGradient(direction * dist) * pseudoMass * weight);
 			}
 		};
-		for (const auto* list : lists) {
-			for (const auto& shape : *list) {
-				if (shape) addShape(*shape);
-			}
-		}
+		shapeBoundaries_.forEach(addShape);
 	}
 }
 

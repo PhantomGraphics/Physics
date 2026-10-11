@@ -1,5 +1,6 @@
 #include "HairCommandDispatcher.h"
 #include "HairWorld.h"
+#include "CommandParse.h"
 #include <charconv>
 #include <cmath>
 #include <cstdio>
@@ -12,10 +13,7 @@ std::string number(double value) {
     std::snprintf(buf, sizeof(buf), "%.9g", value);
     return buf;
 }
-bool parse(std::string_view text, double& value) {
-    const auto result = std::from_chars(text.data(), text.data()+text.size(), value);
-    return result.ec == std::errc{} && result.ptr == text.data()+text.size() && std::isfinite(value);
-}
+bool parse(std::string_view text, double& value) { return CommandParse::parseDouble(text, value); }
 bool param(Physics::HairSolver::Params& p, std::string_view name, double& value, bool set) {
     // Explicit branches keep the integer/boolean validation shared by UI and CLI.
     if (name == "substeps" || name == "iterations") {
@@ -46,7 +44,13 @@ bool param(Physics::HairSolver::Params& p, std::string_view name, double& value,
     else if (name == "teleportDistance") field = &p.teleportDistance;
     else if (name == "teleportAngle") field = &p.teleportAngle;
     if (!field) return false;
-    if (set) *field = static_cast<float>(value); else value = *field;
+    if (set) {
+        // timeStep must advance time; the compliance/damping/drag/radius/teleport thresholds are
+        // magnitudes. Gravity and wind components are free (signed) vectors.
+        const bool signedVec = name.starts_with("gravity") || (name.starts_with("wind") && name != "windDrag");
+        if (name == "timeStep" ? !(value > 0) : (!signedVec && value < 0)) return false;
+        *field = static_cast<float>(value);
+    } else value = *field;
     return true;
 }
 }

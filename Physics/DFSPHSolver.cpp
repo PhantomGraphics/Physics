@@ -368,8 +368,7 @@ float DFSPHSolver::calculateAverageDpDt(const std::vector<DFSPHParticle>& partic
 
 void DFSPHSolver::addBoundaryDensity(std::vector<DFSPHParticle>& particles)
 {
-	if (boundaryPlanes_.empty() && boundarySpheres_.empty() &&
-	    boundaryPlates_.empty() && boundaryCylinders_.empty() && boundaryShapes_.empty()) {
+	if (shapeBoundaries_.empty()) {
 		return;
 	}
 
@@ -418,11 +417,7 @@ void DFSPHSolver::addBoundaryDensity(std::vector<DFSPHParticle>& particles)
 				boundaryGradient += kernel->getCubicSplineGradient(direction * dist) * restDensity * weight;
 			}
 		};
-		for (const auto& plane : boundaryPlanes_) if (plane) addShapeConstraint(*plane);
-		for (const auto& sphere : boundarySpheres_) if (sphere) addShapeConstraint(*sphere);
-		for (const auto& plate : boundaryPlates_) if (plate) addShapeConstraint(*plate);
-		for (const auto& cylinder : boundaryCylinders_) if (cylinder) addShapeConstraint(*cylinder);
-		for (const auto& shape : boundaryShapes_) if (shape) addShapeConstraint(*shape);
+		shapeBoundaries_.forEach(addShapeConstraint);
 
 		// Analytic walls replace missing fluid, as in WCSPHSolver. They must
 		// not add compression to an already full neighborhood: crossing a
@@ -506,8 +501,7 @@ Vector3df clampToPassiveWall(const Vector3df& penaltyAcceleration, const IShapeB
 // of being launched back up.
 void DFSPHSolver::addBoundaryPressure(std::vector<DFSPHParticle>& particles, const float dt)
 {
-	if (boundaryPlanes_.empty() && boundarySpheres_.empty() &&
-	    boundaryPlates_.empty() && boundaryCylinders_.empty() && boundaryShapes_.empty()) return;
+	if (shapeBoundaries_.empty()) return;
 #pragma omp parallel for
 	for (int i = 0; i < static_cast<int>(particles.size()); ++i) {
 		auto& p = particles[i];
@@ -520,11 +514,7 @@ void DFSPHSolver::addBoundaryPressure(std::vector<DFSPHParticle>& particles, con
 			force += clampToPassiveWall(penalty, boundary, p.getPosition(), p.getVelocity(),
 			                            sample.signedDistance, dt, frameTimeStep_);
 		};
-		for (const auto& plane : boundaryPlanes_) if (plane) addShapeForce(*plane);
-		for (const auto& sphere : boundarySpheres_) if (sphere) addShapeForce(*sphere);
-		for (const auto& plate : boundaryPlates_) if (plate) addShapeForce(*plate);
-		for (const auto& cylinder : boundaryCylinders_) if (cylinder) addShapeForce(*cylinder);
-		for (const auto& shape : boundaryShapes_) if (shape) addShapeForce(*shape);
+		shapeBoundaries_.forEach(addShapeForce);
 		p.addForce(force * p.getMass());
 	}
 }

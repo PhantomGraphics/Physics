@@ -1,0 +1,46 @@
+{
+  "name": "54_couple_soft_without_fluid",
+  "steps": [
+    {
+      "label": "Soft scene only: no fluid has been built, so there is no Two-Way solver to couple to",
+      "command": "SetPreset:JellyDrop",
+      "expect": "OK"
+    },
+    {
+      "label": "Precondition: one jelly body",
+      "command": "GetSoftBodyCount",
+      "expect": "Count:1"
+    },
+    {
+      "label": "Enable SoftBody-Fluid coupling with nothing to couple to",
+      "command": "SetSoftFluidCouplingEnabled:true",
+      "expect": "OK"
+    },
+    {
+      "label": "Jelly height before stepping",
+      "command": "GetSoftMinPositionY",
+      "store_as": "y_before"
+    },
+    {
+      "label": "Forced steps must still advance the soft world (regression: it used to be skipped by both FluidWorld and the dispatcher)",
+      "command": "StepSimulation:30",
+      "expect": "OK"
+    },
+    {
+      "label": "Change: the jelly fell",
+      "command": "GetSoftMinPositionY",
+      "store_as": "y_after"
+    },
+    {
+      "label": "Invariant: still exactly one soft body",
+      "command": "GetSoftBodyCount",
+      "expect": "Count:1"
+    },
+    {
+      "label": "Invariant: no velocity explosion",
+      "command": "GetMaxSpeed",
+      "expect_range": "0.0,20.0"
+    }
+  ],
+  "post_assert": "y_after < y_before"
+}

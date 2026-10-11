@@ -28,52 +28,17 @@ void DFSPHFluid::setEffectLength(const float effectLength)
 
 void DFSPHFluid::updateEmitters(const float dt)
 {
-	std::uniform_real_distribution<float> jitterDist(-1.0f, 1.0f);
-
-	for (auto& e : emitters_) {
-		const int remaining = maxParticles_ - static_cast<int>(particles.size());
-		if (remaining <= 0) {
-			continue;
-		}
-
-		const int n = accumulateEmission(e, dt, remaining);
-		const float dirLenSq = Math::getLengthSquared(e.direction);
-		const Vector3df dir = dirLenSq > 1.0e-12f
-			? e.direction / std::sqrt(dirLenSq)
-			: Vector3df(0.0f, 1.0f, 0.0f);
-
-		const float diameter = e.particleRadius * 2.0f;
-		const float mass = diameter * diameter * diameter;
-
-		for (int i = 0; i < n; ++i) {
-			const Vector3df pos = e.center + nextDiskLatticeOffset(e, dir);
-			createParticle(pos, e.particleRadius, mass);
-			particles.velocities.back() = dir * (e.speed + e.speedJitter * jitterDist(rng_));
-		}
-	}
+	emitFromEmitters(emitters_, dt, maxParticles_, rng_,
+		[this] { return particles.size(); },
+		[this](const Vector3df& pos, const Emitter& e) {
+			const float diameter = e.particleRadius * 2.0f;
+			createParticle(pos, e.particleRadius, diameter * diameter * diameter);
+		},
+		[this](const Vector3df& velocity) { particles.velocities.back() = velocity; });
 }
 
 void DFSPHFluid::removeOutflowParticles()
 {
-	if (outflowRegions_.empty()) {
-		return;
-	}
-
-	for (size_t i = 0; i < particles.size();) {
-		const Vector3df& pos = particles.positions[i];
-		bool remove = false;
-		for (const auto& r : outflowRegions_) {
-			if (r.bounds.contains(pos, 0.0f)) {
-				remove = true;
-				break;
-			}
-		}
-
-		if (remove) {
-			particles.swapAndPop(i);
-			continue;
-		}
-		++i;
-	}
+	removeParticlesInRegions(outflowRegions_, particles);
 }
 

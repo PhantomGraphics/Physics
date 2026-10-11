@@ -1,0 +1,458 @@
+{
+  "name": "92_neg_command_arguments",
+  "steps": [
+    {
+      "label": "A rigid scene to check that rejected commands change nothing",
+      "command": "SetPreset:SphereDrop",
+      "expect": "OK"
+    },
+    {
+      "label": "Precondition: floor + sphere",
+      "command": "GetBodyCount",
+      "expect": "Count:2"
+    },
+    {
+      "label": "Record the Baumgarte beta",
+      "command": "GetBaumgarteBeta",
+      "store_as": "beta_before"
+    },
+    {
+      "label": "Record the sphere height",
+      "command": "GetBodyPositionY:1",
+      "store_as": "y_before"
+    },
+    {
+      "command": "SetTimeStep:abc",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetTimeStep:0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetTimeStep:-0.01",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetTimeStep:nan",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetTimeStep:0.01x",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetTimeStep:",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetGravity:1:2",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetGravity:0:-9.8:0:1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetGravity:0:x:0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetGravity:0:nan:0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetSolverIter:1.5",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetSolverIter:0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetSolverIter:5x",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetSolverIter:99999",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetSolverIter:",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetBaumgarteBeta:nan",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetBaumgarteBeta:0.2abc",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddSphere:0:5:0:-1:1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddSphere:0:5:0:0:1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddSphere:0:5:0:0.5",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddSphere:0:5:0:0.5:1:9",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddSphere:0:5:x:0.5:1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddSphere:0:5:0:0.5:-1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddBox:0:5:0:0.5:0.5:0:1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddBox:0:5:0:0.5:0.5:0.5",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddBox:0:5:0:0.5:0.5:0.5:nan",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddFloor:abc",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "Step:abc",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "Step:1.5",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "Step:-1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "Step:99999999",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "GetBodyPositionY:1x",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "GetBodyPositionY:",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "GetBodyVelocityY:1.5",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetRunning:maybe",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetRunning:",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetSelfCollision:2",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetCrossBodyCollisionEnabled:yes",
+      "expect_prefix": "Error:"
+    },
+    {
+      "label": "Rejected rigid commands added no body",
+      "command": "GetBodyCount",
+      "expect": "Count:2"
+    },
+    {
+      "label": "Rejected rigid commands left the Baumgarte beta alone",
+      "command": "GetBaumgarteBeta",
+      "expect": "${beta_before}"
+    },
+    {
+      "label": "Rejected rigid commands did not advance or move the sphere",
+      "command": "GetBodyPositionY:1",
+      "expect": "${y_before}"
+    },
+    {
+      "command": "SetFluidTimeStep:0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidTimeStep:-1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidTimeStep:nan",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidTimeStep:0.01x",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidRadius:0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidRadius:-1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidEffectLength:0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidStiffness:-1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidPressureCoeScale:0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidDensity:0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidViscosity:-0.1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidTension:-1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidBoundaryDamping:0.6",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidBoundaryDamping:-0.1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidMaxParticles:0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidMaxParticles:1.5",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidMaxParticles:abc",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidGravity:0:-9.8:0:1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidGravity:0:-9.8",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidGravity:0:nan:0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidBounds:0:0:0:1:1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidBounds:0:0:0:1:1:1:1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidBounds:0:0:0:1:1:inf",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidBoundary:0:0:0:1:1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidBoundary:1:1:1:0:0:0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetFluidBoundary:0:0:0:0:1:1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetWhiteWaterParam:foamDrag,-1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetWhiteWaterParam:foamDrag,abc",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetRunning:2",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "Step:1x",
+      "expect_prefix": "Error:"
+    },
+    {
+      "label": "Build an (almost) empty DFSPH fluid so emitters have a fluid to register on",
+      "command": "SetSimulationType:DFSPH",
+      "expect": "OK"
+    },
+    {
+      "label": "Valid values are still accepted: fluid bounds (a degenerate seed box is legal)",
+      "command": "SetFluidBounds:0:0:0:0:0:0",
+      "expect": "OK"
+    },
+    {
+      "label": "Rebuild the fluid",
+      "command": "Reset",
+      "expect": "OK"
+    },
+    {
+      "label": "Emitters start empty",
+      "command": "GetEmitterCount",
+      "expect": "0"
+    },
+    {
+      "command": "AddEmitter:0,10,0,0,5,0,-1,0,10",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddEmitter:0,10,0,-1,5,0,-1,0,10",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddEmitter:0,10,0,1,-5,0,-1,0,10",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddEmitter:0,10,0,1,5,0,-1,0,-10",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddEmitter:0,10,0,1,5,0,0,0,10",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddEmitter:0,10,0,1,5,0,-1,0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddEmitter:0,10,0,1,5,0,-1,0,nan",
+      "expect_prefix": "Error:"
+    },
+    {
+      "label": "Rejected AddEmitter added nothing",
+      "command": "GetEmitterCount",
+      "expect": "0"
+    },
+    {
+      "label": "No outflow regions yet",
+      "command": "GetOutflowRegionCount",
+      "expect": "0"
+    },
+    {
+      "command": "AddOutflowRegion:0,0,0,1,1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddOutflowRegion:1,0,0,0,1,1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "AddOutflowRegion:0,0,0,1,1,x",
+      "expect_prefix": "Error:"
+    },
+    {
+      "label": "Rejected AddOutflowRegion added nothing",
+      "command": "GetOutflowRegionCount",
+      "expect": "0"
+    },
+    {
+      "label": "Valid values are still accepted: time step",
+      "command": "SetTimeStep:0.01",
+      "expect": "OK"
+    },
+    {
+      "label": "Valid values are still accepted: gravity",
+      "command": "SetGravity:0:-3:0",
+      "expect": "OK"
+    },
+    {
+      "label": "Valid values are still accepted: damping upper bound",
+      "command": "SetFluidBoundaryDamping:0.5",
+      "expect": "OK"
+    },
+    {
+      "label": "Valid values are still accepted: emitter",
+      "command": "AddEmitter:0,10,0,1.0,5,0,-1,0,10",
+      "expect": "OK"
+    },
+    {
+      "label": "Accepted AddEmitter counted",
+      "command": "GetEmitterCount",
+      "expect": "1"
+    },
+    {
+      "label": "Restore the default fluid damping so later scenarios are unaffected",
+      "command": "SetFluidBoundaryDamping:0",
+      "expect": "OK"
+    },
+    {
+      "label": "Remove the emitter again",
+      "command": "ClearEmitters",
+      "expect": "OK"
+    },
+    {
+      "command": "SetSoftParam:sphereRadius,0",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetSoftParam:selfCollisionThickness,-1",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetSoftParam:selfCollisionEnabled,2",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetSoftParam:sphereEnabled,0.5",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetSoftParam:numSubsteps,1001",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetSoftParam:gravityY,inf",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "SetSoftParam:timeStep,0.01x",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "GetSoftTotalVolume:0x",
+      "expect_prefix": "Error:"
+    },
+    {
+      "command": "GetSoftParticlePositionY:0:1.5",
+      "expect_prefix": "Error:"
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 #include "pch.h"
 #include "FluidWorld.h"
+#include "StepPlan.h"
+#include "FluidSeed.h"
 
 #include "../../CGLib/File/File/STLFileReader.h"
 
@@ -9,23 +11,6 @@ namespace {
 glm::vec3 toGlm(const Phantom::Math::Vector3df& v)
 {
     return glm::vec3(v.x, v.y, v.z);
-}
-
-template <class Fn>
-void forEachFluidSeedInBounds(const Phantom::Math::Box3df& bounds, float diameter, Fn&& fn)
-{
-    using Phantom::Math::Vector3df;
-    const Vector3df bmin = bounds.getMin();
-    const Vector3df bmax = bounds.getMax();
-    if (diameter <= 0.0f) return;
-
-    for (float z = bmin.z; z <= bmax.z + 1e-4f; z += diameter) {
-        for (float y = bmin.y; y <= bmax.y + 1e-4f; y += diameter) {
-            for (float x = bmin.x; x <= bmax.x + 1e-4f; x += diameter) {
-                fn(Vector3df(x, y, z));
-            }
-        }
-    }
 }
 
 } // namespace
@@ -234,50 +219,56 @@ void FluidWorld::stepFluidOnly()
     lastStepTimeMs_ = std::chrono::duration<float, std::milli>(t1 - t0).count();
 }
 
+StepPlan FluidWorld::planFor(bool forced) const
+{
+    StepInputs in;
+    in.forced = forced;
+    in.fluidRunning = isRunning();
+    in.rigidRunning = rigid_.isRunning();
+    in.softRunning  = softWorld_ && softWorld_->isRunning();
+    in.rigidCouplingEnabled  = couplingEnabled_;
+    in.rigidHasExternalClock = rigid_.hasExternalClock();
+    in.oneWaySupported = supportsOneWayCoupling();
+    in.softCouplingEnabled = softCouplingEnabled_;
+    in.softWorldPresent    = softWorld_ != nullptr;
+    in.twoWaySupported     = supportsTwoWayCoupling();
+    return planStep(in);
+}
+
+void FluidWorld::executePlan(const StepPlan& plan, bool forced)
+{
+    if (plan.rigidCoupled) physicsSolver_.rigidFluidSolver().syncBoundaries();
+    if (plan.softCoupled)  physicsSolver_.softFluidSolver().syncBoundaries(getActiveKernel(), getActiveRestDensity());
+
+    if (plan.fluid) stepFluidOnly();
+
+    if (plan.rigidCoupled) {
+        if (forced) physicsSolver_.rigidFluidSolver().stepForced(coupledTimeStep());
+        else        physicsSolver_.rigidFluidSolver().step(coupledTimeStep());
+    } else if (plan.rigid) {
+        if (forced) rigid_.stepForced();
+        else        rigid_.step();
+    }
+
+    if (plan.softCoupled) {
+        if (forced) physicsSolver_.softFluidSolver().stepForced(coupledTimeStep());
+        else        physicsSolver_.softFluidSolver().step(coupledTimeStep());
+    } else if (plan.soft && softWorld_) {
+        if (forced) softWorld_->stepForced();
+        else        softWorld_->step();
+    }
+}
+
 void FluidWorld::step()
 {
-    const bool doFluid = isRunning();
-    const bool doRigid = rigid_.isRunning();
-    const bool doSoft  = softCouplingEnabled_ && softWorld_ && softWorld_->isRunning();
-
-    const bool rigidCoupled = !rigid_.hasExternalClock() && couplingEnabled_     && doFluid && doRigid && supportsOneWayCoupling();
-    const bool softCoupled  = softCouplingEnabled_  && doFluid && doSoft && supportsTwoWayCoupling();
-
-    if (rigidCoupled || softCoupled) {
-        if (rigidCoupled) physicsSolver_.rigidFluidSolver().syncBoundaries();
-        if (softCoupled)  physicsSolver_.softFluidSolver().syncBoundaries(getActiveKernel(), getActiveRestDensity());
-
-        stepFluidOnly();
-
-        if (rigidCoupled) physicsSolver_.rigidFluidSolver().step(coupledTimeStep());
-        else if (doRigid) rigid_.step();
-
-        if (softCoupled) physicsSolver_.softFluidSolver().step(coupledTimeStep());
-        else if (doSoft) softWorld_->step();
-    } else {
-        if (doFluid) stepFluidOnly();
-        if (doRigid) rigid_.step();
-        if (doSoft)  softWorld_->step();
-    }
+    executePlan(planFor(false), false);
 }
 
 void FluidWorld::stepOnce()
 {
-    const bool rigidCoupled = !rigid_.hasExternalClock() && couplingEnabled_ && supportsOneWayCoupling();
-    const bool softCoupled  = softCouplingEnabled_ && softWorld_ && supportsTwoWayCoupling();
-
-    if (rigidCoupled) physicsSolver_.rigidFluidSolver().syncBoundaries();
-    if (softCoupled)  physicsSolver_.softFluidSolver().syncBoundaries(getActiveKernel(), getActiveRestDensity());
-
-    stepFluidOnly();
-
-    if (rigidCoupled) physicsSolver_.rigidFluidSolver().stepForced(coupledTimeStep());
-    else              rigid_.stepForced();
-
-    // Soft-body stepping when NOT soft-coupled remains the caller's
-    // responsibility (see FluidCommandDispatcher's "Step"/"Step:N" handlers),
-    // exactly as before this coupling was added.
-    if (softCoupled) physicsSolver_.softFluidSolver().stepForced(coupledTimeStep());
+    // The soft world is advanced here whenever soft coupling is enabled (coupled or not); a caller
+    // steps it only when coupling is disabled -- see StepPlan::softOwnedByFluid.
+    executePlan(planFor(true), true);
 }
 
 float FluidWorld::coupledTimeStep() const
@@ -756,17 +747,9 @@ void FluidWorld::createDFSPH()
 
     dfsphFluid_->setMaxParticles(params_.maxParticles);
 
-    if (!customPositions_.empty()) {
-        for (size_t i = 0; i < customPositions_.size(); ++i) {
-            dfsphFluid_->createParticle(customPositions_[i], params_.radius, mass);
-            if (i < customVelocities_.size())
-                dfsphFluid_->getParticles().velocities.back() = customVelocities_[i];
-        }
-    } else {
-        forEachFluidSeedInBounds(params_.fluidBounds, diameter, [&](const Vector3df& pos) {
-            dfsphFluid_->createParticle(pos, params_.radius, mass);
-        });
-    }
+    spawnSeed(makeFluidSeed(customPositions_, customVelocities_, params_.fluidBounds, diameter),
+        [&](const Vector3df& pos) { dfsphFluid_->createParticle(pos, params_.radius, mass); },
+        [&](const Vector3df& v) { dfsphFluid_->getParticles().velocities.back() = v; });
 
     auto solver = std::make_unique<DFSPHSolver>();
     // DFSPH treats this as the adaptive integration ceiling; simulate(dt)
@@ -789,17 +772,9 @@ void FluidWorld::createPBSPH()
 
     const float diameter = params_.radius * 2.0f;
 
-    if (!customPositions_.empty()) {
-        for (size_t i = 0; i < customPositions_.size(); ++i) {
-            pbsphFluid_->createParticle(customPositions_[i], params_.radius);
-            if (i < customVelocities_.size())
-                pbsphFluid_->getParticles().velocities.back() = customVelocities_[i];
-        }
-    } else {
-        forEachFluidSeedInBounds(params_.fluidBounds, diameter, [&](const Vector3df& pos) {
-            pbsphFluid_->createParticle(pos, params_.radius);
-        });
-    }
+    spawnSeed(makeFluidSeed(customPositions_, customVelocities_, params_.fluidBounds, diameter),
+        [&](const Vector3df& pos) { pbsphFluid_->createParticle(pos, params_.radius); },
+        [&](const Vector3df& v) { pbsphFluid_->getParticles().velocities.back() = v; });
 
     // Domain container walls: see PBSPHSolver::setBoundary()'s doc comment
     // for how this stays a cheap, O(1)-per-particle penalty (no boundary-
@@ -834,17 +809,9 @@ void FluidWorld::createWCSPH()
 
     const float diameter = params_.radius * 2.0f;
 
-    if (!customPositions_.empty()) {
-        for (size_t i = 0; i < customPositions_.size(); ++i) {
-            csphFluid_->createParticle(customPositions_[i], params_.radius);
-            if (i < customVelocities_.size())
-                csphFluid_->getParticles().velocities.back() = customVelocities_[i];
-        }
-    } else {
-        forEachFluidSeedInBounds(params_.fluidBounds, diameter, [&](const Vector3df& pos) {
-            csphFluid_->createParticle(pos, params_.radius);
-        });
-    }
+    spawnSeed(makeFluidSeed(customPositions_, customVelocities_, params_.fluidBounds, diameter),
+        [&](const Vector3df& pos) { csphFluid_->createParticle(pos, params_.radius); },
+        [&](const Vector3df& v) { csphFluid_->getParticles().velocities.back() = v; });
 
     auto solver = std::make_unique<WCSPHSolver>();
     solver->setEffectLength(params_.effectLength);

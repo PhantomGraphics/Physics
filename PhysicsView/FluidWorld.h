@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "StepPlan.h"
 #include "../Physics/DFSPHFluid.h"
 #include "../Physics/DFSPHSolver.h"
 #include "../Physics/DFSPHParticle.h"
@@ -321,6 +322,9 @@ public:
      */
     float coupledTimeStep() const;
 
+    /** @brief The plan step()/stepOnce() would run right now (see StepPlan.h). */
+    StepPlan planFor(bool forced) const;
+
     RigidBodyWorld&       rigid()       { return rigid_; }
     const RigidBodyWorld& rigid() const { return rigid_; }
 
@@ -459,6 +463,9 @@ private:
     bool           softCouplingEnabled_ = false;
 
     void teardownSoftCoupling();
+
+    // Runs one StepPlan in the documented order (StepPlan.h).
+    void executePlan(const StepPlan& plan, bool forced);
 
     // Static mesh fluid boundary (loadMeshBoundary()/clearMeshBoundary()), independent
     // of rigid()/RigidFluidSolver -- see loadMeshBoundary()'s doc comment.
