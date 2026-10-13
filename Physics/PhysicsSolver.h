@@ -8,6 +8,7 @@
 #include "ISPHSolver.h"
 #include "CGLib/Util/UnCopyable.h"
 
+#include <cmath>
 #include <memory>
 #include <vector>
 
@@ -99,12 +100,23 @@ public:
     ISPHSolver*       fluidSolver()       { return fluidSolver_; }
     const ISPHSolver* fluidSolver() const { return fluidSolver_; }
 
-    /** @brief Time step (seconds) passed to fluidSolver()->simulate() and RigidFluidSolver::stepForced(). */
-    void  setTimeStep(float dt) { timeStep_ = dt; }
+    /** @brief Time step (seconds) passed to fluidSolver()->simulate() and RigidFluidSolver::stepForced().
+     *  @return true if applied. A non-finite or non-positive dt is rejected and the current value is kept. */
+    bool  setTimeStep(float dt) {
+        if (!std::isfinite(dt) || dt <= 0.0f) return false;
+        timeStep_ = dt;
+        return true;
+    }
     float getTimeStep() const   { return timeStep_; }
 
-    /** @brief Constraint-projection iteration count passed to fluidSolver()->simulate(). */
-    void setMaxIter(int maxIter) { maxIter_ = maxIter; }
+    /** @brief Constraint-projection iteration count passed to fluidSolver()->simulate().
+     *  @return true if applied. Values outside [1, kMaxIterLimit] are rejected and the current value is kept. */
+    static constexpr int kMaxIterLimit = 1000;
+    bool setMaxIter(int maxIter) {
+        if (maxIter < 1 || maxIter > kMaxIterLimit) return false;
+        maxIter_ = maxIter;
+        return true;
+    }
     int  getMaxIter() const      { return maxIter_; }
 
     RigidBodySolver&       rigidSolver()       { return rigidFluid_.rigidWorld(); }
