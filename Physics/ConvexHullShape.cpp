@@ -2,7 +2,7 @@
 #include "ConvexHullShape.h"
 #include "ContactGeometry.h"
 
-#include "CGLib/ThirdParty/glm-0.9.9.8/glm/gtc/quaternion.hpp"
+#include "CGLib/ThirdParty/glm/glm/gtc/quaternion.hpp"
 
 #include <unordered_set>
 

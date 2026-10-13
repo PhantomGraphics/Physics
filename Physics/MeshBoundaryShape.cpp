@@ -3,7 +3,7 @@
 
 #include "CGLib/Volume/Volume/LevelSet.h"
 #include "CGLib/Volume/Volume/SparseVolumeTree/Interpolator.h"
-#include "CGLib/ThirdParty/glm-0.9.9.8/glm/gtc/quaternion.hpp"
+#include "CGLib/ThirdParty/glm/glm/gtc/quaternion.hpp"
 
 #include <array>
 
