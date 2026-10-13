@@ -490,3 +490,24 @@ TEST(PhysicsSolverTest, StepUnconditional_FluidRigidAndSoftAllCoupledSimultaneou
         EXPECT_TRUE(std::isfinite(pos.y));
     }
 }
+
+TEST(PhysicsSolverTest, SetTimeStepRejectsInvalidAndKeepsValue) {
+    PhysicsSolver solver;
+    ASSERT_TRUE(solver.setTimeStep(0.005f));
+    const float bad[] = { 0.0f, -0.01f, std::nanf(""), INFINITY, -INFINITY };
+    for (float dt : bad) {
+        EXPECT_FALSE(solver.setTimeStep(dt));
+        EXPECT_FLOAT_EQ(solver.getTimeStep(), 0.005f);
+    }
+}
+
+TEST(PhysicsSolverTest, SetMaxIterRejectsOutOfRangeAndKeepsValue) {
+    PhysicsSolver solver;
+    ASSERT_TRUE(solver.setMaxIter(5));
+    EXPECT_FALSE(solver.setMaxIter(0));
+    EXPECT_FALSE(solver.setMaxIter(-3));
+    EXPECT_FALSE(solver.setMaxIter(PhysicsSolver::kMaxIterLimit + 1));
+    EXPECT_EQ(solver.getMaxIter(), 5);
+    EXPECT_TRUE(solver.setMaxIter(PhysicsSolver::kMaxIterLimit));
+    EXPECT_TRUE(solver.setMaxIter(1));
+}

@@ -84,7 +84,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 | 45–49 | `flame` — 炎 SPH・Flame 描画（Normal/PBVR） | | |
 | 50–59 | `couple` — Rigid↔Fluid / Soft↔Fluid | | |
 
-現在 58 本（`45`〜`49_flame_*`（炎 SPH、`docs/todo/PLAN_flame_sph_pbvr_improvement.md`）、`04_smoke_new_scene`（File > New / `NewScene` コマンド）、`81_render_background` / `82_render_rigid_shaded` / `83_render_soft_shaded` / `84_render_shadows` / `85_render_ssfr_scene`（glTF レンダリング Phase 1–5）を含む）。全シナリオが「事前条件・変化（`store_as`+`post_assert` または初期値を含まない `expect_range`/`expect_not`）・不変条件」の三点契約で構成されている（詳細は
+`scenarios/` 直下に 100 本（2026-10-13 時点。`showcase/` 配下の 6 本は別枠で既定実行に含まない。Debug では `debug-slow` タグ付きも除外）。主なもの: （`45`〜`49_flame_*`（炎 SPH、`docs/todo/PLAN_flame_sph_pbvr_improvement.md`）、`04_smoke_new_scene`（File > New / `NewScene` コマンド）、`81_render_background` / `82_render_rigid_shaded` / `83_render_soft_shaded` / `84_render_shadows` / `85_render_ssfr_scene`（glTF レンダリング Phase 1–5）を含む）。全シナリオが「事前条件・変化（`store_as`+`post_assert` または初期値を含まない `expect_range`/`expect_not`）・不変条件」の三点契約で構成されている（詳細は
 シナリオテストガイドの「アサーション三点契約」節）。
 
 **タグ:** JSON トップレベルの `"tags": [...]` を `run_physics_scenarios.ps1` が読み、`-Tag`/`-ExcludeTag` で絞り込む
