@@ -9,7 +9,7 @@
 #endif
 
 #include "CGLib/Space/Space/NeighborList.h"
-#include "CGLib/ThirdParty/glm-0.9.9.8/glm/gtc/noise.hpp"
+#include "CGLib/ThirdParty/glm/glm/gtc/noise.hpp"
 
 using namespace Phantom::Math;
 using namespace Phantom::Space;

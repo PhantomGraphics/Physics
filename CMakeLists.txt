@@ -100,7 +100,7 @@ add_library(PhysicsWorldCore STATIC
     ${PHYSICS_ROOT}/PhysicsView/SceneComponentRegistry.cpp)
 target_include_directories(PhysicsWorldCore PRIVATE
     ${REPO_ROOT}
-    ${CGLIB_ROOT}/ThirdParty/glm-0.9.9.8)
+    ${CGLIB_ROOT}/ThirdParty/glm)
 target_link_libraries(PhysicsWorldCore PUBLIC PhysicsCore)
 if(OpenMP_CXX_FOUND)
     target_link_libraries(PhysicsWorldCore PRIVATE OpenMP::OpenMP_CXX)
@@ -143,7 +143,7 @@ if(PHANTOM_GTEST_FOUND)
     cglib_add_test(PhysicsTest
         SOURCES ${PHYSICSTEST_SOURCES}
         LINK PhysicsWorldCore PhysicsCore
-        INCLUDES ${PHYSICS_ROOT}/PhysicsTest ${CGLIB_ROOT}/ThirdParty/glm-0.9.9.8)
+        INCLUDES ${PHYSICS_ROOT}/PhysicsTest ${CGLIB_ROOT}/ThirdParty/glm)
     set_target_properties(PhysicsTest PROPERTIES
         CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON

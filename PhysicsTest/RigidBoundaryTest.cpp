@@ -2,7 +2,7 @@
 #include "../Physics/RigidBoundary.h"
 #include "../Physics/RigidBody.h"
 #include "../Physics/MeshBoundaryShape.h"
-#include "CGLib/ThirdParty/glm-0.9.9.8/glm/gtc/quaternion.hpp"
+#include "CGLib/ThirdParty/glm/glm/gtc/quaternion.hpp"
 #include <array>
 #include <cmath>
 
