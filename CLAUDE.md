@@ -216,7 +216,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 
 ### Fluid_GPU_Vk（`Physics/Fluid_GPU_Vk/`）
 
-`CSPHSolverVk` — Vulkan Compute による GPU 版 CSPH ソルバー。`CSPHParticleBufferVk`/`CSPHGridBufferVk` が SSBO を管理、シェーダーソースは `Shader/*.comp`（`Shader/compile_shaders.bat` で glslc により事前に `.comp.spv` へコンパイルし、`VulkanSPVResolver.h` 経由でランタイムに読み込む——他の Vulkan アプリ/ライブラリと同じ方式）。以前は `CSPHShaderSourceVk.h` に埋め込んだ GLSL 文字列を libshaderc で実行時コンパイルしていたが、2026-08-19 にこの事前コンパイル方式へ変更し libshaderc への依存を撤廃した。`FluidWorld::SimulationType::GPU_CSPH` から利用される（`setVulkanContext()` を事前に呼ぶ必要あり）。
+`CSPHSolverVk` — Vulkan Compute による GPU 版 CSPH ソルバー。`CSPHParticleBufferVk`/`CSPHGridBufferVk` が SSBO を管理、シェーダーソースは `Shader/*.comp`（`Shader/compile_shaders.bat` で glslc により事前に `.comp.spv` へコンパイルし、`SpvResolver.h` 経由でランタイムに読み込む——他の Vulkan アプリ/ライブラリと同じ方式）。以前は `CSPHShaderSourceVk.h` に埋め込んだ GLSL 文字列を libshaderc で実行時コンパイルしていたが、2026-08-19 にこの事前コンパイル方式へ変更し libshaderc への依存を撤廃した。`FluidWorld::SimulationType::GPU_CSPH` から利用される（`setVulkanContext()` を事前に呼ぶ必要あり）。
 
 ### FluidRenderer（`Physics/FluidRenderer/`）
 

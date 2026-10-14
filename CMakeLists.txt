@@ -210,7 +210,7 @@ target_compile_features(FluidRendererCore PRIVATE cxx_std_20)
 # --- Fluid_GPU_Vk (GPU Compute CSPH) -- PhysicsView only ---
 #
 # CSPHSolverVk.cpp loads precompiled .spv files at runtime via
-# VulkanSPVResolver.h, same as every other Vulkan app/library in this repo
+# SpvResolver.h, same as every other Vulkan app/library in this repo
 # (see Fluid_GPU_Vk/Shader/compile_shaders.bat) -- no libshaderc dependency.
 
 add_library(FluidGPUVkCore STATIC
@@ -297,7 +297,7 @@ target_compile_features(PhysicsView PRIVATE cxx_std_20)
 
 # PhysicsView loads shaders from three source trees, one per library it links,
 # all flattened into a single `shaders/` directory next to the executable
-# (VulkanSPVResolver resolves every name against that one directory):
+# (SpvResolver resolves every name against that one directory):
 #   - PhysicsView/shaders      -- the viewer's own point/line/triangle pipelines
 #   - Fluid_GPU_Vk/Shader      -- GPU_CSPH compute shaders (CSPHSolverVk)
 #   - FluidRenderer/shaders    -- SSFR + skybox (SSFluidRenderer, FluidRendererCore)
@@ -308,7 +308,7 @@ target_compile_features(PhysicsView PRIVATE cxx_std_20)
 # library means adding its shader directory here too.
 # PhysicsView/shaders also carries the six flame_*.{vert,frag} sources (folded
 # in with the former standalone FlameView) -- FlameRenderer's three pipelines
-# load them by name via VulkanSPVResolver from the same flattened shaders/ dir.
+# load them by name via SpvResolver from the same flattened shaders/ dir.
 # It likewise carries gltf.{vert,frag} (copied verbatim from CGLib/GltfViewer/
 # shaders -- the SDR/in-shader-tonemap variant, same as Universe uses) for the
 # GltfSceneRenderer background pass (PLAN_physicsview_gltf_rendering.md Phase 0).

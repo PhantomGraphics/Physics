@@ -2,7 +2,7 @@
 
 #include "CSPHSolverVk.h"
 
-#include "../../CGLib/VulkanGraphics/VulkanSPVResolver.h"
+#include "../../CGLib/VulkanGraphics/SpvResolver.h"
 
 #include <chrono>
 #include <cmath>
