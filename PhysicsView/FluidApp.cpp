@@ -4,7 +4,7 @@
 #include <chrono>
 #include "../Physics/CloudDensity.h"
 
-#include "../../CGLib/VulkanGraphics/VulkanSPVResolver.h"
+#include "../../CGLib/VulkanGraphics/SpvResolver.h"
 
 #include <algorithm>
 #include <cmath>
