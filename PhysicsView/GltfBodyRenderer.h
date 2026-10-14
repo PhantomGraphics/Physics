@@ -39,7 +39,7 @@ namespace Physics { class RigidBody; }
  * owns the viewport), Shaded (this renderer only), or Both. FluidApp reads
  * mode() to gate the two renderers' setEnabled().
  */
-class GltfBodyRenderer : public ::VKG::IVkSubRenderer {
+class GltfBodyRenderer : public ::Phantom::VKG::IVkSubRenderer {
 public:
     using Mode = BodyRenderMode;
 

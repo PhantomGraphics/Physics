@@ -37,7 +37,7 @@ namespace Phantom {
  * depth. Data is pushed in by FluidApp every frame; this class never reads
  * Physics::FlameFluid.
  */
-class FlameRenderer : public ::VKG::IVkSubRenderer
+class FlameRenderer : public ::Phantom::VKG::IVkSubRenderer
 {
 public:
 	enum class RenderMode { Normal, PBVR };

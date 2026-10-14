@@ -12,7 +12,7 @@
 
 namespace Phantom {
 
-class RigidBodyWireRenderer : public ::VKG::IVkSubRenderer {
+class RigidBodyWireRenderer : public ::Phantom::VKG::IVkSubRenderer {
 public:
     struct Shaders {
         std::vector<uint32_t> vertSpv;
@@ -52,7 +52,7 @@ private:
     const Phantom::VKG::VulkanContext*     ctx_  = nullptr;
     const Phantom::VKG::VulkanCommandPool* pool_ = nullptr;
 
-    std::optional<VKG::VkLineRenderer> lineRenderer_;
+    std::optional<Phantom::VKG::VkLineRenderer> lineRenderer_;
 
     std::vector<float>    positions_;
     std::vector<float>    colors_;

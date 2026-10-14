@@ -18,7 +18,7 @@ namespace Phantom {
  * Phantom::VKG::VkTriangleRenderer, mirroring RigidBodyWireRenderer's
  * external-MVP wrapper pattern (no owned camera).
  */
-class FluidMeshRenderer : public ::VKG::IVkSubRenderer {
+class FluidMeshRenderer : public ::Phantom::VKG::IVkSubRenderer {
 public:
     struct Shaders {
         std::vector<uint32_t> vertSpv;
@@ -56,7 +56,7 @@ private:
     const Phantom::VKG::VulkanContext*     ctx_  = nullptr;
     const Phantom::VKG::VulkanCommandPool* pool_ = nullptr;
 
-    std::optional<VKG::VkTriangleRenderer> triangleRenderer_;
+    std::optional<Phantom::VKG::VkTriangleRenderer> triangleRenderer_;
 
     std::vector<float>    positions_;
     std::vector<float>    colors_;

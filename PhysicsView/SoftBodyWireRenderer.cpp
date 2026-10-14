@@ -26,7 +26,7 @@ void SoftBodyWireRenderer::onInit(Phantom::VKG::VulkanContext& ctx,
     ctx_  = &ctx;
     pool_ = &pool;
 
-    VKG::VkLineRenderer::Config cfg;
+    Phantom::VKG::VkLineRenderer::Config cfg;
     cfg.vertSpv = std::move(shaders_.vertSpv);
     cfg.fragSpv = std::move(shaders_.fragSpv);
     cfg.alphaBlend = alphaBlend_;
@@ -45,7 +45,7 @@ void SoftBodyWireRenderer::onUpdate(uint32_t frameIndex)
 
     vkDeviceWaitIdle(ctx_->getDevice());
 
-    VKG::VkLineRenderer::Buffer buf;
+    Phantom::VKG::VkLineRenderer::Buffer buf;
     buf.positions        = positions_;
     buf.colors           = colors_;
     buf.indices          = indices_;

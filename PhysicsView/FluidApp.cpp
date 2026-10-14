@@ -211,101 +211,101 @@ void FluidApp::onInit()
 
     {
         FluidRenderer::Shaders s;
-        s.vertSpv = ::VKG::loadSPVRepo("shaders/fluid_point.vert.spv");
-        s.fragSpv = ::VKG::loadSPVRepo("shaders/fluid_point.frag.spv");
+        s.vertSpv = ::Phantom::VKG::loadSPVRepo("shaders/fluid_point.vert.spv");
+        s.fragSpv = ::Phantom::VKG::loadSPVRepo("shaders/fluid_point.frag.spv");
         fluidRenderer_.setShaders(std::move(s));
     }
     {
         RigidBodyWireRenderer::Shaders s;
-        s.vertSpv = ::VKG::loadSPVRepo("shaders/line.vert.spv");
-        s.fragSpv = ::VKG::loadSPVRepo("shaders/line.frag.spv");
+        s.vertSpv = ::Phantom::VKG::loadSPVRepo("shaders/line.vert.spv");
+        s.fragSpv = ::Phantom::VKG::loadSPVRepo("shaders/line.frag.spv");
         rigidRenderer_.setShaders(std::move(s));
         RigidBodyWireRenderer::Shaders debug;
-        debug.vertSpv = ::VKG::loadSPVRepo("shaders/line.vert.spv");
-        debug.fragSpv = ::VKG::loadSPVRepo("shaders/line.frag.spv");
+        debug.vertSpv = ::Phantom::VKG::loadSPVRepo("shaders/line.vert.spv");
+        debug.fragSpv = ::Phantom::VKG::loadSPVRepo("shaders/line.frag.spv");
         flameDebugRenderer_.setShaders(std::move(debug));
         flameDebugRenderer_.setExtent(getExtent());
     }
     {
         SoftBodyWireRenderer::Shaders s;
-        s.vertSpv = ::VKG::loadSPVRepo("shaders/line.vert.spv");
-        s.fragSpv = ::VKG::loadSPVRepo("shaders/line.frag.spv");
+        s.vertSpv = ::Phantom::VKG::loadSPVRepo("shaders/line.vert.spv");
+        s.fragSpv = ::Phantom::VKG::loadSPVRepo("shaders/line.frag.spv");
         softRenderer_.setShaders(std::move(s));
         SoftBodyWireRenderer::Shaders hairShaders;
-        hairShaders.vertSpv = ::VKG::loadSPVRepo("shaders/line.vert.spv");
-        hairShaders.fragSpv = ::VKG::loadSPVRepo("shaders/line.frag.spv");
+        hairShaders.vertSpv = ::Phantom::VKG::loadSPVRepo("shaders/line.vert.spv");
+        hairShaders.fragSpv = ::Phantom::VKG::loadSPVRepo("shaders/line.frag.spv");
         hairRenderer_.setShaders(std::move(hairShaders));
     }
     {
         VolumeRenderer::Shaders s;
-        s.vertSpv = ::VKG::loadSPVRepo("shaders/point.vert.spv");
-        s.fragSpv = ::VKG::loadSPVRepo("shaders/point.frag.spv");
+        s.vertSpv = ::Phantom::VKG::loadSPVRepo("shaders/point.vert.spv");
+        s.fragSpv = ::Phantom::VKG::loadSPVRepo("shaders/point.frag.spv");
         volumeRenderer_.setShaders(std::move(s));
     }
     {
         FluidMeshRenderer::Shaders s;
-        s.vertSpv = ::VKG::loadSPVRepo("shaders/triangle.vert.spv");
-        s.fragSpv = ::VKG::loadSPVRepo("shaders/triangle.frag.spv");
+        s.vertSpv = ::Phantom::VKG::loadSPVRepo("shaders/triangle.vert.spv");
+        s.fragSpv = ::Phantom::VKG::loadSPVRepo("shaders/triangle.frag.spv");
         meshRenderer_.setShaders(std::move(s));
     }
     {
         // Flame's three self-contained point-sprite pipelines (additive flame/
         // spark, alpha-blended smoke, unified opaque PBVR) -- see FlameRenderer.
         FlameRenderer::Shaders fs;
-        fs.flameVert = ::VKG::loadSPVRepo("shaders/flame_point.vert.spv");
-        fs.flameFrag = ::VKG::loadSPVRepo("shaders/flame_point.frag.spv");
-        fs.smokeVert = ::VKG::loadSPVRepo("shaders/flame_smoke.vert.spv");
-        fs.smokeFrag = ::VKG::loadSPVRepo("shaders/flame_smoke.frag.spv");
-        fs.pbvr.pointVert      = ::VKG::loadSPVRepo("shaders/flame_pbvr_point.vert.spv");
-        fs.pbvr.pointFrag      = ::VKG::loadSPVRepo("shaders/flame_pbvr_point.frag.spv");
+        fs.flameVert = ::Phantom::VKG::loadSPVRepo("shaders/flame_point.vert.spv");
+        fs.flameFrag = ::Phantom::VKG::loadSPVRepo("shaders/flame_point.frag.spv");
+        fs.smokeVert = ::Phantom::VKG::loadSPVRepo("shaders/flame_smoke.vert.spv");
+        fs.smokeFrag = ::Phantom::VKG::loadSPVRepo("shaders/flame_smoke.frag.spv");
+        fs.pbvr.pointVert      = ::Phantom::VKG::loadSPVRepo("shaders/flame_pbvr_point.vert.spv");
+        fs.pbvr.pointFrag      = ::Phantom::VKG::loadSPVRepo("shaders/flame_pbvr_point.frag.spv");
         fs.pbvr.emissiveVert   = fs.flameVert;
         fs.pbvr.emissiveFrag   = fs.flameFrag;
-        fs.pbvr.fullscreenVert = ::VKG::loadSPVRepo("shaders/flame_fullscreen.vert.spv");
-        fs.pbvr.blendFrag      = ::VKG::loadSPVRepo("shaders/flame_pbvr_blend.frag.spv");
-        fs.pbvr.compositeFrag  = ::VKG::loadSPVRepo("shaders/flame_pbvr_composite.frag.spv");
-        fs.pbvr.generateComp   = ::VKG::loadSPVRepo("shaders/flame_pbvr_generate.comp.spv");
-        fs.pbvr.finalizeComp   = ::VKG::loadSPVRepo("shaders/flame_pbvr_finalize.comp.spv");
-        fs.pbvr.shadowVert     = ::VKG::loadSPVRepo("shaders/flame_pbvr_shadow.vert.spv");
-        fs.pbvr.shadowFrag     = ::VKG::loadSPVRepo("shaders/flame_pbvr_shadow.frag.spv");
-        fs.haze.fieldVert      = ::VKG::loadSPVRepo("shaders/flame_haze_field.vert.spv");
-        fs.haze.fieldFrag      = ::VKG::loadSPVRepo("shaders/flame_haze_field.frag.spv");
+        fs.pbvr.fullscreenVert = ::Phantom::VKG::loadSPVRepo("shaders/flame_fullscreen.vert.spv");
+        fs.pbvr.blendFrag      = ::Phantom::VKG::loadSPVRepo("shaders/flame_pbvr_blend.frag.spv");
+        fs.pbvr.compositeFrag  = ::Phantom::VKG::loadSPVRepo("shaders/flame_pbvr_composite.frag.spv");
+        fs.pbvr.generateComp   = ::Phantom::VKG::loadSPVRepo("shaders/flame_pbvr_generate.comp.spv");
+        fs.pbvr.finalizeComp   = ::Phantom::VKG::loadSPVRepo("shaders/flame_pbvr_finalize.comp.spv");
+        fs.pbvr.shadowVert     = ::Phantom::VKG::loadSPVRepo("shaders/flame_pbvr_shadow.vert.spv");
+        fs.pbvr.shadowFrag     = ::Phantom::VKG::loadSPVRepo("shaders/flame_pbvr_shadow.frag.spv");
+        fs.haze.fieldVert      = ::Phantom::VKG::loadSPVRepo("shaders/flame_haze_field.vert.spv");
+        fs.haze.fieldFrag      = ::Phantom::VKG::loadSPVRepo("shaders/flame_haze_field.frag.spv");
         fs.haze.fullscreenVert = fs.pbvr.fullscreenVert;
-        fs.haze.applyFrag      = ::VKG::loadSPVRepo("shaders/flame_haze_apply.frag.spv");
+        fs.haze.applyFrag      = ::Phantom::VKG::loadSPVRepo("shaders/flame_haze_apply.frag.spv");
         flameRenderer_.setShaders(std::move(fs));
         flameRenderer_.setDepthFormat(getSwapChain().findDepthFormat().value_or(VK_FORMAT_D32_SFLOAT));
 
         CloudVolumeRenderer::Shaders cs;
-        cs.fullscreenVert = ::VKG::loadSPVRepo("shaders/volume_fullscreen.vert.spv");
-        cs.raymarchFrag = ::VKG::loadSPVRepo("shaders/volume_raymarch.frag.spv");
-        cs.sunTransmittanceComp = ::VKG::loadSPVRepo("shaders/volume_sun_transmittance.comp.spv");
-        cs.pbvrGenerateComp = ::VKG::loadSPVRepo("shaders/volume_pbvr_generate.comp.spv");
-        cs.pbvrPointVert = ::VKG::loadSPVRepo("shaders/volume_pbvr_point.vert.spv");
-        cs.pbvrPointFrag = ::VKG::loadSPVRepo("shaders/volume_pbvr_point.frag.spv");
-        cs.pbvrAccumulateComp = ::VKG::loadSPVRepo("shaders/volume_pbvr_accumulate.comp.spv");
-        cs.pbvrCompositeFrag = ::VKG::loadSPVRepo("shaders/volume_pbvr_composite.frag.spv");
+        cs.fullscreenVert = ::Phantom::VKG::loadSPVRepo("shaders/volume_fullscreen.vert.spv");
+        cs.raymarchFrag = ::Phantom::VKG::loadSPVRepo("shaders/volume_raymarch.frag.spv");
+        cs.sunTransmittanceComp = ::Phantom::VKG::loadSPVRepo("shaders/volume_sun_transmittance.comp.spv");
+        cs.pbvrGenerateComp = ::Phantom::VKG::loadSPVRepo("shaders/volume_pbvr_generate.comp.spv");
+        cs.pbvrPointVert = ::Phantom::VKG::loadSPVRepo("shaders/volume_pbvr_point.vert.spv");
+        cs.pbvrPointFrag = ::Phantom::VKG::loadSPVRepo("shaders/volume_pbvr_point.frag.spv");
+        cs.pbvrAccumulateComp = ::Phantom::VKG::loadSPVRepo("shaders/volume_pbvr_accumulate.comp.spv");
+        cs.pbvrCompositeFrag = ::Phantom::VKG::loadSPVRepo("shaders/volume_pbvr_composite.frag.spv");
         cloudVolumeRenderer_.setDepthFormat(getSwapChain().findDepthFormat().value_or(VK_FORMAT_D32_SFLOAT));
         cloudVolumeRenderer_.setShaders(std::move(cs));
     }
     {
         static constexpr auto kSS = "shaders/";
         Phantom::SSFluidRenderer::Shaders s;
-        s.depthVert      = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_depth.vert.spv");
-        s.depthFrag      = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_depth.frag.spv");
-        s.thicknessVert  = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_thickness.vert.spv");
-        s.thicknessFrag  = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_thickness.frag.spv");
-        s.bilateralVert  = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_bilateral.vert.spv");
-        s.bilateralFrag  = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_bilateral.frag.spv");
-        s.reflectionVert = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_reflection.vert.spv");
-        s.reflectionFrag = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_reflection.frag.spv");
-        s.refractionVert = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_refraction.vert.spv");
-        s.refractionFrag = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_refraction.frag.spv");
-        s.compositeVert  = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_composite.vert.spv");
-        s.compositeFrag  = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_composite.frag.spv");
-        s.skyboxVert     = ::VKG::loadSPVRepo(std::string(kSS) + "skybox.vert.spv");
-        s.skyboxFrag     = ::VKG::loadSPVRepo(std::string(kSS) + "skybox.frag.spv");
-        s.anisoVert          = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_aniso.vert.spv");
-        s.depthAnisoFrag     = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_depth_aniso.frag.spv");
-        s.thicknessAnisoFrag = ::VKG::loadSPVRepo(std::string(kSS) + "ssfr_thickness_aniso.frag.spv");
+        s.depthVert      = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "ssfr_depth.vert.spv");
+        s.depthFrag      = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "ssfr_depth.frag.spv");
+        s.thicknessVert  = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "ssfr_thickness.vert.spv");
+        s.thicknessFrag  = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "ssfr_thickness.frag.spv");
+        s.bilateralVert  = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "ssfr_bilateral.vert.spv");
+        s.bilateralFrag  = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "ssfr_bilateral.frag.spv");
+        s.reflectionVert = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "ssfr_reflection.vert.spv");
+        s.reflectionFrag = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "ssfr_reflection.frag.spv");
+        s.refractionVert = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "ssfr_refraction.vert.spv");
+        s.refractionFrag = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "ssfr_refraction.frag.spv");
+        s.compositeVert  = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "ssfr_composite.vert.spv");
+        s.compositeFrag  = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "ssfr_composite.frag.spv");
+        s.skyboxVert     = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "skybox.vert.spv");
+        s.skyboxFrag     = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "skybox.frag.spv");
+        s.anisoVert          = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "ssfr_aniso.vert.spv");
+        s.depthAnisoFrag     = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "ssfr_depth_aniso.frag.spv");
+        s.thicknessAnisoFrag = ::Phantom::VKG::loadSPVRepo(std::string(kSS) + "ssfr_thickness_aniso.frag.spv");
         ssfrRenderer_.setShaders(std::move(s));
     }
 
@@ -316,18 +316,18 @@ void FluidApp::onInit()
     bgGltfRenderer_.setExtent(getExtent());
     {
         Phantom::Gltf::GltfSceneRenderer::Shaders s;
-        s.vertSpv = ::VKG::loadSPVRepo("shaders/gltf.vert.spv");
-        s.fragSpv = ::VKG::loadSPVRepo("shaders/gltf.frag.spv");
-        s.sampledLightFragSpv = ::VKG::loadSPVRepo("shaders/gltf_flame.frag.spv");
-        s.shadowVertSpv = ::VKG::loadSPVRepo("shaders/shadow.vert.spv");
-        s.shadowFragSpv = ::VKG::loadSPVRepo("shaders/shadow.frag.spv");
+        s.vertSpv = ::Phantom::VKG::loadSPVRepo("shaders/gltf.vert.spv");
+        s.fragSpv = ::Phantom::VKG::loadSPVRepo("shaders/gltf.frag.spv");
+        s.sampledLightFragSpv = ::Phantom::VKG::loadSPVRepo("shaders/gltf_flame.frag.spv");
+        s.shadowVertSpv = ::Phantom::VKG::loadSPVRepo("shaders/shadow.vert.spv");
+        s.shadowFragSpv = ::Phantom::VKG::loadSPVRepo("shaders/shadow.frag.spv");
         bgGltfRenderer_.setShaders(std::move(s));
     }
     {
         Gltf::GltfSceneRenderer::Shaders s;
-        s.vertSpv=::VKG::loadSPVRepo("shaders/combustible.vert.spv");
-        s.fragSpv=::VKG::loadSPVRepo("shaders/combustible.frag.spv");
-        s.sampledLightFragSpv=::VKG::loadSPVRepo("shaders/combustible_flame.frag.spv");
+        s.vertSpv=::Phantom::VKG::loadSPVRepo("shaders/combustible.vert.spv");
+        s.fragSpv=::Phantom::VKG::loadSPVRepo("shaders/combustible.frag.spv");
+        s.sampledLightFragSpv=::Phantom::VKG::loadSPVRepo("shaders/combustible_flame.frag.spv");
         combustibleRenderer_.setShaders(std::move(s));
         combustibleRenderer_.bind(&flameWorld_);
         combustibleRenderer_.setOnChanged([this] { if(!flameWorld_.isRunning()) flameRenderer_.notifySimulationAdvanced(true); });
@@ -341,18 +341,18 @@ void FluidApp::onInit()
     // Rigid-/soft-body shaded pass: same gltf.{vert,frag} + shadow.{vert,frag};
     // each per-body GltfSceneRenderer instance gets its own copy (see
     // GltfBodyRenderer / GltfSoftRenderer).
-    rigidGltfRenderer_.setShaders(::VKG::loadSPVRepo("shaders/gltf.vert.spv"),
-                                  ::VKG::loadSPVRepo("shaders/gltf.frag.spv"));
-    rigidGltfRenderer_.setSampledLightShader(::VKG::loadSPVRepo("shaders/gltf_flame.frag.spv"));
-    rigidGltfRenderer_.setShadowShaders(::VKG::loadSPVRepo("shaders/shadow.vert.spv"),
-                                        ::VKG::loadSPVRepo("shaders/shadow.frag.spv"));
-    softGltfRenderer_.setShaders(::VKG::loadSPVRepo("shaders/gltf.vert.spv"),
-                                  ::VKG::loadSPVRepo("shaders/gltf.frag.spv"));
-    softGltfRenderer_.setSampledLightShader(::VKG::loadSPVRepo("shaders/gltf_flame.frag.spv"));
-    softGltfRenderer_.setShadowShaders(::VKG::loadSPVRepo("shaders/shadow.vert.spv"),
-                                       ::VKG::loadSPVRepo("shaders/shadow.frag.spv"));
+    rigidGltfRenderer_.setShaders(::Phantom::VKG::loadSPVRepo("shaders/gltf.vert.spv"),
+                                  ::Phantom::VKG::loadSPVRepo("shaders/gltf.frag.spv"));
+    rigidGltfRenderer_.setSampledLightShader(::Phantom::VKG::loadSPVRepo("shaders/gltf_flame.frag.spv"));
+    rigidGltfRenderer_.setShadowShaders(::Phantom::VKG::loadSPVRepo("shaders/shadow.vert.spv"),
+                                        ::Phantom::VKG::loadSPVRepo("shaders/shadow.frag.spv"));
+    softGltfRenderer_.setShaders(::Phantom::VKG::loadSPVRepo("shaders/gltf.vert.spv"),
+                                  ::Phantom::VKG::loadSPVRepo("shaders/gltf.frag.spv"));
+    softGltfRenderer_.setSampledLightShader(::Phantom::VKG::loadSPVRepo("shaders/gltf_flame.frag.spv"));
+    softGltfRenderer_.setShadowShaders(::Phantom::VKG::loadSPVRepo("shaders/shadow.vert.spv"),
+                                       ::Phantom::VKG::loadSPVRepo("shaders/shadow.frag.spv"));
 
-    ::VKG::VkAppBase::onInit();   // onInits ssfrRenderer_ (composite -> swapchain) + UI panels
+    ::Phantom::VKG::VkAppBase::onInit();   // onInits ssfrRenderer_ (composite -> swapchain) + UI panels
     setupCallbacks();
 
     // Phase 5: linear-HDR opaque-scene target. Every "scene" renderer is onInit'd
@@ -396,7 +396,7 @@ void FluidApp::onInit()
     // Shipped default environment: a compact studio with large light panels
     // and a cool window, giving water readable highlights without visual noise.
     static const std::string kEnvMapDir =
-        (::VKG::detail::detectModuleDir() / "envmap").string();
+        (::Phantom::VKG::detail::detectModuleDir() / "envmap").string();
     {
         std::array<std::string, 6> paths;
         bool ok = true;
@@ -686,7 +686,7 @@ void FluidApp::onUpdate(uint32_t frameIndex)
     } else {
     }
 
-    ::VKG::VkAppBase::onUpdate(frameIndex);   // ssfrRenderer_ + UI panels
+    ::Phantom::VKG::VkAppBase::onUpdate(frameIndex);   // ssfrRenderer_ + UI panels
     // Scene surfaces are part of the PBVR average too. Restart a paused mean
     // after edits; use temporal averaging while rigid/soft geometry is moving.
     const std::string sceneState=renderBackground_.sceneStateJson()+":"+
@@ -751,7 +751,7 @@ void FluidApp::onPreRender(VkCommandBuffer cmd, uint32_t frameIndex)
         // haze pass's background target first; the HDR scene pass then starts with
         // a displaced copy of it and the flame is drawn on top.
         const bool haze = flameRenderer_.hazeActive();
-        auto* const flameSub = static_cast<::VKG::IVkSubRenderer*>(&flameRenderer_);
+        auto* const flameSub = static_cast<::Phantom::VKG::IVkSubRenderer*>(&flameRenderer_);
         if (haze) {
             flameRenderer_.recordHazeField(cmd, frameIndex);
             flameRenderer_.beginHazeBackground(cmd, clear);
@@ -778,7 +778,7 @@ void FluidApp::onImGui()
     if (!uiVisible_) return;
     menuBar_.show();
     shell_.drawWindows();         // Command + Outliner, and syncs bound panel visibility
-    ::VKG::VkAppBase::onImGui(); // the other windows draw themselves
+    ::Phantom::VKG::VkAppBase::onImGui(); // the other windows draw themselves
     shell_.placeBoundPanels();
 }
 
@@ -787,7 +787,7 @@ void FluidApp::onCleanup()
     // Must run before VkAppBase::onCleanup()'s caller (cleanup()) destroys
     // the VulkanContext -- see FluidWorld::releaseGpuResources()'s doc comment.
     world_.releaseGpuResources();
-    ::VKG::VkAppBase::onCleanup();   // cleans up ssfrRenderer_ (the only sub-renderer left)
+    ::Phantom::VKG::VkAppBase::onCleanup();   // cleans up ssfrRenderer_ (the only sub-renderer left)
 
     // Phase 5: the opaque scene renderers are driven manually, so clean them up
     // manually too (device is idle -- cleanup() waited).

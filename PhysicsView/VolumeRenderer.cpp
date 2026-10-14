@@ -25,7 +25,7 @@ void VolumeRenderer::onInit(Phantom::VKG::VulkanContext& ctx,
     ctx_  = &ctx;
     pool_ = &pool;
 
-    VKG::VkPointRenderer::Config cfg;
+    Phantom::VKG::VkPointRenderer::Config cfg;
     cfg.vertSpv = std::move(shaders_.vertSpv);
     cfg.fragSpv = std::move(shaders_.fragSpv);
     pointRenderer_.emplace(std::move(cfg));
@@ -42,7 +42,7 @@ void VolumeRenderer::onUpdate(uint32_t frameIndex)
     // VkLineRenderer/VkTriangleRenderer) -- re-upload every frame so the
     // points track the shared orbit camera, mirroring VkSpaceRenderer's
     // point-renderer usage (CGLib/Space/SpaceView/VkSpaceRenderer.cpp).
-    VKG::VkPointRenderer::Buffer buf;
+    Phantom::VKG::VkPointRenderer::Buffer buf;
     buf.positions        = positions_;
     buf.colors           = colors_;
     buf.sizes            = sizes_;

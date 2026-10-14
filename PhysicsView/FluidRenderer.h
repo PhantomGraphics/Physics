@@ -20,7 +20,7 @@ struct VkFluidVertex {
     static std::array<VkVertexInputAttributeDescription, 1> getAttributeDescriptions();
 };
 
-class FluidRenderer : public ::VKG::IVkSubRenderer {
+class FluidRenderer : public ::Phantom::VKG::IVkSubRenderer {
 public:
     FluidRenderer() = default;
 

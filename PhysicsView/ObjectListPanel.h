@@ -20,7 +20,7 @@ namespace Phantom {
  * with its close box wired to visible_ (docs/todo/PLAN_physicsview_declarative_ui.md
  * declarative style).
  */
-class ObjectListPanel : public ::VKG::IVkUIPanel {
+class ObjectListPanel : public ::Phantom::VKG::IVkUIPanel {
 public:
     void bind(const SceneComponentRegistry* registry) { registry_ = registry; }
     void setVisible(bool v) { visible_ = v; }

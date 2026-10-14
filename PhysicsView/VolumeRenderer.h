@@ -19,7 +19,7 @@ namespace Phantom {
  * external-MVP wrapper pattern (no owned camera -- the caller passes the
  * shared scene MVP into update() each time the data or camera changes).
  */
-class VolumeRenderer : public ::VKG::IVkSubRenderer {
+class VolumeRenderer : public ::Phantom::VKG::IVkSubRenderer {
 public:
     struct Shaders {
         std::vector<uint32_t> vertSpv;
@@ -57,7 +57,7 @@ private:
     const Phantom::VKG::VulkanContext*     ctx_  = nullptr;
     const Phantom::VKG::VulkanCommandPool* pool_ = nullptr;
 
-    std::optional<VKG::VkPointRenderer> pointRenderer_;
+    std::optional<Phantom::VKG::VkPointRenderer> pointRenderer_;
 
     std::vector<float> positions_;
     std::vector<float> colors_;

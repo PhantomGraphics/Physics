@@ -35,7 +35,7 @@ namespace Physics { struct ISoftBody; }
  * smooth normal each frame via GltfSceneRenderer::updateMorphedGeometry() (the
  * primitive is marked setDynamic(true) so the CPU vertex mirror is kept).
  */
-class GltfSoftRenderer : public ::VKG::IVkSubRenderer {
+class GltfSoftRenderer : public ::Phantom::VKG::IVkSubRenderer {
 public:
     using Mode = BodyRenderMode;
 

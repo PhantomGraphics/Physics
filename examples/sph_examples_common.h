@@ -20,7 +20,7 @@
 #include <string>
 #include <vector>
 
-namespace sph_examples {
+namespace Phantom::sph_examples {
 
 using Phantom::Math::Vector3df;
 using Phantom::Math::Box3df;
