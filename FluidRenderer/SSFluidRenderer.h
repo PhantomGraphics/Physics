@@ -29,7 +29,7 @@
 
 namespace Phantom::VKG { class VulkanContext; class VulkanCommandPool; }
 
-using GlobalVkSubRenderer = ::VKG::IVkSubRenderer;
+using GlobalVkSubRenderer = ::Phantom::VKG::IVkSubRenderer;
 using GlobalVulkanContext = Phantom::VKG::VulkanContext;
 using GlobalVulkanCommandPool = Phantom::VKG::VulkanCommandPool;
 using GlobalVulkanCubeMap = Phantom::VKG::VulkanCubeMap;

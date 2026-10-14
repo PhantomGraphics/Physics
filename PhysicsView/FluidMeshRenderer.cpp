@@ -26,7 +26,7 @@ void FluidMeshRenderer::onInit(Phantom::VKG::VulkanContext& ctx,
     ctx_  = &ctx;
     pool_ = &pool;
 
-    VKG::VkTriangleRenderer::Config cfg;
+    Phantom::VKG::VkTriangleRenderer::Config cfg;
     cfg.vertSpv     = std::move(shaders_.vertSpv);
     cfg.fragSpv     = std::move(shaders_.fragSpv);
     cfg.blendEnable = false;
@@ -46,7 +46,7 @@ void FluidMeshRenderer::onUpdate(uint32_t frameIndex)
 
     vkDeviceWaitIdle(ctx_->getDevice());
 
-    VKG::VkTriangleRenderer::Buffer buf;
+    Phantom::VKG::VkTriangleRenderer::Buffer buf;
     buf.positions        = positions_;
     buf.colors           = colors_;
     buf.indices          = indices_;

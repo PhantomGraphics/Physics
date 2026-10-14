@@ -50,7 +50,7 @@
 
 namespace Phantom {
 
-class FluidApp : public ::VKG::VkAppBase, public ::IScenarioHost {
+class FluidApp : public ::Phantom::VKG::VkAppBase, public ::IScenarioHost {
 public:
     FluidApp(int width, int height, const std::string& title);
 
@@ -118,7 +118,7 @@ private:
     bool                             hdrValid_ = false;
     // Opaque "scene" sub-renderers, driven manually against hdrScene_'s render
     // pass (NOT via add()). Populated in the constructor.
-    std::vector<::VKG::IVkSubRenderer*> hdrRenderers_;
+    std::vector<::Phantom::VKG::IVkSubRenderer*> hdrRenderers_;
     // Anisotropic kernel (SSFR ellipsoid splats): recomputed with every
     // particle sync while the renderer's kernel flag is on, and once more when
     // the flag / settings change (kernelGeneration) so a paused scene updates.

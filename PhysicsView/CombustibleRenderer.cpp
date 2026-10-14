@@ -7,7 +7,7 @@
 
 using namespace Phantom;
 
-void CombustibleRenderer::onInit(VKG::VulkanContext& ctx,const VKG::VulkanCommandPool& pool,VkRenderPass pass,uint32_t frames)
+void CombustibleRenderer::onInit(Phantom::VKG::VulkanContext& ctx,const Phantom::VKG::VulkanCommandPool& pool,VkRenderPass pass,uint32_t frames)
 { ctx_=&ctx; pool_=&pool; pass_=pass; frames_=frames; }
 
 void CombustibleRenderer::onUpdate(uint32_t frame)

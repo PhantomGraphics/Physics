@@ -24,7 +24,7 @@
 #include <cstdio>
 #include <string>
 
-using namespace sph_examples;
+using namespace Phantom::sph_examples;
 using Phantom::Physics::WCSPHFluid;
 using Phantom::Physics::WCSPHSolver;
 using Phantom::Physics::Emitter;

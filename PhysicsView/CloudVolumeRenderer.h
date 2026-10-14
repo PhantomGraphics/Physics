@@ -26,7 +26,7 @@ namespace Phantom {
  * parameters, viewport) the ensemble average restarts and `ensemblesPerFrame` ensembles are added
  * per frame (same-frame averaging only); once still, it keeps adding until `targetEnsembles`.
  */
-class CloudVolumeRenderer : public ::VKG::IVkSubRenderer
+class CloudVolumeRenderer : public ::Phantom::VKG::IVkSubRenderer
 {
 public:
 	enum class Mode { Raymarch, Pbvr };

@@ -26,12 +26,12 @@
 #include <memory>
 #include <string>
 
-using namespace sph_examples;
+using namespace Phantom::sph_examples;
 namespace P = Phantom::Physics;
 
 // Shared geometry (mirrors scenarios 11 & 12: a resting 3x3x3 block that
 // settles under gravity in a roomy box).
-namespace scene {
+namespace Phantom::scene {
     constexpr float radius       = 0.15f;
     constexpr float spacing      = radius * 2.0f;
     constexpr float effectLength = 1.0f;
@@ -57,13 +57,13 @@ static Sim makeWCSPH()
 {
     Sim s;
     s.wcsph = std::make_unique<P::WCSPHFluid>();
-    s.wcsph->setDensity(scene::restDensity);
-    s.wcsph->setEffectLength(scene::effectLength);
+    s.wcsph->setDensity(Phantom::scene::restDensity);
+    s.wcsph->setEffectLength(Phantom::scene::effectLength);
     s.wcsph->setPressureCoeFromScale(1960.0f);
     s.wcsph->setVicosityCoe(0.5f);
     s.wcsph->setTensionCoe(0.0f);
-    for (const auto& p : seedBox(scene::block, scene::spacing))
-        s.wcsph->createParticle(p, scene::radius);
+    for (const auto& p : seedBox(Phantom::scene::block, Phantom::scene::spacing))
+        s.wcsph->createParticle(p, Phantom::scene::radius);
 
     auto solver = std::make_unique<P::WCSPHSolver>();
     solver->add(s.wcsph.get());
@@ -75,12 +75,12 @@ static Sim makePBSPH()
 {
     Sim s;
     s.pbsph = std::make_unique<P::PBSPHFluid>();
-    s.pbsph->setEffectLength(scene::effectLength);
-    s.pbsph->setRestDensity(scene::restDensity);
+    s.pbsph->setEffectLength(Phantom::scene::effectLength);
+    s.pbsph->setRestDensity(Phantom::scene::restDensity);
     s.pbsph->setStiffness(0.001f);        // PBSPH's own stable regime
     s.pbsph->setVicsosity(0.0f);
-    for (const auto& p : seedBox(scene::block, scene::spacing))
-        s.pbsph->createParticle(p, scene::radius);
+    for (const auto& p : seedBox(Phantom::scene::block, Phantom::scene::spacing))
+        s.pbsph->createParticle(p, Phantom::scene::radius);
 
     auto solver = std::make_unique<P::PBSPHSolver>();
     solver->add(s.pbsph.get());
@@ -91,10 +91,10 @@ static Sim makePBSPH()
 // From here down, only ISPHSolver is used -- no solver-specific code.
 static void run(const std::string& name, Sim sim)
 {
-    sim->setEffectLength(scene::effectLength);
-    sim->setTimeStep(scene::dt);
-    sim->setExternalForce(scene::gravity);
-    sim->setBoundary(scene::container, scene::dt);
+    sim->setEffectLength(Phantom::scene::effectLength);
+    sim->setTimeStep(Phantom::scene::dt);
+    sim->setExternalForce(Phantom::scene::gravity);
+    sim->setBoundary(Phantom::scene::container, Phantom::scene::dt);
     // A little wall-normal damping is part of the scene, not a material
     // parameter.  Without it PBSPH's hard positional wall constraint and
     // WCSPH's penalty wall retain very different amounts of impact energy,
@@ -106,8 +106,8 @@ static void run(const std::string& name, Sim sim)
 
     Stopwatch clock;
     float worstSpeed = 0.f;
-    for (int step = 0; step < scene::steps; ++step) {
-        sim->simulate(scene::dt, 4);
+    for (int step = 0; step < Phantom::scene::steps; ++step) {
+        sim->simulate(Phantom::scene::dt, 4);
         worstSpeed = std::max(worstSpeed, maxSpeed(sim->getParticleVelocities()));
     }
 
@@ -121,9 +121,9 @@ static void run(const std::string& name, Sim sim)
 
 int main()
 {
-    const int n = static_cast<int>(seedBox(scene::block, scene::spacing).size());
+    const int n = static_cast<int>(seedBox(Phantom::scene::block, Phantom::scene::spacing).size());
     std::printf("%d-particle block settling in a box, %d steps, one ISPHSolver* loop:\n",
-                n, scene::steps);
+                n, Phantom::scene::steps);
     run("WCSPH", makeWCSPH());
     run("PBSPH", makePBSPH());
     std::printf("\nBoth were driven through the identical ISPHSolver* code path in run().\n");
