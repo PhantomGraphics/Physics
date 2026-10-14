@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Physics/CloudParticle.h"
+#include "../Physics/CloudParticleSoA.h"
 #include "../Physics/CloudSolver.h"
 
 #include <cstdint>

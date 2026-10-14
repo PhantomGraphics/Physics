@@ -16,7 +16,7 @@
 #include "ShapeBoundarySet.h"
 #include "BoundaryRegistry.h"
 #include "DFSPHParticle.h"
-#include "CGLib/Space/Space/NeighborList.h"
+#include "CGLib/Space/Space/CSRNeighborList.h"
 #include <memory>
 
 namespace Phantom {

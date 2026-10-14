@@ -23,7 +23,7 @@ TEST(CloudDensityTest, SingleParticleConservesMass)
   CloudParticleSoA soa;
   soa.add(Vector3dd(500.0, 500.0, 500.0), Vector3dd(0.0), 8000.0, 290.0, 0.0, 1.0e-3);   // 8 kg of cloud water
   const auto desc = CloudDensity::makeGridDesc(Vector3dd(0.0), Vector3dd(1000.0), 64);
-  Phantom::Volume::ScalarGrid3D grid;
+  Phantom::Volume::ScalarGrid3d grid;
   const CloudDensityStats st = CloudDensity::reconstruct(soa, desc, 60.0, grid);
   EXPECT_NEAR(st.particleMass, 8.0, 1e-12);
   EXPECT_LT(st.relativeError, 0.01);
@@ -41,7 +41,7 @@ TEST(CloudDensityTest, UniformLatticeGivesUniformInteriorDensity)
     for (double y = dx / 2; y < 1000.0; y += dx)
       for (double x = dx / 2; x < 1000.0; x += dx) soa.add(Vector3dd(x, y, z), Vector3dd(0.0), m, 290.0, 0.0, qc);
   const auto desc = CloudDensity::makeGridDesc(Vector3dd(0.0), Vector3dd(1000.0), 64);
-  Phantom::Volume::ScalarGrid3D grid;
+  Phantom::Volume::ScalarGrid3d grid;
   const CloudDensityStats st = CloudDensity::reconstruct(soa, desc, 1.5 * dx, grid);
   const double expected = m * qc / (dx * dx * dx);
   for (float p : { 400.0f, 500.0f, 613.0f }) {
@@ -56,7 +56,7 @@ TEST(CloudDensityTest, NoCloudWaterGivesEmptyGrid)
   CloudParticleSoA soa;
   soa.add(Vector3dd(10.0), Vector3dd(0.0), 1000.0, 290.0, 0.01, 0.0);
   const auto desc = CloudDensity::makeGridDesc(Vector3dd(0.0), Vector3dd(100.0), 16);
-  Phantom::Volume::ScalarGrid3D grid;
+  Phantom::Volume::ScalarGrid3d grid;
   const CloudDensityStats st = CloudDensity::reconstruct(soa, desc, 10.0, grid);
   EXPECT_EQ(st.cloudyParticles, 0u);
   EXPECT_EQ(st.gridMass, 0.0);
@@ -68,7 +68,7 @@ TEST(CloudDensityTest, ParticleOnWallReportsTruncatedMass)
   CloudParticleSoA soa;
   soa.add(Vector3dd(0.0, 500.0, 500.0), Vector3dd(0.0), 8000.0, 290.0, 0.0, 1.0e-3);
   const auto desc = CloudDensity::makeGridDesc(Vector3dd(0.0), Vector3dd(1000.0), 64);
-  Phantom::Volume::ScalarGrid3D grid;
+  Phantom::Volume::ScalarGrid3d grid;
   const CloudDensityStats st = CloudDensity::reconstruct(soa, desc, 60.0, grid);
   EXPECT_GT(st.relativeError, 0.3);   // about half the kernel lies outside the grid
   EXPECT_LT(st.gridMass, st.particleMass);

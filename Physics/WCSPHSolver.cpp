@@ -5,7 +5,7 @@
 #include "WCSPHFluid.h"
 #include "OpenMPRuntimeTuning.h"
 
-#include "CGLib/Space/Space/NeighborList.h"
+#include "CGLib/Space/Space/CSRNeighborList.h"
 
 
 using namespace Phantom::Math;
