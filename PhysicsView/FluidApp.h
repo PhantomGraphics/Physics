@@ -170,7 +170,7 @@ private:
     SoftBodyWireRenderer hairRenderer_;
     double            hairLastTime_ = -1.;
     CloudVolumeRenderer cloudVolumeRenderer_;
-    Volume::ScalarGrid3D cloudDensity_;            // last reconstructed density (cloud space)
+    Volume::ScalarGrid3d cloudDensity_;            // last reconstructed density (cloud space)
     bool              cloudDirty_ = true;          // display needs re-uploading
     bool              prevCloudActive_ = false;
     uint64_t          cloudSyncedStep_ = ~0ull;

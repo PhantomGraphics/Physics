@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CGLib/VkAppBase/IVkSubRenderer.h"
-#include "CGLib/Volume/VolumeRaymarch/VolumePbvrGpu.h"
+#include "CGLib/Volume/VolumeRaymarch/VolumePBVRGpu.h"
 #include "CGLib/Volume/VolumeRaymarch/VolumeRaymarchGpu.h"
 
 #include <glm/glm.hpp>
@@ -14,7 +14,7 @@ namespace Phantom {
  * @brief IVkSubRenderer that draws a cloud-water density grid into PhysicsView's HDR scene
  * (docs/todo/PLAN_cloud_sph_pbvr.md Phase 3): either the reference raymarch or the ensemble PBVR
  * of the same grids. A thin adapter over the cloud-agnostic Volume::VolumeRaymarchGpu /
- * VolumePbvrGpu: it owns the cloud-space -> scene-space transform, upload scheduling and the
+ * VolumePBVRGpu: it owns the cloud-space -> scene-space transform, upload scheduling and the
  * accumulation policy, nothing physical.
  *
  * Cloud space is z-up metres; the scene (FluidRenderer camera) is y-up and ~40 units across, so
@@ -36,7 +36,7 @@ public:
 		std::vector<uint32_t> pbvrGenerateComp, pbvrPointVert, pbvrPointFrag, pbvrAccumulateComp, pbvrCompositeFrag;
 	};
 
-	struct PbvrSettings {
+	struct PBVRSettings {
 		uint32_t ensemblesPerFrame = 2;    ///< Added per frame (running: 1..4 is the interactive budget).
 		uint32_t targetEnsembles = 64;     ///< Stop accumulating here while the image is still.
 		float minDiameterPx = 1.5f;
@@ -56,14 +56,14 @@ public:
 	bool isEnabled() const { return enabled_; }
 	void setMode(Mode m);
 	Mode mode() const { return mode_; }
-	void setPbvrSettings(const PbvrSettings& s);
-	const PbvrSettings& pbvrSettings() const { return pbvrSettings_; }
+	void setPbvrSettings(const PBVRSettings& s);
+	const PBVRSettings& pbvrSettings() const { return pbvrSettings_; }
 
 	/** @brief HDR target size in pixels (PBVR screen-sized targets). */
 	void resize(uint32_t width, uint32_t height);
 
 	/** @brief Grid to render (cloud-space box). Recreates the GPU images when the layout changes. */
-	void setDensity(const Volume::ScalarGrid3D& density);
+	void setDensity(const Volume::ScalarGrid3d& density);
 	void setScattering(const Volume::ScatteringParams& p);
 	/** @brief cloud -> scene transform, and the camera in scene space. */
 	void setCamera(const glm::mat4& proj, const glm::mat4& view, const glm::mat4& cloudToScene, uint32_t viewportHeight);
@@ -90,21 +90,21 @@ private:
 	Phantom::VKG::VulkanContext* ctx_ = nullptr;
 	const Phantom::VKG::VulkanCommandPool* pool_ = nullptr;
 	Phantom::Volume::VolumeRaymarchGpu gpu_;
-	Phantom::Volume::VolumePbvrGpu pbvr_;
+	Phantom::Volume::VolumePBVRGpu pbvr_;
 	bool ready_ = false;
 	bool pbvrReady_ = false;
 	bool enabled_ = false;
 	Mode mode_ = Mode::Raymarch;
-	PbvrSettings pbvrSettings_;
+	PBVRSettings pbvrSettings_;
 	uint32_t width_ = 0, height_ = 0;
 
-	Volume::ScalarGrid3D pending_;
+	Volume::ScalarGrid3d pending_;
 	bool densityDirty_ = false;
 	bool sunDirty_ = false;
 	bool pbvrRestart_ = true;
 	Volume::ScatteringParams scattering_;
 	Phantom::Volume::VolumeRaymarchGpu::Camera camera_;
-	Phantom::Volume::VolumePbvrGpu::Camera pbvrCamera_;
+	Phantom::Volume::VolumePBVRGpu::Camera pbvrCamera_;
 	bool hasCamera_ = false;
 };
 

@@ -8,7 +8,7 @@
 #include <omp.h>
 #endif
 
-#include "CGLib/Space/Space/NeighborList.h"
+#include "CGLib/Space/Space/CSRNeighborList.h"
 #include "CGLib/ThirdParty/glm/glm/gtc/noise.hpp"
 
 using namespace Phantom::Math;

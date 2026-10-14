@@ -1,4 +1,4 @@
-#include "CloudParticle.h"
+#include "CloudParticleSoA.h"
 #include "CloudThermodynamics.h"
 
 #include <algorithm>

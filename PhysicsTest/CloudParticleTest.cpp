@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "../Physics/CloudParticle.h"
+#include "../Physics/CloudParticleSoA.h"
 #include "../Physics/CloudThermodynamics.h"
 
 #include <cmath>

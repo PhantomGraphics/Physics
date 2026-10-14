@@ -1,7 +1,7 @@
 #pragma once
 
-#include "CloudParticle.h"
-#include "CGLib/Volume/Volume/ScalarGrid3D.h"
+#include "CloudParticleSoA.h"
+#include "CGLib/Volume/Volume/ScalarGrid3d.h"
 
 namespace Phantom {
 	namespace Physics {
@@ -34,7 +34,7 @@ Volume::ScalarGridDesc makeGridDesc(const Math::Vector3dd& domainMin, const Math
  * cell-centre sampling stays accurate. Returns the mass check.
  */
 CloudDensityStats reconstruct(const CloudParticleSoA& soa, const Volume::ScalarGridDesc& desc,
-                              double supportRadius, Volume::ScalarGrid3D& out);
+                              double supportRadius, Volume::ScalarGrid3d& out);
 
 }  // namespace CloudDensity
 

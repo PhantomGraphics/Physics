@@ -3,7 +3,7 @@
 #include "AnisotropicKernel.h"
 
 #include "CGLib/Numerics/Numerics/SVD3d.h"
-#include "CGLib/Space/Space/NeighborList.h"
+#include "CGLib/Space/Space/CSRNeighborList.h"
 
 using namespace Phantom::Math;
 using namespace Phantom::Physics;

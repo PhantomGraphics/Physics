@@ -10,7 +10,7 @@ namespace Phantom {
 
 bool CloudVolumeRenderer::createPbvr()
 {
-	Volume::VolumePbvrGpu::Config pc;
+	Volume::VolumePBVRGpu::Config pc;
 	pc.generateCompSpv = shaders_.pbvrGenerateComp;
 	pc.pointVertSpv = shaders_.pbvrPointVert;
 	pc.pointFragSpv = shaders_.pbvrPointFrag;
@@ -38,7 +38,7 @@ void CloudVolumeRenderer::onInit(Phantom::VKG::VulkanContext& ctx, const Phantom
 	pool_ = &pool;
 	renderPass_ = renderPass;
 	framesInFlight_ = framesInFlight;
-	if (!Volume::Volume3DImage::isSupported(ctx)) {
+	if (!Volume::Volume3dImage::isSupported(ctx)) {
 		std::fprintf(stderr, "[Cloud] R32F 3D images are not supported here; the volume renderer is disabled\n");
 		return;
 	}
@@ -73,7 +73,7 @@ void CloudVolumeRenderer::setMode(Mode m)
 	mode_ = m;
 }
 
-void CloudVolumeRenderer::setPbvrSettings(const PbvrSettings& s)
+void CloudVolumeRenderer::setPbvrSettings(const PBVRSettings& s)
 {
 	if (s.minDiameterPx != pbvrSettings_.minDiameterPx || s.maxPerCell != pbvrSettings_.maxPerCell) {
 		pbvrRestart_ = true;
@@ -103,7 +103,7 @@ void CloudVolumeRenderer::resize(uint32_t width, uint32_t height)
 	}
 }
 
-void CloudVolumeRenderer::setDensity(const Volume::ScalarGrid3D& density)
+void CloudVolumeRenderer::setDensity(const Volume::ScalarGrid3d& density)
 {
 	pending_ = density;
 	densityDirty_ = true;
@@ -131,7 +131,7 @@ void CloudVolumeRenderer::setCamera(const glm::mat4& proj, const glm::mat4& view
 	const glm::vec3 eyeScene = glm::vec3(glm::inverse(view)[3]);
 	camera_.position = glm::vec3(glm::inverse(cloudToScene) * glm::vec4(eyeScene, 1.0f));
 
-	Volume::VolumePbvrGpu::Camera pc;
+	Volume::VolumePBVRGpu::Camera pc;
 	pc.viewProj = proj * view * cloudToScene;
 	pc.position = camera_.position;
 	const float h = static_cast<float>(std::max(1u, viewportHeight));
@@ -191,7 +191,7 @@ CloudVolumeRenderer::Stats CloudVolumeRenderer::queryStats()
 	s.mode = mode_;
 	if (ready_ && pbvrReady_) {
 		s.accumulated = pbvr_.accumulatedEnsembles();
-		Volume::VolumePbvrGpu::Stats gs;
+		Volume::VolumePBVRGpu::Stats gs;
 		vkDeviceWaitIdle(ctx_->getDevice());
 		if (pbvr_.readStats(*ctx_, *pool_, gs)) {
 			s.overflowed = gs.overflowed;

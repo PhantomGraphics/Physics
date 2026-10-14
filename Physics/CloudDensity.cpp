@@ -7,7 +7,7 @@ namespace Phantom {
 	namespace Physics {
 		namespace CloudDensity {
 
-using Volume::ScalarGrid3D;
+using Volume::ScalarGrid3d;
 using Volume::ScalarGridDesc;
 
 namespace {
@@ -39,9 +39,9 @@ ScalarGridDesc makeGridDesc(const Math::Vector3dd& lo, const Math::Vector3dd& hi
 }
 
 CloudDensityStats reconstruct(const CloudParticleSoA& soa, const ScalarGridDesc& desc, double supportRadius,
-                              ScalarGrid3D& out)
+                              ScalarGrid3d& out)
 {
-	out = ScalarGrid3D(desc, 0.0f, 0.0f);
+	out = ScalarGrid3d(desc, 0.0f, 0.0f);
 	CloudDensityStats st;
 	const double cell = desc.cellSize;
 	const double h = std::max(supportRadius, 2.0 * cell);

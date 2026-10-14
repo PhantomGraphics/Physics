@@ -1,9 +1,9 @@
 #pragma once
 
 #include "CloudParams.h"
-#include "CloudParticle.h"
+#include "CloudParticleSoA.h"
 #include "CloudStats.h"
-#include "CGLib/Space/Space/NeighborList.h"
+#include "CGLib/Space/Space/CSRNeighborList.h"
 
 #include <vector>
 
