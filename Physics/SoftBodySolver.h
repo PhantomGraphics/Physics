@@ -3,7 +3,7 @@
 #include <memory>
 #include <vector>
 #include "CGLib/Util/UnCopyable.h"
-#include "CGLib/Math/Vector3d.h"
+#include "CGLib/Math/Math/Vector3d.h"
 #include "ISoftBody.h"
 #include "XPBDSolver.h"
 #include "SphereCollider.h"

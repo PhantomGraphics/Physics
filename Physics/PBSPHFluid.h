@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CGLib/Util/UnCopyable.h"
-#include "CGLib/Math/Box3d.h"
+#include "CGLib/Math/Math/Box3d.h"
 #include "SPHKernel.h"
 #include "PBSPHParticle.h"
 #include "Emitter.h"

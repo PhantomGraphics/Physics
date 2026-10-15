@@ -1,8 +1,8 @@
 ﻿#pragma once
 
 #include "CGLib/Util/UnCopyable.h"
-#include "CGLib/Math/Vector3d.h"
-#include "CGLib/Math/Matrix3d.h"
+#include "CGLib/Math/Math/Vector3d.h"
+#include "CGLib/Math/Math/Matrix3d.h"
 
 #include "SPHKernel.h"
 #include <vector>

@@ -4,8 +4,8 @@
 #include "SPHKernel.h"
 #include "BoundaryParticle.h"
 #include "IBoundaryParticles.h"
-#include "CGLib/Math/Vector3d.h"
-#include "CGLib/Math/Quaternion.h"
+#include "CGLib/Math/Math/Vector3d.h"
+#include "CGLib/Math/Math/Quaternion.h"
 
 #include <vector>
 

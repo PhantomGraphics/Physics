@@ -3,7 +3,7 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
-#include "../../CGLib/Math/Vector3d.h"
+#include "../../CGLib/Math/Math/Vector3d.h"
 #include "../../CGLib/Util/UnCopyable.h"
 #include "../../CGLib/VulkanGraphics/VulkanContext.h"
 #include "../../CGLib/VulkanGraphics/VulkanBuffer.h"

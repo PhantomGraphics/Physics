@@ -3,7 +3,7 @@
 #include "ContactGeometry.h"
 #include "ConvexHullShape.h"
 
-#include "CGLib/Math/Matrix3d.h"
+#include "CGLib/Math/Math/Matrix3d.h"
 #include "CGLib/ThirdParty/glm/glm/gtc/quaternion.hpp"
 
 namespace Phantom {

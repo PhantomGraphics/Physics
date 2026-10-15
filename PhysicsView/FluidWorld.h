@@ -21,7 +21,7 @@
 #include "RigidBodyWorld.h"
 #include "SoftBodyWorld.h"
 
-#include "../../CGLib/Math/Box3d.h"
+#include "../../CGLib/Math/Math/Box3d.h"
 #include "../../CGLib/VulkanGraphics/VulkanContext.h"
 #include "../../CGLib/VulkanGraphics/VulkanCommandPool.h"
 

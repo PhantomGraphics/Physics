@@ -1,7 +1,7 @@
 #pragma once
 
 #include "SoftParticle.h"
-#include "CGLib/Math/Quaternion.h"
+#include "CGLib/Math/Math/Quaternion.h"
 #include <cstdint>
 
 namespace Phantom::Physics {

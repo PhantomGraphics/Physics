@@ -3,7 +3,7 @@
 #include "DMBoundary.h"
 
 #include "SPHKernel.h"
-#include "CGLib/Math/Plane3d.h"
+#include "CGLib/Math/Math/Plane3d.h"
 
 #include "CGLib/Space/Space/SignedDistanceCalculator.h"
 

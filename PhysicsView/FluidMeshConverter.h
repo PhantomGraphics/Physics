@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../CGLib/Volume/Volume/SparseVolumeTree/SparseVolume.h"
-#include "../../CGLib/Math/Triangle3d.h"
+#include "../../CGLib/Math/Math/Triangle3d.h"
 
 #include <cstdint>
 #include <string>

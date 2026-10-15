@@ -1,6 +1,6 @@
 #pragma once
-#include "CGLib/Math/Box3d.h"
-#include "CGLib/Math/Triangle3d.h"
+#include "CGLib/Math/Math/Box3d.h"
+#include "CGLib/Math/Math/Triangle3d.h"
 #include "CGLib/Space/Space/Octree.h"
 
 #include <vector>

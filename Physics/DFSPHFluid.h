@@ -6,7 +6,7 @@
 #include "OutflowRegion.h"
 #include "RandomSeed.h"
 #include "CGLib/Util/UnCopyable.h"
-#include "CGLib/Math/Box3d.h"
+#include "CGLib/Math/Math/Box3d.h"
 
 #include <random>
 #include <vector>

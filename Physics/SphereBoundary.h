@@ -2,7 +2,7 @@
 
 #include "BoundaryPenalty.h"
 #include "IShapeBoundary.h"
-#include "CGLib/Math/Vector3d.h"
+#include "CGLib/Math/Math/Vector3d.h"
 
 #include <limits>
 
