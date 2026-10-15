@@ -6,7 +6,7 @@
 #include "../Physics/ISPHSolver.h"
 #include "../Physics/SPHKernel.h"
 #include "CGLib/Util/UnCopyable.h"
-#include "CGLib/Math/Box3d.h"
+#include "CGLib/Math/Math/Box3d.h"
 
 #include <memory>
 #include <vector>

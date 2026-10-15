@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-#include "../../CGLib/Math/Box3d.h"
+#include "../../CGLib/Math/Math/Box3d.h"
 
 using namespace Phantom::Math;
 using namespace Phantom::Physics;

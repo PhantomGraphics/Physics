@@ -1,7 +1,7 @@
 #pragma once
 
-#include "CGLib/Math/Vector3d.h"
-#include "CGLib/Math/Matrix3d.h"
+#include "CGLib/Math/Math/Vector3d.h"
+#include "CGLib/Math/Math/Matrix3d.h"
 
 #include <cstddef>
 #include <vector>

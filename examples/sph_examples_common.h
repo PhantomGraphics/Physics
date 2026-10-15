@@ -6,8 +6,8 @@
 // to keep the example .cpp files short. Copy what you need into your own code.
 #pragma once
 
-#include "CGLib/Math/Vector3d.h"
-#include "CGLib/Math/Box3d.h"
+#include "CGLib/Math/Math/Vector3d.h"
+#include "CGLib/Math/Math/Box3d.h"
 
 #include <chrono>
 #include <cmath>

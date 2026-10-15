@@ -2,8 +2,8 @@
 
 #include "ICollisionShape.h"
 #include "RigidBody.h"
-#include "CGLib/Math/Vector3d.h"
-#include "CGLib/Math/Quaternion.h"
+#include "CGLib/Math/Math/Vector3d.h"
+#include "CGLib/Math/Math/Quaternion.h"
 #include <algorithm>
 
 namespace Phantom {

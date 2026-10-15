@@ -2,7 +2,7 @@
 #include "RigidBody.h"
 #include "ConvexHullShape.h"
 
-#include "CGLib/Math/Quaternion.h"
+#include "CGLib/Math/Math/Quaternion.h"
 #include "CGLib/ThirdParty/glm/glm/gtc/quaternion.hpp"
 
 namespace Phantom {

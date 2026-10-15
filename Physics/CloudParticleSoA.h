@@ -2,7 +2,7 @@
 
 #include "CloudParams.h"
 #include "CloudStats.h"
-#include "CGLib/Math/Vector3d.h"
+#include "CGLib/Math/Math/Vector3d.h"
 
 #include <cstdint>
 #include <vector>
