@@ -2,7 +2,7 @@
 #include "RigidBoundaryParticles.h"
 #include "BoundaryPsi.h"
 
-#include "CGLib/Math/Math/pi.h"
+#include "CGLib/Math/Core/pi.h"
 
 namespace Phantom {
 namespace Physics {

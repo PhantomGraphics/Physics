@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CloudParticleSoA.h"
-#include "CGLib/Volume/Volume/ScalarGrid3d.h"
+#include "CGLib/Volume/Core/ScalarGrid3d.h"
 
 namespace Phantom {
 	namespace Physics {

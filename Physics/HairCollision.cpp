@@ -1,5 +1,5 @@
 #include "HairCollision.h"
-#include "CGLib/Space/Space/DistanceCalculator.h"
+#include "CGLib/Space/Core/DistanceCalculator.h"
 #include <algorithm>
 #include <cmath>
 

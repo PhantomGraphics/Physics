@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../CGLib/Math/Math/Box3d.h"
-#include "../../CGLib/Volume/Volume/SparseVolumeTree/SparseVolume.h"
+#include "../../CGLib/Math/Core/Box3d.h"
+#include "../../CGLib/Volume/Core/SparseVolumeTree/SparseVolume.h"
 #include <memory>
 
 namespace Phantom {

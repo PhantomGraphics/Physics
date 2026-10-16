@@ -9,8 +9,8 @@
 #include <cmath>
 #include <cstring>
 
-#include "../../CGLib/Math/Math/Vector3d.h"
-#include "../../CGLib/Math/Math/Box3d.h"
+#include "../../CGLib/Math/Core/Vector3d.h"
+#include "../../CGLib/Math/Core/Box3d.h"
 #include "../../CGLib/Util/UnCopyable.h"
 #include "../../CGLib/VulkanGraphics/VulkanContext.h"
 #include "../../CGLib/VulkanGraphics/VulkanBuffer.h"

@@ -3,9 +3,9 @@
 #include "DMBoundary.h"
 
 #include "SPHKernel.h"
-#include "CGLib/Math/Math/Plane3d.h"
+#include "CGLib/Math/Core/Plane3d.h"
 
-#include "CGLib/Space/Space/SignedDistanceCalculator.h"
+#include "CGLib/Space/Core/SignedDistanceCalculator.h"
 
 using namespace Phantom::Math;
 using namespace Phantom::Space;

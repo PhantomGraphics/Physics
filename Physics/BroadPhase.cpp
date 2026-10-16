@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "BroadPhase.h"
 
-#include "CGLib/Space/Space/BVH.h"
+#include "CGLib/Space/Core/BVH.h"
 
 namespace Phantom {
 namespace Physics {

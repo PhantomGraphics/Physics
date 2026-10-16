@@ -6,7 +6,7 @@
 #include "CylinderBoundary.h"
 #include <optional>
 #include "CGLib/Util/UnCopyable.h"
-#include "CGLib/Math/Math/Box3d.h"
+#include "CGLib/Math/Core/Box3d.h"
 
 #include <vector>
 

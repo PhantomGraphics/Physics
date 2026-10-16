@@ -1,5 +1,5 @@
 #include "SelfCollision.h"
-#include "CGLib/Space/Space/CompactSpaceHash.h"
+#include "CGLib/Space/Core/CompactSpaceHash.h"
 
 #include <cmath>
 #include <set>

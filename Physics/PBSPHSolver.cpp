@@ -6,7 +6,7 @@
 #include "PlaneBoundary.h"
 #include "OpenMPRuntimeTuning.h"
 
-#include "CGLib/Space/Space/CSRNeighborList.h"
+#include "CGLib/Space/Core/CSRNeighborList.h"
 
 
 #include <algorithm>

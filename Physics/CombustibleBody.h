@@ -1,7 +1,7 @@
-﻿#pragma once
+#pragma once
 
-#include "CGLib/Math/Math/Vector3d.h"
-#include "CGLib/Math/Math/Quaternion.h"
+#include "CGLib/Math/Core/Vector3d.h"
+#include "CGLib/Math/Core/Quaternion.h"
 #include <cstdint>
 #include <vector>
 

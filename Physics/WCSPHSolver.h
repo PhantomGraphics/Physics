@@ -1,7 +1,7 @@
 #pragma once
 
 #include "SPHKernel.h"
-#include "CGLib/Math/Math/Box3d.h"
+#include "CGLib/Math/Core/Box3d.h"
 #include "CGLib/Util/UnCopyable.h"
 #include "PlaneBoundary.h"
 #include "ShapeBoundarySet.h"

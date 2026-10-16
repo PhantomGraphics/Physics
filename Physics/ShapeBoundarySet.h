@@ -6,7 +6,7 @@
 #include "PlateBoundary.h"
 #include "SphereBoundary.h"
 
-#include "CGLib/Math/Math/Box3d.h"
+#include "CGLib/Math/Core/Box3d.h"
 
 #include <memory>
 #include <utility>
