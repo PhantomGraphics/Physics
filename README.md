@@ -17,11 +17,14 @@ and standalone Vulkan viewers.
 
 | Project | Type | Purpose |
 |---|---|---|
-| `Physics/` (`PhysicsCore`) | Static library | Core library in `Phantom::Physics` |
+| `Core/` (`PhysicsCore`) | Static library | Core library in `Phantom::Physics` |
 | `PhysicsTest/` | GoogleTest | Core-library unit tests |
 | `PhysicsView/` | Vulkan + ImGui app | Integrated viewer with JSON scenarios; also hosts the experimental combustion-gas (Flame) SPH scene |
 | `Fluid_GPU_Vk/` (`FluidGPUVkCore`) | Static library | Vulkan Compute CSPH solver |
 | `FluidRenderer/` (`FluidRendererCore`) | Static library | Screen-space fluid rendering pipeline |
+
+The layout follows CGLib modules: `Core/` holds library headers and sources,
+with `PhysicsTest/` and `PhysicsView/` alongside it.
 
 ### Core capabilities
 

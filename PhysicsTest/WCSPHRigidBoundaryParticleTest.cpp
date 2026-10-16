@@ -1,9 +1,9 @@
 #include "pch.h"
-#include "../Physics/WCSPHSolver.h"
-#include "../Physics/WCSPHFluid.h"
-#include "../Physics/WCSPHParticle.h"
-#include "../Physics/RigidBoundaryParticles.h"
-#include "../Physics/IBoundaryParticles.h"
+#include "../Core/WCSPHSolver.h"
+#include "../Core/WCSPHFluid.h"
+#include "../Core/WCSPHParticle.h"
+#include "../Core/RigidBoundaryParticles.h"
+#include "../Core/IBoundaryParticles.h"
 #include <cmath>
 
 // Mirrors DFSPHRigidBoundaryParticleTest.cpp: WCSPH joined DFSPH/PBSPH in

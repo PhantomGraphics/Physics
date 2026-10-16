@@ -1,7 +1,7 @@
 #include "pch.h"
 #include <algorithm>
-#include "../Physics/SelfCollision.h"
-#include "../Physics/XPBDSolver.h"
+#include "../Core/SelfCollision.h"
+#include "../Core/XPBDSolver.h"
 
 using namespace Phantom::Physics;
 using namespace Phantom::Math;

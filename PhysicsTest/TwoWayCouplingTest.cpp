@@ -1,11 +1,11 @@
 #include "pch.h"
-#include "../Physics/PBSPHSolver.h"
-#include "../Physics/PBSPHFluid.h"
-#include "../Physics/PBSPHParticle.h"
-#include "../Physics/RigidBoundary.h"
-#include "../Physics/RigidBoundaryParticles.h"
-#include "../Physics/RigidFluidSolver.h"
-#include "../Physics/ICollisionShape.h"
+#include "../Core/PBSPHSolver.h"
+#include "../Core/PBSPHFluid.h"
+#include "../Core/PBSPHParticle.h"
+#include "../Core/RigidBoundary.h"
+#include "../Core/RigidBoundaryParticles.h"
+#include "../Core/RigidFluidSolver.h"
+#include "../Core/ICollisionShape.h"
 #include <cmath>
 
 using namespace Phantom::Physics;

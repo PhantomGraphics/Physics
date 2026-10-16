@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "../Physics/SoftFluidSolver.h"
+#include "../Core/SoftFluidSolver.h"
 #include <cmath>
 
 using namespace Phantom::Physics;

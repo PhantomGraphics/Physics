@@ -1,9 +1,9 @@
 #include "pch.h"
 #include "../PhysicsView/RenderDomainPolicy.h"
 #include "../PhysicsView/SoftBodyWireData.h"
-#include "../Physics/ClothBody.h"
-#include "../Physics/RigidBody.h"
-#include "../Physics/ICollisionShape.h"
+#include "../Core/ClothBody.h"
+#include "../Core/RigidBody.h"
+#include "../Core/ICollisionShape.h"
 
 using namespace Phantom;
 using namespace Phantom::Physics;

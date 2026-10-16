@@ -1,9 +1,9 @@
 #include "pch.h"
 
-#include "../Physics/FlameFluid.h"
-#include "../Physics/FlameParticle.h"
-#include "../Physics/FlameSolver.h"
-#include "../Physics/FlameStats.h"
+#include "../Core/FlameFluid.h"
+#include "../Core/FlameParticle.h"
+#include "../Core/FlameSolver.h"
+#include "../Core/FlameStats.h"
 #include "../PhysicsView/FlameWorld.h"
 
 #include <algorithm>

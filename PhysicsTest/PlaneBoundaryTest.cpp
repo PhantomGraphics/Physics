@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "../Physics/PlaneBoundary.h"
+#include "../Core/PlaneBoundary.h"
 
 using namespace Phantom::Math;
 using namespace Phantom::Physics;

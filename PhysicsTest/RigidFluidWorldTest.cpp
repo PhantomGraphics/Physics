@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "../Physics/RigidFluidSolver.h"
+#include "../Core/RigidFluidSolver.h"
 #include <cmath>
 
 using namespace Phantom::Physics;

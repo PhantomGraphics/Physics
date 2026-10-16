@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Physics/Physics/RigidBody.h"
-#include "Physics/Physics/RigidBodySolver.h"
-#include "Physics/Physics/PhysicsSolver.h"
-#include "Physics/Physics/ICollisionShape.h"
+#include "Physics/Core/RigidBody.h"
+#include "Physics/Core/RigidBodySolver.h"
+#include "Physics/Core/PhysicsSolver.h"
+#include "Physics/Core/ICollisionShape.h"
 #include "SceneComponent.h"
 #include <glm/glm.hpp>
 #include <memory>
@@ -87,7 +87,7 @@ private:
     Physics::PhysicsSolver& physicsSolver_;
     ScenePreset              preset_ = ScenePreset::SphereDrop;
 
-    // RigidBodySolver only holds non-owning pointers (see Physics/Physics/RigidBodySolver.h);
+    // RigidBodySolver only holds non-owning pointers (see Physics/Core/RigidBodySolver.h);
     // this world owns every RigidBody it creates, and (since each body owns its shape
     // 1:1 and no shape is ever shared between bodies) the ICollisionShape backing its
     // RigidBody::shape pointer too.

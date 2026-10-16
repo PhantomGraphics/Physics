@@ -163,7 +163,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 
 ## Architecture
 
-### Phantom::Physics（`Physics/Physics/`）— コアライブラリ
+### Phantom::Physics（`Physics/Core/`）— コアライブラリ
 
 **流体（SPH）**
 - `ISPHSolver` — DFSPH/PBSPH/WCSPH の共通インターフェース。`simulate(dt, maxIter)` に加え、剛体境界（One-Way SDF: `addRigidBoundary`／Two-Way Akinci 境界粒子: `addRigidBoundaryParticles`）と SoftBody 境界粒子（`addSoftBoundaryParticles`）の登録口を持つ。`setMaxSubstep()` は DFSPH の適応サブステップ上限を明示する別名で、`getLastSolveStats()` は直前フレームの進行時間・サブステップ数・反復回数・収束／設定妥当性を返す。粒子数・位置・速度・密度・カーネル・基準密度も共通 getter で取得でき、PhysicsView の CPU ソルバー表示／WhiteWater 経路は具象流体へ分岐しない。Two-Way 系は DFSPH/PBSPH/WCSPH が実装（`supportsTwoWayCoupling()`）。（旧 MVCSolver は意図的に対応せず no-op を継承していたが、開発一時停止のため現在はビルド対象外 — 下記参照。）
@@ -209,7 +209,7 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 - `FlameWorld`/`FlameControlPanel`/`FlameRenderer` — 炎 SPH（旧 FlameView を統合、下記 Flame 節）。`ControlPage::Flame` を開いている間だけ描画する独立ドメイン。
 
 - `CloudWorld`/`CloudControlPanel`/`CloudCommandDispatcher` — 雲（湿潤空気 SPH）。Flame と同じ「結合しない独立ドメイン」で
-  `ControlPage::Cloud`。コアは `Physics/Physics/Cloud{Params,Thermodynamics,Particle,Stats,Solver}`（double、Vulkan/ImGui 非依存、
+  `ControlPage::Cloud`。コアは `Physics/Core/Cloud{Params,Thermodynamics,Particle,Stats,Solver}`（double、Vulkan/ImGui 非依存、
   PhysicsTest で検証）。表示は既定でレイマーチング（`CloudVolumeRenderer` → 独立モジュール `CGLib/Volume/VolumeRaymarch`。密度は `Physics/CloudDensity` が粒子から再構成）、`volumeMode=0` で FluidRenderer による粒子診断表示。PBVR は未実装。シナリオ `55`〜`59_cloud_*`。
   コマンド名はすべて "Cloud" を含む（`CloudCommandDispatcher.h` 参照）。`CloudWorld` は構築時に格子を作らず（`ensureBuilt()`）、
   初回使用時に 32³ を作る。**格子・環境系パラメータは `CloudReset` で反映**される。
@@ -223,12 +223,12 @@ PhysicsView 全体——fluid + rigid + soft-body + coupling——であるた�
 Screen Space Fluid Rendering（SSFR）パイプライン。`ParticleDepthRenderer`（深度）→ `BilateralFilter`（平滑化）→ `SSThicknessRenderer`（厚み）→ `SSReflectionRenderer`/`SSRefractionRenderer`（反射・屈折）を `SSFluidRenderer` が束ね、`SSFROffscreenSet` でオフスクリーンターゲットを管理する。
 
 **異方性カーネル（楕円体スプラット、`docs/todo/PLAN_ssfr_anisotropic_kernel.md`、既定 OFF）**: Yu & Turk (2013) の異方性カーネルで各粒子を楕円体として深度・厚みパスにレイキャストする（`shaders/ssfr_aniso.vert` + `ssfr_{depth,thickness}_aniso.frag`、共通部は `ssfr_aniso_*.glsl`）。既存の「Anisotropic Smoothing」（`BilateralFilter` の画面空間フィルタ）とは別物で、名前・UI・コマンドを分けてある。
-- 行列の定義は `Physics/Physics/AnisotropicKernel.{h,cpp}` の 1 か所（`anisotropyFromCovariance()`／`computeAnisotropy()`、`Space::CSRNeighborList` + OpenMP、自分自身も近傍に含む）。`SPHSurfaceParticle`（Volume 変換）も同じ関数を呼ぶので、Volume の G と SSFR の楕円体軸 T = R·diag(σ) は常に対応する（G·T が直交行列）。
+- 行列の定義は `Physics/Core/AnisotropicKernel.{h,cpp}` の 1 か所（`anisotropyFromCovariance()`／`computeAnisotropy()`、`Space::CSRNeighborList` + OpenMP、自分自身も近傍に含む）。`SPHSurfaceParticle`（Volume 変換）も同じ関数を呼ぶので、Volume の G と SSFR の楕円体軸 T = R·diag(σ) は常に対応する（G·T が直交行列）。
 - `FluidRendererCore` は PhysicsCore に依存しない。楕円体はホスト側で `SSFRAnisotropy.h`（header-only の `SSFRAnisotropyBuilder`/`SSFRKernelSettings`）が計算し、`SSFluidRenderer::setParticleEllipsoids()`（CPU、frame-in-flight ごとの mapped バッファへ `onUpdate()` でアップロード）か `setEllipsoidBuffers()`（外部 GPU バッファ）で渡す。`Shaders::anisoVert/depthAnisoFrag/thicknessAnisoFrag` が空ならこの機能は無効で、OFF 時の描画は従来と完全に同じ。
 - 探索半径の既定は粒子半径の 6 倍（3 粒子間隔）。4.5 倍だと容器の稜線上の粒子が N_ε=25 に届かず k_n=0.5 に縮んで点々に見えた。
 - PhysicsView: SSFR パネルの「Anisotropic Kernel」、コマンド `SetSSFRAnisotropicKernel:{0|1}` / `GetSSFRAnisotropicKernel` / `SetSSFRKernelParam:<key>=<v>` / `GetSSFRKernelParam:<key>` / `GetSSFRKernelStat:<computeMs|meanStretchRatio|particleCount|anisotropicCount|active>`。GPU_CSPH は CPU に位置が無いため球スプライトのまま（Phase 5 の GPU compute 版で対応予定）。
 
-### Flame（`Physics/Physics/Flame*` + `Physics/PhysicsView/Flame*`）— 炎 SPH（実験的・独立系統）
+### Flame（`Physics/Core/Flame*` + `Physics/PhysicsView/Flame*`）— 炎 SPH（実験的・独立系統）
 
 内部設計メモに基づく、燃焼するガスを表現する SPH ソルバー。
 `WCSPHParticle`/`WCSPHFluid`/`WCSPHSolver` と同じ 3 分割構成・同じ近傍探索（`Space::CSRNeighborList`）/
@@ -237,7 +237,7 @@ Screen Space Fluid Rendering（SSFR）パイプライン。`ParticleDepthRendere
 `Physics/FlameView/` スタンドアロンビューアを PhysicsView へ統合したが、この「結合しない独立系統」
 という性質は変えていない（PhysicsView の中でも fluid/rigid/soft とは一切カップリングしない）。
 
-- `FlameParticle`/`FlameFluid`/`FlameSolver`（`Physics/Physics/`）— コアシミュレーション
+- `FlameParticle`/`FlameFluid`/`FlameSolver`（`Physics/Core/`）— コアシミュレーション
   （`docs/todo/PLAN_flame_sph_pbvr_improvement.md` Phase 0–4 で改修、2026-09-24）。
   `FlameParticle` は position/velocity/force/density に加え `temperature`/`fuel`/`soot`/`oxygen`/`age` を保持する。
   - **燃焼モデル** `FlameFluid::CombustionModel`: 既定 `Physical`（反応速度 `k(T)·f·o`、`k(T)` は着火温度まわりの
@@ -294,7 +294,7 @@ Screen Space Fluid Rendering（SSFR）パイプライン。`ParticleDepthRendere
 
 - **例外禁止**: このリポジトリ全体の規約に従い、`throw`/`try`/`catch` は使わない。エラーは `bool`/`std::optional` で返す。
 - **One-Way / Two-Way の呼称**: 剛体または SoftBody が流体に一方的に力を及ぼす（SDF ペナルティ）場合が **One-Way**、Akinci 境界粒子により双方向に力が伝わる場合が **Two-Way (Track B)**。コード・コメント中でこの呼称が統一して使われている。
-- **非所有ポインタの寿命（Tier 1 / Tier 2）**: 内部設計メモ の方針Aに基づき、`Physics/Physics` の公開 API は 2 階層に分かれる。
+- **非所有ポインタの寿命（Tier 1 / Tier 2）**: 内部設計メモ の方針Aに基づき、`Physics/Core` の公開 API は 2 階層に分かれる。
   - **Tier 1（シミュレーション実体）**: `ISPHSolver` 実装、`*Fluid`、`RigidBody`、`ISoftBody`、`ICollisionShape`。**常に呼び出し側が生成・破棄する**。`bindRigidBody()`/`bindSoftBody()`/`addRigidBoundary()`/`setFluidSolver()`/`RigidBodySolver::addBody()`/`SoftBodySolver::addBody()` 等が受け取るポインタはすべて非所有で、呼び出し元が寿命管理する（`PhysicsSolver.h` の doc コメントに明記）。ソルバー側は個体の削除 API を持たず、`clear()`/`clearBodies()`/`clearBindings()` で登録を一括で空にするのみ。`RigidBody`/`ISoftBody` の所有権は常に呼び出し側（PhysicsView の各 World、テストのローカル変数など）が持つ。
   - **Tier 2（ライブラリ内部の実装オブジェクト）**: `XPBDSolver`、`IConstraint`、`RigidBodyCollider`、`SparseVolumef`、境界粒子集合（`RigidBoundary`/`RigidBoundaryParticles`/`SoftBoundaryParticles`）。ライブラリ側が所有してよいが、外部に生ポインタを登録させるものはアドレス安定なコンテナで保持する必要がある（`RigidFluidSolver`/`SoftFluidSolver`/`RigidSoftSolver` の `bindings_` が `std::vector` ではなく `std::deque` なのはこのため）。
 - **境界登録の寿命（Phase 1、2026-10-10、`docs/todo/PLAN_physics_refactoring.md`）**: `ISPHSolver` の `addRigidBoundary()`/`addRigidBoundaryParticles()`/`addSoftBoundaryParticles()` は**非所有ポインタ**で、`nullptr` と登録済みポインタは無視される（二重登録で境界が2回適用されることはない）。個別解除は `removeRigidBoundary()` 等（登録されていれば true）、件数は `getRigidBoundaryCount()` 等。`clear*()` は他の所有者の登録まで消すので、自分の登録だけを外すときは `remove*()` を使う（`PhysicsSolver` と `FluidWorld` はそうしている）。`PhysicsSolver::setFluidSolver()` は切替時に**自分が登録した分だけ**を旧ソルバーから外し、新ソルバーの kernel／基準密度・剛体境界粒子の psi・残留反作用を更新してから登録し直す（初回接続と同じ経路）。同じソルバーの再設定は何もしない。`nullptr` で切り離してもバインディングは残り、再接続で再登録される。**旧ソルバーを破棄する前、およびソルバーが `PhysicsSolver` より長生きする場合は `PhysicsSolver` を破棄する前に `setFluidSolver(nullptr)`（または別ソルバーへ切替）を呼ぶこと**（デストラクタはソルバーに触れないため、接続したままだとソルバーがバインディングの解放済みポインタを保持する）。ソルバーに直接 `clear*()` した場合は `PhysicsSolver::resyncFluidRegistrations()` で戻せる。登録の検証は `PhysicsTest/BoundaryRegistrationTest.cpp`。
@@ -330,7 +330,7 @@ Screen Space Fluid Rendering（SSFR）パイプライン。`ParticleDepthRendere
   N 倍になり別の絵になる（内部設計メモ 11.2 節）。
   なお `WCSPHFluid::estimateViscosityCoe()` の `effectLength^1.5` は**この点で誤り**だが、
   本番コードからは呼ばれていない（呼ぶのは同名のテストのみ）。
-- **乱数は決定的シードが既定（`Physics/Physics/RandomSeed.h`）**: `WCSPHFluid`/`DFSPHFluid`/`PBSPHFluid`
+- **乱数は決定的シードが既定（`Physics/Core/RandomSeed.h`）**: `WCSPHFluid`/`DFSPHFluid`/`PBSPHFluid`
   （エミッターの `speedJitter`）・`FlameFluid`（噴出ディスク/火花/煙）・`WhiteWaterSystem`（飛沫/泡の寿命）の
   `std::mt19937` はすべて `kDefaultRandomSeed` から始まる。2026-08-27 以前は `std::random_device{}()` で
   seed されており、**エミッターを使うシーンは実行のたびに違う結果になっていた**——ショーケースのベイクが
@@ -340,4 +340,4 @@ Screen Space Fluid Rendering（SSFR）パイプライン。`ParticleDepthRendere
   `WCSPHEmitterDrivenSceneRepeatedRunsMatch` / `EmitterRandomSeedSelectsTheDraw`。
 - **新しい流体ソルバーを追加する場合**: `ISPHSolver` を実装し、Two-Way 結合をサポートしないなら `addRigidBoundaryParticles`/`addSoftBoundaryParticles`/`supportsTwoWayCoupling()` はデフォルト実装（no-op）のままでよい。サポートする場合は `IBoundaryParticles*` のリストを rigid 用・soft 用の2本持ち（`clearRigidBoundaryParticles()`/`clearSoftBoundaryParticles()` を独立に保つため）、両リストに対して同一の `addBoundaryParticleDensity()`/`addBoundaryParticlePressure()` を呼ぶ形にする（DFSPHSolver/PBSPHSolver/WCSPHSolver 参照）。解析境界は `setShapeBoundaries()` を主経路にし、Plane/Sphere/Plate/generic は WCSPH/DFSPH/PBSPH が実装する。DFSPH・PBSPH のような制約方式では境界密度と α／制約勾配 counterpart を必ず対で追加すること（PBSPH は `addShapeBoundaryConstraint()` で全 shape 種を1つのループにまとめている）。
 - **`PhysicsSolver` の使い分けに注意**: 新しいアプリ/機能で Rigid/Fluid/SoftBody 結合が必要な場合は `Physics::PhysicsSolver` を使うのが標準。`PhysicsView`の`FluidWorld`/`RigidBodyWorld`/`SoftBodyWorld`も内部では単一の`PhysicsSolver`を共有する（上記参照）が、`PhysicsSolver::step()`/`setRunning()`は使わず独自に個別Play/Pauseをオーケストレーションしている点に注意（fluid/rigid/softを独立制御する必要がないアプリでは`PhysicsSolver::step()`/`stepUnconditional()`/`setRunning()`をそのまま使う方が単純）。
-- **SPH の長さ単位はシーンごとの暗黙の取り決め（内部設計メモ 参照）**: `Physics/Physics` 内部のどの型も長さの単位を明示的には定義していない。本コードベースの慣例的な既定シーン（`radius=1` 等）は暗黙に「1 unit ≒ 1m」を仮定しており、重力の既定値（`DFSPHSolver`/`PBSPHSolver`/`WCSPHSolver` の `externalForce{0,-9.8f,0}`・`.fsscene` の `gravityY="-9.8"` 等）はこの前提のもとでの現実の重力加速度（9.8 m/s²）をそのまま採用している。**シーン全体の長さスケールを変える場合**（例: 粒子半径を 1.0 → 0.01 にして「1cm 粒子」を表現する）は、以下も比例して再スケールしないと同じ相対挙動にならない: 重力・`RigidBoundary::penaltyStiffness_`（Phase 2 以降は `estimateStiffness(dt)` で `dt` から自動導出可能）・`WCSPHFluid::pressureCoe`/`PBSPHFluid::stiffness`（Phase 1 以降は `estimatePressureCoe()`/`setPressureCoeFromScale()` で自動導出可能）・`maxTimeStep`/`boundaryTimeStep`（Phase 6 時点では手動比例のまま、既定値 `0.01f` は `radius=1` の CFL 見積もり相当）。DFSPH/PBSPH/WCSPH いずれも `setEffectLength()` を呼ばずに `simulate()` すると effectLength が `0.f` のまま（Phase 5）で no-op になる点にも注意。
+- **SPH の長さ単位はシーンごとの暗黙の取り決め（内部設計メモ 参照）**: `Physics/Core` 内部のどの型も長さの単位を明示的には定義していない。本コードベースの慣例的な既定シーン（`radius=1` 等）は暗黙に「1 unit ≒ 1m」を仮定しており、重力の既定値（`DFSPHSolver`/`PBSPHSolver`/`WCSPHSolver` の `externalForce{0,-9.8f,0}`・`.fsscene` の `gravityY="-9.8"` 等）はこの前提のもとでの現実の重力加速度（9.8 m/s²）をそのまま採用している。**シーン全体の長さスケールを変える場合**（例: 粒子半径を 1.0 → 0.01 にして「1cm 粒子」を表現する）は、以下も比例して再スケールしないと同じ相対挙動にならない: 重力・`RigidBoundary::penaltyStiffness_`（Phase 2 以降は `estimateStiffness(dt)` で `dt` から自動導出可能）・`WCSPHFluid::pressureCoe`/`PBSPHFluid::stiffness`（Phase 1 以降は `estimatePressureCoe()`/`setPressureCoeFromScale()` で自動導出可能）・`maxTimeStep`/`boundaryTimeStep`（Phase 6 時点では手動比例のまま、既定値 `0.01f` は `radius=1` の CFL 見積もり相当）。DFSPH/PBSPH/WCSPH いずれも `setEffectLength()` を呼ばずに `simulate()` すると effectLength が `0.f` のまま（Phase 5）で no-op になる点にも注意。

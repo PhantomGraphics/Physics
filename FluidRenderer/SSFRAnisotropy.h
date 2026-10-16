@@ -6,7 +6,7 @@
 // every app that hosts SSFR already links PhysicsCore for its solvers.
 
 #include "SSFREllipsoid.h"
-#include "../Physics/AnisotropicKernel.h"
+#include "../Core/AnisotropicKernel.h"
 
 #include <chrono>
 #include <cstdint>

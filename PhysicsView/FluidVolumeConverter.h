@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Physics/SPHVolumeConverter.h"
+#include "../Core/SPHVolumeConverter.h"
 
 #include <glm/glm.hpp>
 #include <memory>

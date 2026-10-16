@@ -1,12 +1,12 @@
 #include "pch.h"
 
-#include "../Physics/PBSPHFluid.h"
-#include "../Physics/PBSPHParticle.h"
-#include "../Physics/PBSPHSolver.h"
-#include "../Physics/ISPHSolver.h"
-#include "../Physics/SphereBoundary.h"
-#include "../Physics/PlateBoundary.h"
-#include "../Physics/PlaneBoundary.h"
+#include "../Core/PBSPHFluid.h"
+#include "../Core/PBSPHParticle.h"
+#include "../Core/PBSPHSolver.h"
+#include "../Core/ISPHSolver.h"
+#include "../Core/SphereBoundary.h"
+#include "../Core/PlateBoundary.h"
+#include "../Core/PlaneBoundary.h"
 
 #include <cmath>
 #include <memory>

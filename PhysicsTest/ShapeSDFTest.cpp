@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "../Physics/ICollisionShape.h"
+#include "../Core/ICollisionShape.h"
 #include "CGLib/ThirdParty/glm/glm/gtc/quaternion.hpp"
 #include <cmath>
 

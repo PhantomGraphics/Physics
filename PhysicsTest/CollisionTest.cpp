@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "../Physics/RigidBody.h"
-#include "../Physics/NarrowPhase.h"
+#include "../Core/RigidBody.h"
+#include "../Core/NarrowPhase.h"
 #include <cmath>
 
 using namespace Phantom::Physics;

@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "../Physics/MeshBoundaryShape.h"
-#include "../Physics/ICollisionShape.h"
+#include "../Core/MeshBoundaryShape.h"
+#include "../Core/ICollisionShape.h"
 #include "CGLib/ThirdParty/glm/glm/gtc/quaternion.hpp"
 #include <cmath>
 

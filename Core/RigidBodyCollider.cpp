@@ -1,6 +1,6 @@
 #include "RigidBodyCollider.h"
-#include "Physics/Physics/RigidBody.h"
-#include "Physics/Physics/ICollisionShape.h"
+#include "Physics/Core/RigidBody.h"
+#include "Physics/Core/ICollisionShape.h"
 
 namespace Phantom {
 namespace Physics {

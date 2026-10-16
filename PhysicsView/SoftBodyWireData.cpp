@@ -1,7 +1,7 @@
 #include "SoftBodyWireData.h"
 
-#include "../Physics/ICollisionShape.h"
-#include "../Physics/RigidBody.h"
+#include "../Core/ICollisionShape.h"
+#include "../Core/RigidBody.h"
 
 #include <glm/glm.hpp>
 

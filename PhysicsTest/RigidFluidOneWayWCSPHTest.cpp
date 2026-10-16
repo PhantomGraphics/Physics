@@ -1,8 +1,8 @@
 #include "pch.h"
-#include "../Physics/WCSPHSolver.h"
-#include "../Physics/WCSPHFluid.h"
-#include "../Physics/RigidFluidSolver.h"
-#include "../Physics/ICollisionShape.h"
+#include "../Core/WCSPHSolver.h"
+#include "../Core/WCSPHFluid.h"
+#include "../Core/RigidFluidSolver.h"
+#include "../Core/ICollisionShape.h"
 #include <cmath>
 #include <vector>
 

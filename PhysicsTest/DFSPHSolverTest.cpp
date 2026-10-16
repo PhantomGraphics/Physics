@@ -1,9 +1,9 @@
 ﻿#include "pch.h"
 
-#include "../Physics/DFSPHFluid.h"
-#include "../Physics/DFSPHParticle.h"
-#include "../Physics/DFSPHSolver.h"
-#include "../Physics/WCSPHFluid.h"
+#include "../Core/DFSPHFluid.h"
+#include "../Core/DFSPHParticle.h"
+#include "../Core/DFSPHSolver.h"
+#include "../Core/WCSPHFluid.h"
 
 #include <algorithm>
 #include <cmath>

@@ -1,10 +1,10 @@
 ﻿#include "pch.h"
-#include "../Physics/CombustibleBody.h"
-#include "../Physics/SolidCombustionSolver.h"
-#include "../Physics/FlameSolidCoupler.h"
-#include "../Physics/FlameFluid.h"
+#include "../Core/CombustibleBody.h"
+#include "../Core/SolidCombustionSolver.h"
+#include "../Core/FlameSolidCoupler.h"
+#include "../Core/FlameFluid.h"
 #include "../PhysicsView/FlameWorld.h"
-#include "../Physics/FlameStats.h"
+#include "../Core/FlameStats.h"
 #include "../PhysicsView/CombustibleGltf.h"
 #include <cstring>
 #include <limits>

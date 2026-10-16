@@ -1,7 +1,7 @@
 #include "pch.h"
-#include "../Physics/SoftMesh.h"
-#include "../Physics/XPBDSolver.h"
-#include "../Physics/DistanceConstraint.h"
+#include "../Core/SoftMesh.h"
+#include "../Core/XPBDSolver.h"
+#include "../Core/DistanceConstraint.h"
 #include <limits>
 
 using namespace Phantom::Physics;

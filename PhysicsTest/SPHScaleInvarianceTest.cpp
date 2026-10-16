@@ -1,8 +1,8 @@
 #include "pch.h"
 
-#include "../Physics/WCSPHFluid.h"
-#include "../Physics/WCSPHParticle.h"
-#include "../Physics/WCSPHSolver.h"
+#include "../Core/WCSPHFluid.h"
+#include "../Core/WCSPHParticle.h"
+#include "../Core/WCSPHSolver.h"
 
 #include <cmath>
 #include <limits>

@@ -2,7 +2,7 @@
 #include "FluidApp.h"
 
 #include <chrono>
-#include "../Physics/CloudDensity.h"
+#include "../Core/CloudDensity.h"
 
 #include "../../CGLib/VulkanGraphics/SpvResolver.h"
 

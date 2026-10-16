@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../CGLib/GltfRenderer/Gltf/GltfDocument.h"
-#include "Physics/Physics/SoftMesh.h"
+#include "Physics/Core/SoftMesh.h"
 
 #include <glm/glm.hpp>
 

@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "../Physics/RopeBody.h"
-#include "../Physics/XPBDSolver.h"
+#include "../Core/RopeBody.h"
+#include "../Core/XPBDSolver.h"
 
 using namespace Phantom::Physics;
 

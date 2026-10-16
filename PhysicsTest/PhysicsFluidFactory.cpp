@@ -1,12 +1,12 @@
 #include "pch.h"
 #include "PhysicsFluidFactory.h"
 
-#include "../Physics/DFSPHSolver.h"
-#include "../Physics/DFSPHParticle.h"
-#include "../Physics/PBSPHSolver.h"
-#include "../Physics/PBSPHParticle.h"
-#include "../Physics/WCSPHSolver.h"
-#include "../Physics/WCSPHParticle.h"
+#include "../Core/DFSPHSolver.h"
+#include "../Core/DFSPHParticle.h"
+#include "../Core/PBSPHSolver.h"
+#include "../Core/PBSPHParticle.h"
+#include "../Core/WCSPHSolver.h"
+#include "../Core/WCSPHParticle.h"
 
 namespace {
 

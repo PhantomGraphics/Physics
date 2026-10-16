@@ -1,7 +1,7 @@
 #include "pch.h"
 #include <set>
 #include <utility>
-#include "../Physics/SoftMesh.h"
+#include "../Core/SoftMesh.h"
 
 using namespace Phantom::Physics;
 

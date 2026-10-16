@@ -62,7 +62,7 @@ phantom_add_numerics_core()
 # out into its own file) is picked up on the next build without a manual
 # `cmake <builddir>` reconfigure -- otherwise a stale object of a rewritten
 # source can linger and cause "unresolved external symbol" at link time.
-file(GLOB PHYSICS_SOURCES CONFIGURE_DEPENDS ${PHYSICS_ROOT}/Physics/*.cpp)
+file(GLOB PHYSICS_SOURCES CONFIGURE_DEPENDS ${PHYSICS_ROOT}/Core/*.cpp)
 list(FILTER PHYSICS_SOURCES EXCLUDE REGEX "pch\\.cpp$")
 
 add_library(PhysicsCore STATIC ${PHYSICS_SOURCES})
@@ -263,7 +263,7 @@ target_include_directories(PhysicsView PRIVATE
     ${CGLIB_ROOT}/UIWidgets
     ${PHYSICS_ROOT}/FluidRenderer
     ${PHYSICS_ROOT}/Fluid_GPU_Vk
-    ${PHYSICS_ROOT}/Physics
+    ${PHYSICS_ROOT}/Core
 )
 target_link_libraries(PhysicsView PRIVATE
     PhysicsWorldCore
@@ -339,7 +339,7 @@ else()
     message(WARNING "Physics: vulkan/vulkan.h not found -- PhysicsView is skipped. Pass -DVULKAN_INCLUDE_DIR=/path/to/include to enable it (on Windows, check $ENV{VULKAN_SDK} is set).")
 endif()
 
-# Precompiled headers (cmake/PhantomPch.cmake). Physics/pch.h and PhysicsTest/pch.h hold
+# Precompiled headers (cmake/PhantomPch.cmake). Core/pch.h and PhysicsTest/pch.h hold
 # only the STL / gtest, so their lists cover every TU; PhysicsView/ and Fluid_GPU_Vk/
 # keep their own pch.h (it sets GLM_FORCE_* macros) for the files that include it.
 include(PhantomPch)

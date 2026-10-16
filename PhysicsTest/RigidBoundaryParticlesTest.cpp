@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "../Physics/RigidBoundaryParticles.h"
+#include "../Core/RigidBoundaryParticles.h"
 #include <cmath>
 
 using namespace Phantom::Physics;

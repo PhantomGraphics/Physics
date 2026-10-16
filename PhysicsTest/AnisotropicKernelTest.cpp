@@ -1,7 +1,7 @@
 #include "pch.h"
 
-#include "../Physics/AnisotropicKernel.h"
-#include "../Physics/SPHSurfaceParticle.h"
+#include "../Core/AnisotropicKernel.h"
+#include "../Core/SPHSurfaceParticle.h"
 
 #include <algorithm>
 #include <cmath>

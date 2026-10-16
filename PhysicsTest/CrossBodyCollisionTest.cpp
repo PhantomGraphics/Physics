@@ -1,8 +1,8 @@
 #include "pch.h"
 #include <algorithm>
-#include "../Physics/CrossBodyCollision.h"
-#include "../Physics/SoftBodySolver.h"
-#include "../Physics/JellyBody.h"
+#include "../Core/CrossBodyCollision.h"
+#include "../Core/SoftBodySolver.h"
+#include "../Core/JellyBody.h"
 
 using namespace Phantom::Physics;
 using namespace Phantom::Math;

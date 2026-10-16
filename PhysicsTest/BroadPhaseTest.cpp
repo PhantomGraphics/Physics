@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "../Physics/RigidBody.h"
-#include "../Physics/BroadPhase.h"
+#include "../Core/RigidBody.h"
+#include "../Core/BroadPhase.h"
 #include <algorithm>
 #include <random>
 

@@ -1,9 +1,9 @@
 #include "pch.h"
-#include "../Physics/DFSPHSolver.h"
-#include "../Physics/DFSPHFluid.h"
-#include "../Physics/DFSPHParticle.h"
-#include "../Physics/SoftBoundaryParticles.h"
-#include "../Physics/IBoundaryParticles.h"
+#include "../Core/DFSPHSolver.h"
+#include "../Core/DFSPHFluid.h"
+#include "../Core/DFSPHParticle.h"
+#include "../Core/SoftBoundaryParticles.h"
+#include "../Core/IBoundaryParticles.h"
 #include <cmath>
 
 using namespace Phantom::Physics;
