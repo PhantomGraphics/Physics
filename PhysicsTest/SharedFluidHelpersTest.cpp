@@ -1,7 +1,7 @@
 #include "pch.h"
-#include "../Physics/Emitter.h"
-#include "../Physics/OutflowRegion.h"
-#include "../Physics/ShapeBoundarySet.h"
+#include "../Core/Emitter.h"
+#include "../Core/OutflowRegion.h"
+#include "../Core/ShapeBoundarySet.h"
 #include "../PhysicsView/FluidSeed.h"
 
 #include <random>

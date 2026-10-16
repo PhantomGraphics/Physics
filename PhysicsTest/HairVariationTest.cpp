@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "../Physics/HairGenerator.h"
+#include "../Core/HairGenerator.h"
 #include "../PhysicsView/HairWorld.h"
 #include "../PhysicsView/HairCommandDispatcher.h"
 #include <algorithm>

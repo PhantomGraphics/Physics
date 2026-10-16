@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../Physics/FlameFluid.h"
-#include "../Physics/FlameSolver.h"
-#include "../Physics/FlameSolidCoupler.h"
+#include "../Core/FlameFluid.h"
+#include "../Core/FlameSolver.h"
+#include "../Core/FlameSolidCoupler.h"
 
 #include <glm/glm.hpp>
 

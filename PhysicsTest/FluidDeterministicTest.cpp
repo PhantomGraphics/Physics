@@ -1,17 +1,17 @@
 #include "pch.h"
 
-#include "../Physics/PlaneBoundary.h"
-#include "../Physics/PlateBoundary.h"
-#include "../Physics/WCSPHFluid.h"
-#include "../Physics/WCSPHSolver.h"
-#include "../Physics/DFSPHFluid.h"
-#include "../Physics/DFSPHParticle.h"
-#include "../Physics/DFSPHSolver.h"
-#include "../Physics/PBSPHFluid.h"
-#include "../Physics/PBSPHParticle.h"
-#include "../Physics/PBSPHSolver.h"
-#include "../Physics/SPHKernel.h"
-#include "../Physics/Emitter.h"
+#include "../Core/PlaneBoundary.h"
+#include "../Core/PlateBoundary.h"
+#include "../Core/WCSPHFluid.h"
+#include "../Core/WCSPHSolver.h"
+#include "../Core/DFSPHFluid.h"
+#include "../Core/DFSPHParticle.h"
+#include "../Core/DFSPHSolver.h"
+#include "../Core/PBSPHFluid.h"
+#include "../Core/PBSPHParticle.h"
+#include "../Core/PBSPHSolver.h"
+#include "../Core/SPHKernel.h"
+#include "../Core/Emitter.h"
 
 #include <algorithm>
 #include <cmath>
@@ -434,7 +434,7 @@ TEST(FluidDeterminism, PBSPHRepeatedRunsMatch)
 // each *Fluid's own std::mt19937. That RNG used to be seeded from
 // std::random_device{}(), which made every emitter-driven scene -- including
 // all three SPH showcase bakes -- give a different result on every run, with
-// none of the tests above noticing. See Physics/Physics/RandomSeed.h and
+// none of the tests above noticing. See Physics/Core/RandomSeed.h and
 // internal design notes section 11.4.
 //
 // A non-zero speedJitter is the whole point of these: with jitter at 0 the

@@ -6,7 +6,7 @@
 #include "CommandParse.h"
 #include "RigidBodyWorld.h"
 
-#include "../Physics/FlameStats.h"
+#include "../Core/FlameStats.h"
 
 #include <charconv>
 #include <cmath>

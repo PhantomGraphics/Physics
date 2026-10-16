@@ -1,7 +1,7 @@
 #include "pch.h"
-#include "../Physics/SoftParticle.h"
-#include "../Physics/SphereCollider.h"
-#include "../Physics/PlaneCollider.h"
+#include "../Core/SoftParticle.h"
+#include "../Core/SphereCollider.h"
+#include "../Core/PlaneCollider.h"
 
 using namespace Phantom::Physics;
 using namespace Phantom::Math;

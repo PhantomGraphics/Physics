@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../Physics/DFSPHFluid.h"
-#include "../Physics/PBSPHFluid.h"
-#include "../Physics/WCSPHFluid.h"
-#include "../Physics/ISPHSolver.h"
-#include "../Physics/SPHKernel.h"
+#include "../Core/DFSPHFluid.h"
+#include "../Core/PBSPHFluid.h"
+#include "../Core/WCSPHFluid.h"
+#include "../Core/ISPHSolver.h"
+#include "../Core/SPHKernel.h"
 #include "CGLib/Util/UnCopyable.h"
 #include "CGLib/Math/Core/Box3d.h"
 

@@ -1,8 +1,8 @@
 ﻿#include "pch.h"
-#include "../Physics/CombustibleBody.h"
-#include "../Physics/FlameSolidCoupler.h"
-#include "../Physics/FlameFluid.h"
-#include "../Physics/PhysicsSolver.h"
+#include "../Core/CombustibleBody.h"
+#include "../Core/FlameSolidCoupler.h"
+#include "../Core/FlameFluid.h"
+#include "../Core/PhysicsSolver.h"
 #include "../PhysicsView/FlameWorld.h"
 #include "../PhysicsView/RigidBodyWorld.h"
 #include <limits>

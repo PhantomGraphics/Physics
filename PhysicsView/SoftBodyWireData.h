@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Physics/SoftBodySolver.h"
+#include "../Core/SoftBodySolver.h"
 
 #include <cstdint>
 #include <vector>

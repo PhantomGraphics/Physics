@@ -1,7 +1,7 @@
 #pragma once
-#include "../Physics/HairSolver.h"
-#include "../Physics/HairGenerator.h"
-#include "../Physics/HairFollowers.h"
+#include "../Core/HairSolver.h"
+#include "../Core/HairGenerator.h"
+#include "../Core/HairFollowers.h"
 #include "SceneComponent.h"
 
 namespace Phantom {

@@ -1,9 +1,9 @@
 #include "pch.h"
-#include "../Physics/PBSPHSolver.h"
-#include "../Physics/PBSPHFluid.h"
-#include "../Physics/PBSPHParticle.h"
-#include "../Physics/RigidBoundary.h"
-#include "../Physics/ICollisionShape.h"
+#include "../Core/PBSPHSolver.h"
+#include "../Core/PBSPHFluid.h"
+#include "../Core/PBSPHParticle.h"
+#include "../Core/RigidBoundary.h"
+#include "../Core/ICollisionShape.h"
 #include "CGLib/ThirdParty/glm/glm/gtc/quaternion.hpp"
 #include <cmath>
 

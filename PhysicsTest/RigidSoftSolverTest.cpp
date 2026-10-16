@@ -1,8 +1,8 @@
 #include "pch.h"
-#include "../Physics/RigidSoftSolver.h"
-#include "../Physics/ClothBody.h"
-#include "Physics/Physics/RigidBody.h"
-#include "Physics/Physics/ICollisionShape.h"
+#include "../Core/RigidSoftSolver.h"
+#include "../Core/ClothBody.h"
+#include "Physics/Core/RigidBody.h"
+#include "Physics/Core/ICollisionShape.h"
 #include <cmath>
 #include <memory>
 

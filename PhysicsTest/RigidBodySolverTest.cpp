@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "../Physics/RigidBody.h"
-#include "../Physics/RigidBodySolver.h"
+#include "../Core/RigidBody.h"
+#include "../Core/RigidBodySolver.h"
 #include <cmath>
 
 using namespace Phantom::Physics;

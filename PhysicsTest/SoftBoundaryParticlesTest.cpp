@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "../Physics/SoftBoundaryParticles.h"
+#include "../Core/SoftBoundaryParticles.h"
 #include <cmath>
 
 using namespace Phantom::Physics;

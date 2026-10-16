@@ -6,7 +6,7 @@
 #include "FlameLightSampler.h"
 #include "CGLib/GltfRenderer/Renderer/GltfSampledLight.h"
 
-#include "CGLib/Graphics/EnsembleLodController.h"
+#include "CGLib/Graphics/Core/EnsembleLodController.h"
 #include "CGLib/VulkanGraphics/VulkanBuffer.h"
 #include "CGLib/VulkanGraphics/VulkanComputePipeline.h"
 #include "CGLib/VulkanGraphics/VulkanDescriptorPool.h"

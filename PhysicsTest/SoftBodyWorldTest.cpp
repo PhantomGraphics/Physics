@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "../Physics/SoftBodySolver.h"
-#include "../Physics/ClothBody.h"
+#include "../Core/SoftBodySolver.h"
+#include "../Core/ClothBody.h"
 
 using namespace Phantom::Physics;
 using namespace Phantom::Math;

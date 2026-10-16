@@ -1,7 +1,7 @@
 #include "pch.h"
-#include "../Physics/RigidBoundary.h"
-#include "../Physics/RigidBody.h"
-#include "../Physics/MeshBoundaryShape.h"
+#include "../Core/RigidBoundary.h"
+#include "../Core/RigidBody.h"
+#include "../Core/MeshBoundaryShape.h"
 #include "CGLib/ThirdParty/glm/glm/gtc/quaternion.hpp"
 #include <array>
 #include <cmath>

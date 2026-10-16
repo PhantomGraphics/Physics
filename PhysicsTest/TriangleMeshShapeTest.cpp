@@ -1,9 +1,9 @@
 #include "pch.h"
-#include "../Physics/TriangleMeshShape.h"
-#include "../Physics/ConvexHullShape.h"
-#include "../Physics/RigidBody.h"
-#include "../Physics/RigidBodySolver.h"
-#include "../Physics/NarrowPhase.h"
+#include "../Core/TriangleMeshShape.h"
+#include "../Core/ConvexHullShape.h"
+#include "../Core/RigidBody.h"
+#include "../Core/RigidBodySolver.h"
+#include "../Core/NarrowPhase.h"
 #include "CGLib/ThirdParty/glm/glm/gtc/quaternion.hpp"
 #include <cmath>
 

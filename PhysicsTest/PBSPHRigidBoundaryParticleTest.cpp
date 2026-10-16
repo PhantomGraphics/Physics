@@ -1,10 +1,10 @@
 #include "pch.h"
-#include "../Physics/PBSPHSolver.h"
-#include "../Physics/PBSPHFluid.h"
-#include "../Physics/PBSPHParticle.h"
-#include "../Physics/RigidBoundaryParticles.h"
-#include "../Physics/SoftBoundaryParticles.h"
-#include "../Physics/IBoundaryParticles.h"
+#include "../Core/PBSPHSolver.h"
+#include "../Core/PBSPHFluid.h"
+#include "../Core/PBSPHParticle.h"
+#include "../Core/RigidBoundaryParticles.h"
+#include "../Core/SoftBoundaryParticles.h"
+#include "../Core/IBoundaryParticles.h"
 #include <cmath>
 #include <memory>
 

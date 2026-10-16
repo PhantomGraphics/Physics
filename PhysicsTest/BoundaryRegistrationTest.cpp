@@ -1,12 +1,12 @@
 #include "pch.h"
-#include "../Physics/PhysicsSolver.h"
-#include "../Physics/ClothBody.h"
-#include "../Physics/DFSPHFluid.h"
-#include "../Physics/DFSPHSolver.h"
-#include "../Physics/PBSPHFluid.h"
-#include "../Physics/PBSPHSolver.h"
-#include "../Physics/WCSPHFluid.h"
-#include "../Physics/WCSPHSolver.h"
+#include "../Core/PhysicsSolver.h"
+#include "../Core/ClothBody.h"
+#include "../Core/DFSPHFluid.h"
+#include "../Core/DFSPHSolver.h"
+#include "../Core/PBSPHFluid.h"
+#include "../Core/PBSPHSolver.h"
+#include "../Core/WCSPHFluid.h"
+#include "../Core/WCSPHSolver.h"
 
 #include <memory>
 #include <vector>

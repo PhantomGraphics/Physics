@@ -1,9 +1,9 @@
 ﻿#include "pch.h"
-#include "../Physics/WCSPHSolver.h"
-#include "../Physics/WCSPHFluid.h"
-#include "../Physics/WCSPHParticle.h"
-#include "../Physics/SphereBoundary.h"
-#include "../Physics/Emitter.h"
+#include "../Core/WCSPHSolver.h"
+#include "../Core/WCSPHFluid.h"
+#include "../Core/WCSPHParticle.h"
+#include "../Core/SphereBoundary.h"
+#include "../Core/Emitter.h"
 #include <cmath>
 #include <cstdio>
 

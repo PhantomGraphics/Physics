@@ -1,11 +1,11 @@
 #include "pch.h"
 
-#include "../Physics/WCSPHFluid.h"
-#include "../Physics/WCSPHParticle.h"
-#include "../Physics/WCSPHSolver.h"
-#include "../Physics/SPHKernel.h"
-#include "../Physics/SphereBoundary.h"
-#include "../Physics/PlateBoundary.h"
+#include "../Core/WCSPHFluid.h"
+#include "../Core/WCSPHParticle.h"
+#include "../Core/WCSPHSolver.h"
+#include "../Core/SPHKernel.h"
+#include "../Core/SphereBoundary.h"
+#include "../Core/PlateBoundary.h"
 
 #include <algorithm>
 #include <cmath>

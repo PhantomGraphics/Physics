@@ -1,6 +1,6 @@
 #include "CloudWorld.h"
 
-#include "../Physics/CloudThermodynamics.h"
+#include "../Core/CloudThermodynamics.h"
 
 #include <algorithm>
 #include <cmath>

@@ -1,7 +1,7 @@
 #include "pch.h"
 #include <cmath>
-#include "../Physics/JellyBody.h"
-#include "../Physics/XPBDSolver.h"
+#include "../Core/JellyBody.h"
+#include "../Core/XPBDSolver.h"
 
 using namespace Phantom::Physics;
 

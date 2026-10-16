@@ -2,14 +2,14 @@
 
 #include "SoftBodyWireData.h"
 
-#include "Physics/Physics/SoftBodySolver.h"
-#include "Physics/Physics/PhysicsSolver.h"
-#include "Physics/Physics/ISoftBody.h"
-#include "Physics/Physics/ClothBody.h"
-#include "Physics/Physics/RopeBody.h"
-#include "Physics/Physics/JellyBody.h"
-#include "Physics/Physics/RigidBody.h"
-#include "Physics/Physics/ICollisionShape.h"
+#include "Physics/Core/SoftBodySolver.h"
+#include "Physics/Core/PhysicsSolver.h"
+#include "Physics/Core/ISoftBody.h"
+#include "Physics/Core/ClothBody.h"
+#include "Physics/Core/RopeBody.h"
+#include "Physics/Core/JellyBody.h"
+#include "Physics/Core/RigidBody.h"
+#include "Physics/Core/ICollisionShape.h"
 #include "SceneComponent.h"
 
 #include <cstdint>
@@ -110,7 +110,7 @@ private:
     SoftBodyPreset         preset_ = SoftBodyPreset::ClothTwoPin;
     std::vector<Physics::ISoftBody*> bodyPtrs_;
 
-    // SoftBodySolver only holds non-owning pointers (see Physics/Physics/SoftBodySolver.h);
+    // SoftBodySolver only holds non-owning pointers (see Physics/Core/SoftBodySolver.h);
     // this world owns every ISoftBody it creates.
     std::vector<std::unique_ptr<Physics::ISoftBody>> ownedBodies_;
 

@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "../Physics/HairSolver.h"
-#include "../Physics/HairGenerator.h"
+#include "../Core/HairSolver.h"
+#include "../Core/HairGenerator.h"
 #include "../PhysicsView/HairWorld.h"
 #include <limits>
 

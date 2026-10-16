@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "../Physics/CylinderBoundary.h"
+#include "../Core/CylinderBoundary.h"
 
 using namespace Phantom::Math;
 using namespace Phantom::Physics;

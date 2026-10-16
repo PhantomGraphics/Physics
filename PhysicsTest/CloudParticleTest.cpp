@@ -1,7 +1,7 @@
 #include "pch.h"
 
-#include "../Physics/CloudParticleSoA.h"
-#include "../Physics/CloudThermodynamics.h"
+#include "../Core/CloudParticleSoA.h"
+#include "../Core/CloudThermodynamics.h"
 
 #include <cmath>
 #include <cstdint>

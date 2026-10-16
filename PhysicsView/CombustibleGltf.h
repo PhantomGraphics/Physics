@@ -1,5 +1,5 @@
 ﻿#pragma once
-#include "../Physics/CombustibleBody.h"
+#include "../Core/CombustibleBody.h"
 #include "../../CGLib/GltfRenderer/Gltf/GltfDocument.h"
 
 namespace Phantom {

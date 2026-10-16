@@ -1,9 +1,9 @@
 #include "pch.h"
-#include "../Physics/PhysicsSolver.h"
-#include "../Physics/ClothBody.h"
-#include "../Physics/DFSPHFluid.h"
-#include "../Physics/DFSPHParticle.h"
-#include "../Physics/DFSPHSolver.h"
+#include "../Core/PhysicsSolver.h"
+#include "../Core/ClothBody.h"
+#include "../Core/DFSPHFluid.h"
+#include "../Core/DFSPHParticle.h"
+#include "../Core/DFSPHSolver.h"
 #include "PhysicsFluidFactory.h"
 #include <algorithm>
 #include <cmath>

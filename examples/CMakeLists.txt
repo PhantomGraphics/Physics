@@ -55,7 +55,7 @@ if(NOT TARGET PhysicsCore)
     phantom_add_volume_core()
     phantom_add_numerics_core()
 
-    file(GLOB _physics_sources CONFIGURE_DEPENDS "${PHYSICS_ROOT}/Physics/*.cpp")
+    file(GLOB _physics_sources CONFIGURE_DEPENDS "${PHYSICS_ROOT}/Core/*.cpp")
     list(FILTER _physics_sources EXCLUDE REGEX "pch\\.cpp$")
     add_library(PhysicsCore STATIC ${_physics_sources})
     target_include_directories(PhysicsCore PRIVATE "${REPO_ROOT}")
@@ -84,7 +84,7 @@ foreach(_ex IN LISTS PHYSICS_EXAMPLES)
     target_include_directories(sph_example_${_ex} PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}"   # sph_examples_common.h
         "${REPO_ROOT}"                  # CGLib/Math/...
-        "${PHYSICS_ROOT}/Physics"       # WCSPHFluid.h, ISPHSolver.h, ...
+        "${PHYSICS_ROOT}/Core"       # WCSPHFluid.h, ISPHSolver.h, ...
     )
     target_link_libraries(sph_example_${_ex} PRIVATE PhysicsCore)
     set_target_properties(sph_example_${_ex} PROPERTIES CXX_STANDARD 20)

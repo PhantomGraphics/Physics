@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "../Physics/HairGenerator.h"
-#include "../Physics/HairSolver.h"
+#include "../Core/HairGenerator.h"
+#include "../Core/HairSolver.h"
 #include <limits>
 
 using namespace Phantom::Physics;

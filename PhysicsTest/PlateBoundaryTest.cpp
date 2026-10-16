@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "../Physics/PlateBoundary.h"
+#include "../Core/PlateBoundary.h"
 
 #include <cmath>
 
