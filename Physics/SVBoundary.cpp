@@ -1,7 +1,7 @@
 #include "pch.h"
 
 #include "SVBoundary.h"
-#include "../../CGLib/Volume/Volume/LevelSet.h"
+#include "../../CGLib/Volume/Core/LevelSet.h"
 
 
 using namespace Phantom::Math;

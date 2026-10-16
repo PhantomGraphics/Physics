@@ -2,8 +2,8 @@
 
 #include <vector>
 
-#include "CGLib/Math/Math/Vector3d.h"
-#include "CGLib/Space/Space/NeighborIndexView.h"
+#include "CGLib/Math/Core/Vector3d.h"
+#include "CGLib/Space/Core/NeighborIndexView.h"
 
 namespace Phantom {
 	namespace Physics {

@@ -2,7 +2,7 @@
 
 #include <memory>
 #include <vector>
-#include "CGLib/Math/Math/Vector3d.h"
+#include "CGLib/Math/Core/Vector3d.h"
 #include "CGLib/Util/UnCopyable.h"
 #include "SoftMesh.h"
 #include "IConstraint.h"

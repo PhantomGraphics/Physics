@@ -3,7 +3,7 @@
 #include "CloudParams.h"
 #include "CloudParticleSoA.h"
 #include "CloudStats.h"
-#include "CGLib/Space/Space/CSRNeighborList.h"
+#include "CGLib/Space/Core/CSRNeighborList.h"
 
 #include <vector>
 

@@ -2,8 +2,8 @@
 
 #include <vector>
 
-#include "CGLib/Math/Math/Vector3d.h"
-#include "CGLib/Math/Math/Box3d.h"
+#include "CGLib/Math/Core/Vector3d.h"
+#include "CGLib/Math/Core/Box3d.h"
 #include "PlaneBoundary.h"
 #include "SphereBoundary.h"
 #include "PlateBoundary.h"
@@ -16,7 +16,7 @@
 #include "ShapeBoundarySet.h"
 #include "BoundaryRegistry.h"
 #include "DFSPHParticle.h"
-#include "CGLib/Space/Space/CSRNeighborList.h"
+#include "CGLib/Space/Core/CSRNeighborList.h"
 #include <memory>
 
 namespace Phantom {

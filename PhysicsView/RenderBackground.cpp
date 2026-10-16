@@ -6,8 +6,8 @@
 #include "../../CGLib/GltfRenderer/Gltf/GltfReader.h"
 #include "../../CGLib/GltfRenderer/Gltf/ObjToGltfConverter.h"
 #include "../../CGLib/GltfRenderer/Gltf/StlToGltfConverter.h"
-#include "../../CGLib/File/File/OBJFileReader.h"
-#include "../../CGLib/File/File/STLFileReader.h"
+#include "../../CGLib/File/Core/OBJFileReader.h"
+#include "../../CGLib/File/Core/STLFileReader.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 

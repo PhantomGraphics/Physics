@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ICollisionShape.h"
-#include "CGLib/Math/Math/Matrix3d.h"
+#include "CGLib/Math/Core/Matrix3d.h"
 
 #include <vector>
 

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "CGLib/Math/Math/Vector3d.h"
-#include "CGLib/Math/Math/Quaternion.h"
-#include "CGLib/Math/Math/Box3d.h"
+#include "CGLib/Math/Core/Vector3d.h"
+#include "CGLib/Math/Core/Quaternion.h"
+#include "CGLib/Math/Core/Box3d.h"
 #include "PlaneBoundary.h"
 
 #include <array>

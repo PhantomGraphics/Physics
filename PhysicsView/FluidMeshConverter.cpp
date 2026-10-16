@@ -1,9 +1,9 @@
 #include "pch.h"
 #include "FluidMeshConverter.h"
 
-#include "../../CGLib/Volume/Volume/MCSurfaceBuilder.h"
-#include "../../CGLib/File/File/OBJFile.h"
-#include "../../CGLib/File/File/OBJFileWriter.h"
+#include "../../CGLib/Volume/Core/MCSurfaceBuilder.h"
+#include "../../CGLib/File/Core/OBJFile.h"
+#include "../../CGLib/File/Core/OBJFileWriter.h"
 
 #include <filesystem>
 

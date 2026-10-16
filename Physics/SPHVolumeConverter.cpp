@@ -1,9 +1,9 @@
-﻿#include "pch.h"
+#include "pch.h"
 
 #include "SPHVolumeConverter.h"
 
-#include "CGLib/Space/Space/CompactSpaceHash.h"
-#include "CGLib/Volume/Volume/SparseVolumeTree/SparseVolume.h"
+#include "CGLib/Space/Core/CompactSpaceHash.h"
+#include "CGLib/Volume/Core/SparseVolumeTree/SparseVolume.h"
 
 #include "WPCA.h"
 #include "SPHKernel.h"

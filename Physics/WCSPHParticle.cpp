@@ -4,7 +4,7 @@
 #include "WCSPHFluid.h"
 #include "SPHKernel.h"
 
-#include "CGLib/Math/Math/Vector3d.h"
+#include "CGLib/Math/Core/Vector3d.h"
 
 using namespace Phantom::Math;
 using namespace Phantom::Physics;

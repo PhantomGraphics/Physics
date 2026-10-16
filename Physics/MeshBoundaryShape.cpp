@@ -1,8 +1,8 @@
 #include "pch.h"
 #include "MeshBoundaryShape.h"
 
-#include "CGLib/Volume/Volume/LevelSet.h"
-#include "CGLib/Volume/Volume/SparseVolumeTree/TrilinearInterpolator.h"
+#include "CGLib/Volume/Core/LevelSet.h"
+#include "CGLib/Volume/Core/SparseVolumeTree/TrilinearInterpolator.h"
 #include "CGLib/ThirdParty/glm/glm/gtc/quaternion.hpp"
 
 #include <array>

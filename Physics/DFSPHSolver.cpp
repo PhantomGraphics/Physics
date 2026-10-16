@@ -1,11 +1,11 @@
-﻿#include "pch.h"
+#include "pch.h"
 
 #include "DFSPHSolver.h"
 #include "DFSPHParticle.h"
 #include "DFSPHFluid.h"
 #include "OpenMPRuntimeTuning.h"
 
-#include "CGLib/Space/Space/CSRNeighborList.h"
+#include "CGLib/Space/Core/CSRNeighborList.h"
 
 #include <iostream>
 

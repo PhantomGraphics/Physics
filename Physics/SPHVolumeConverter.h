@@ -5,7 +5,7 @@
 
 #include "SPHSurfaceParticle.h"
 
-#include "CGLib/Volume/Volume/SparseVolumeTree/SparseVolume.h"
+#include "CGLib/Volume/Core/SparseVolumeTree/SparseVolume.h"
 
 namespace Phantom {
 	namespace Physics {

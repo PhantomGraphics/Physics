@@ -1,5 +1,5 @@
 #include "ShapeMatchingConstraint.h"
-#include "CGLib/Math/Math/Quaternion.h"
+#include "CGLib/Math/Core/Quaternion.h"
 
 namespace Phantom {
 namespace Physics {
