@@ -9,7 +9,9 @@
 #include "../Core/PlaneBoundary.h"
 
 #include <cmath>
+#include <limits>
 #include <memory>
+#include <vector>
 
 using namespace Phantom::Math;
 using namespace Phantom::Physics;
@@ -651,6 +653,107 @@ TEST(PBSPHSolverTest, RejectsInvalidTimeStepWithoutTouchingParticleState)
   EXPECT_FLOAT_EQ(afterVel.y, beforeVel.y);
 }
 
+// A bare `std::abs(value - common) > tol` mismatch check passes a NaN through
+// (every comparison against NaN is false), and the common values are read from
+// fluids.front() before it is null-checked. simulate() must instead reject any
+// registered fluid that is null, has a null kernel, or has a non-finite /
+// non-positive effect length or rest density -- whatever its registration order
+// -- without touching particle state.
+
+TEST(PBSPHSolverTest, RejectsNullFrontFluidWithoutCrashing)
+{
+  PBSPHSolver solver;
+  solver.add(nullptr);                       // add(nullptr) -> fluids.front() == nullptr
+  solver.setExternalForce(Vector3df(0.0f, -9.8f, 0.0f));
+  solver.setTimeStep(0.01f);
+  solver.simulate(0.01f, 3);
+
+  EXPECT_FALSE(solver.getLastSolveStats().validConfiguration);
+}
+
+TEST(PBSPHSolverTest, RejectsNullSecondFluidWithoutTouchingFirst)
+{
+  auto a = makeDynamicFluid();
+  const Vector3df beforeA = a->getParticles().positions[0];
+
+  PBSPHSolver solver;
+  solver.add(a.get());
+  solver.add(nullptr);
+  solver.setExternalForce(Vector3df(0.0f, -9.8f, 0.0f));
+  solver.setTimeStep(0.01f);
+  solver.setBoundary(makeBoundaryBox(), 0.01f);
+  solver.simulate(0.01f, 3);
+
+  EXPECT_FALSE(solver.getLastSolveStats().validConfiguration);
+  EXPECT_FLOAT_EQ(a->getParticles().positions[0].y, beforeA.y);
+}
+
+TEST(PBSPHSolverTest, RejectsSecondFluidWithNonFiniteEffectLength)
+{
+  for (float bad : { std::numeric_limits<float>::quiet_NaN(),
+                     std::numeric_limits<float>::infinity() })
+  {
+    auto a = makeDynamicFluid();
+    auto b = makeDynamicFluid();
+    b->setEffectLength(bad);
+    const Vector3df beforeA = a->getParticles().positions[0];
+    const Vector3df beforeB = b->getParticles().positions[0];
+
+    PBSPHSolver solver;
+    solver.add(a.get());
+    solver.add(b.get());
+    solver.setExternalForce(Vector3df(0.0f, -9.8f, 0.0f));
+    solver.setTimeStep(0.01f);
+    solver.setBoundary(makeBoundaryBox(), 0.01f);
+    solver.simulate(0.01f, 3);
+
+    EXPECT_FALSE(solver.getLastSolveStats().validConfiguration);
+    EXPECT_FLOAT_EQ(a->getParticles().positions[0].y, beforeA.y);
+    EXPECT_FLOAT_EQ(b->getParticles().positions[0].y, beforeB.y);
+  }
+}
+
+TEST(PBSPHSolverTest, RejectsSecondFluidWithNonFiniteOrNonPositiveRestDensity)
+{
+  for (float bad : { std::numeric_limits<float>::quiet_NaN(),
+                     std::numeric_limits<float>::infinity(),
+                     0.0f, -100.0f })
+  {
+    auto a = makeDynamicFluid();
+    auto b = makeDynamicFluid();
+    b->setRestDensity(bad);
+    const Vector3df beforeA = a->getParticles().positions[0];
+
+    PBSPHSolver solver;
+    solver.add(a.get());
+    solver.add(b.get());
+    solver.setExternalForce(Vector3df(0.0f, -9.8f, 0.0f));
+    solver.setTimeStep(0.01f);
+    solver.setBoundary(makeBoundaryBox(), 0.01f);
+    solver.simulate(0.01f, 3);
+
+    EXPECT_FALSE(solver.getLastSolveStats().validConfiguration)
+        << "restDensity = " << bad;
+    EXPECT_FLOAT_EQ(a->getParticles().positions[0].y, beforeA.y);
+  }
+}
+
+TEST(PBSPHSolverTest, RejectsSingleFluidWithNonPositiveEffectLength)
+{
+  auto fluid = makeDynamicFluid();
+  fluid->setEffectLength(-0.1f);
+  const Vector3df before = fluid->getParticles().positions[0];
+
+  PBSPHSolver solver;
+  solver.add(fluid.get());
+  solver.setExternalForce(Vector3df(0.0f, -9.8f, 0.0f));
+  solver.setTimeStep(0.01f);
+  solver.simulate(0.01f, 3);
+
+  EXPECT_FALSE(solver.getLastSolveStats().validConfiguration);
+  EXPECT_FLOAT_EQ(fluid->getParticles().positions[0].y, before.y);
+}
+
 // ---- Analytic sphere boundary (common IShapeBoundary path) --------------
 // Mirrors DFSPHSolverTest.SphereBoundaryUsesCommonShapeInterface: a closed
 // spherical container registered via setBoundarySpheres() must keep the fluid
@@ -823,6 +926,146 @@ TEST(PBSPHSolverTest, PlaneRegisteredAsGenericShapeMatchesTypedPlane)
   EXPECT_NEAR(typed.x, viaShape.x, 1.0e-6f);
   EXPECT_NEAR(typed.y, viaShape.y, 1.0e-6f);
   EXPECT_NEAR(typed.z, viaShape.z, 1.0e-6f);
+}
+
+// ---- Shape boundary: the paired density + constraint-gradient contribution --
+// Mirrors the DFSPH "boundary density and its alpha counterpart must be added
+// together" rule. addShapeBoundaryConstraint() adds, from a single
+// IShapeBoundary::sample(), BOTH the boundary's contribution to a penetrating
+// particle's density (the PBF constraint numerator) AND the matching
+// constraint-gradient term (calculateLambda()'s denominator). The penalty force
+// and clampToBoundary() safety net alone would still keep a particle inside the
+// boundary, so the earlier shape tests above could not detect it if that pass
+// were dropped or added only one of its two halves. These target it directly.
+
+namespace
+{
+// A lone-particle fluid whose self-density alone is on the order of the rest
+// density (radius/effectLength near the codebase's conventional ratio), so a
+// boundary penetration pushes the incompressibility constraint active.
+std::unique_ptr<PBSPHFluid> makeConstraintProbeFluid(const Vector3df& at)
+{
+  auto f = std::make_unique<PBSPHFluid>();
+  f->setRestDensity(1000.0f);
+  f->setStiffness(200.0f);
+  f->setVicsosity(0.0f);
+  f->setEffectLength(0.1f);
+  f->setIsBoundary(false);
+  f->createParticle(at, 0.045f);
+  return f;
+}
+}
+
+TEST(PBSPHSolverTest, ShapeBoundaryAddsToPenetratingParticleDensity)
+{
+  // One particle, no neighbours, no gravity: its final density must be strictly
+  // higher with a penetrated floor plane registered than with no boundary at
+  // all. The only source of the difference is addShapeBoundaryConstraint()'s
+  // density (numerator) term -- remove it and the two runs match.
+  const PlaneBoundary floor(Vector3df(0.0f, 1.0f, 0.0f), 0.0f); // y >= 0 valid
+
+  auto densityAfterOneIter = [&](bool withBoundary) {
+    auto fluid = makeConstraintProbeFluid(Vector3df(0.0f, -0.03f, 0.0f)); // 0.03 into the floor
+    PBSPHSolver solver;
+    solver.add(fluid.get());
+    solver.setExternalForce(Vector3df(0.0f, 0.0f, 0.0f));
+    solver.setTimeStep(0.005f);
+    if (withBoundary) solver.setBoundaryPlanes({ floor }, 0.005f);
+    solver.simulate(0.005f, 1);
+    return solver.getParticleDensities()[0];
+  };
+
+  const float withoutBoundary = densityAfterOneIter(false);
+  const float withBoundary    = densityAfterOneIter(true);
+
+  EXPECT_TRUE(std::isfinite(withBoundary));
+  EXPECT_GT(withBoundary, withoutBoundary * 1.001f)
+      << "the penetrated plane must add a boundary density contribution";
+}
+
+TEST(PBSPHSolverTest, ShapeBoundaryConstraintGradientKeepsLambdaCalibrated)
+{
+  // Same lone penetrating particle, no neighbours: the ONLY constraint-gradient
+  // contribution reaching calculateLambda() is the one addShapeBoundaryConstraint()
+  // pairs with the boundary density. With it, the PBF Lagrange multiplier is a
+  // small, well-scaled value. Without it, the gradient denominator collapses to
+  // calculateLambda()'s 1e-6 floor and lambda saturates hard against its +-1 cap.
+  constexpr float kLambdaCap = 1.0f; // mirrors PBSPHParticle.cpp
+  const PlaneBoundary floor(Vector3df(0.0f, 1.0f, 0.0f), 0.0f);
+
+  auto fluid = makeConstraintProbeFluid(Vector3df(0.0f, -0.03f, 0.0f));
+  PBSPHSolver solver;
+  solver.add(fluid.get());
+  solver.setExternalForce(Vector3df(0.0f, 0.0f, 0.0f));
+  solver.setTimeStep(0.005f);
+  solver.setBoundaryPlanes({ floor }, 0.005f);
+  solver.simulate(0.005f, 1);
+
+  PBSPHParticle probe(fluid->getParticles(), 0, fluid.get());
+  const float lambda = probe.getLambda();
+
+  EXPECT_TRUE(std::isfinite(lambda));
+  EXPECT_GT(std::fabs(lambda), 0.0f)               // the constraint is active
+      << "self + boundary density should exceed rest density here";
+  EXPECT_LT(std::fabs(lambda), 0.9f * kLambdaCap)  // ... and stays well-calibrated
+      << "lambda saturates against its cap when the boundary constraint gradient "
+         "(calculateLambda's denominator) is missing";
+  EXPECT_TRUE(isFinite3(fluid->getParticles().positions[0]));
+}
+
+TEST(PBSPHSolverTest, PlateBoundaryDensityContributionTapersTowardRim)
+{
+  // Two particles at the same penetration depth into the same finite plate: one
+  // under the plate's centre, one close to its u-edge. PlateBoundary's rim taper
+  // (getDensityWeight) must hand the edge particle a smaller boundary density
+  // contribution than the centre particle -- addShapeBoundaryConstraint() feeds
+  // sample.densityWeight straight into the density term.
+  auto densityAt = [](const Vector3df& at) {
+    auto fluid = makeConstraintProbeFluid(at);
+    PBSPHSolver solver;
+    solver.add(fluid.get());
+    solver.setExternalForce(Vector3df(0.0f, 0.0f, 0.0f));
+    solver.setTimeStep(0.005f);
+    // Plate in the z = 0 plane: u = x (halfU 1), v = y (halfV 1), half-thickness 0.05.
+    solver.setBoundaryPlates(
+        { PlateBoundary(Vector3df(0.0f), Vector3df(0.0f, 0.0f, 1.0f),
+                        Vector3df(1.0f, 0.0f, 0.0f), 1.0f, 1.0f, 0.05f) },
+        0.005f);
+    solver.simulate(0.005f, 1);
+    return solver.getParticleDensities()[0];
+  };
+
+  const float centre  = densityAt(Vector3df(0.0f,  0.0f, 0.02f)); // 0.03 into the +z face
+  const float nearRim = densityAt(Vector3df(0.97f, 0.0f, 0.02f)); // same depth, by the u-edge
+
+  EXPECT_TRUE(std::isfinite(centre) && std::isfinite(nearRim));
+  EXPECT_GT(centre, nearRim)
+      << "the plate rim taper must reduce the boundary density contribution "
+         "near its finite edge";
+}
+
+TEST(PBSPHSolverTest, OverlappingShapeBoundariesStayFiniteAndBounded)
+{
+  // A box corner is where three plane boundaries overlap and act on the same
+  // particle at once -- the genuine "overlapping shapes" case. The tripled
+  // boundary density + constraint-gradient contribution there must not drive
+  // lambda or the position correction to diverge: the particle stays pinned in
+  // the corner region, not flung to +-1000s (PBSPHParticle.cpp "problem B").
+  auto fluid = makeConstraintProbeFluid(Vector3df(-0.98f, -0.98f, -0.98f)); // into the -x,-y,-z corner
+  PBSPHSolver solver;
+  solver.add(fluid.get());
+  solver.setExternalForce(Vector3df(-20.0f, -20.0f, -20.0f)); // shove it hard into the corner
+  solver.setTimeStep(0.005f);
+  solver.setBoundary(makeBoundaryBox(), 0.005f); // unit box -> 6 planes, 3 meet at each corner
+  for (int step = 0; step < 120; ++step) solver.simulate(0.005f, 3);
+
+  const Vector3df after = fluid->getParticles().positions[0];
+  EXPECT_TRUE(isFinite3(after));
+  EXPECT_TRUE(isFinite3(fluid->getParticles().velocities[0]));
+  // Stayed in the corner neighbourhood rather than diverging.
+  EXPECT_GT(after.x, -1.2f); EXPECT_LT(after.x, 0.0f);
+  EXPECT_GT(after.y, -1.2f); EXPECT_LT(after.y, 0.0f);
+  EXPECT_GT(after.z, -1.2f); EXPECT_LT(after.z, 0.0f);
 }
 
 // ---- Common solver contract: static fluids, clear, particle getters ----

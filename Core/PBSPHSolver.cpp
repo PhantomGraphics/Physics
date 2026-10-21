@@ -93,14 +93,32 @@ void PBSPHSolver::simulate(const float dt, const int maxIter)
 		return;
 	}
 
-	// Reject an unset/garbage kernel instead of feeding it to the neighbor
-	// search: effectLength stays 0.f until setEffectLength() is called, so a
-	// caller that forgets it gets an inert (no-op) solver rather than UB
+	// Reject an unset/garbage configuration instead of feeding it to the
+	// neighbor search: effectLength stays 0.f until setEffectLength() is called,
+	// so a caller that forgets it gets an inert (no-op) solver rather than UB
 	// (mirrors WCSPHSolver/DFSPHSolver; internal design notes Phase 5).
-	SPHKernel* frontKernel = fluids.front()->getKernel();
-	const float commonEffectLength = (frontKernel != nullptr) ? frontKernel->getEffectLength() : 0.0f;
-	const float commonRestDensity  = fluids.front()->getRestDensity();
-	if (frontKernel == nullptr || !std::isfinite(commonEffectLength) || commonEffectLength <= 0.0f) {
+	//
+	// Every registered fluid is validated explicitly for a null pointer, a null
+	// kernel, and a non-finite / non-positive effect length or rest density. A
+	// bare `std::abs(value - common) > tol` mismatch check is not enough on its
+	// own: if a later fluid's effect length or rest density is NaN, the
+	// difference is NaN, every comparison against it is false, and that garbage
+	// would flow into the density / constraint-gradient / lambda / position
+	// passes below. The first fluid also has to be null-checked before it is
+	// dereferenced for the common values (a caller may have done add(nullptr)).
+	auto fluidScaleValid = [](PBSPHFluid* fluid, float& effectLength, float& restDensity) -> bool {
+		if (fluid == nullptr) return false;
+		SPHKernel* kernel = fluid->getKernel();
+		if (kernel == nullptr) return false;
+		effectLength = kernel->getEffectLength();
+		restDensity  = fluid->getRestDensity();
+		return std::isfinite(effectLength) && effectLength > 0.0f &&
+		       std::isfinite(restDensity) && restDensity > 0.0f;
+	};
+
+	float commonEffectLength = 0.0f;
+	float commonRestDensity  = 0.0f;
+	if (!fluidScaleValid(fluids.front(), commonEffectLength, commonRestDensity)) {
 		lastSolveStats_.validConfiguration = false;
 		return;
 	}
@@ -108,10 +126,12 @@ void PBSPHSolver::simulate(const float dt, const int maxIter)
 	// density (mirrors DFSPHSolver): the single neighbor search and the shared
 	// lambda calibration below assume one consistent SPH scale.
 	for (auto* fluid : fluids) {
-		if (!fluid || !fluid->getKernel() ||
-		    std::abs(fluid->getKernel()->getEffectLength() - commonEffectLength) >
+		float effectLength = 0.0f;
+		float restDensity  = 0.0f;
+		if (!fluidScaleValid(fluid, effectLength, restDensity) ||
+		    std::abs(effectLength - commonEffectLength) >
 		        std::max(1.0e-6f, std::abs(commonEffectLength) * 1.0e-5f) ||
-		    std::abs(fluid->getRestDensity() - commonRestDensity) >
+		    std::abs(restDensity - commonRestDensity) >
 		        std::max(1.0e-6f, std::abs(commonRestDensity) * 1.0e-5f)) {
 			lastSolveStats_.validConfiguration = false;
 			return;
@@ -158,7 +178,7 @@ void PBSPHSolver::simulate(const float dt, const int maxIter)
 	// making results non-deterministic across runs. Gathering per-particle
 	// means each thread only ever writes to its own particle (same as
 	// WCSPHSolver.cpp).
-	const auto searchLength = fluids.front()->getKernel()->getEffectLength() * 1.1f;
+	const auto searchLength = commonEffectLength * 1.1f;
 	CSRNeighborList neighbors;
 	neighbors.build(positions, searchLength);
 

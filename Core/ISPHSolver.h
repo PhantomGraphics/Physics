@@ -80,10 +80,18 @@ public:
 	/**
 	 * @brief Sets the solver's time-step limit/state. For DFSPH this is the
 	 * maximum adaptive substep; simulate()'s dt remains the frame duration.
+	 *
+	 * The single-step solvers (WCSPH, PBSPH) do NOT split simulate()'s dt into
+	 * substeps, so this value never gates how far a frame advances. WCSPH ignores
+	 * it entirely; PBSPH keeps it only as the dt^2 factor that turns a boundary
+	 * penalty acceleration into a position correction (no analytic/rigid boundary
+	 * registered -> no effect on the result). See PBSPHSolver::setTimeStep().
 	 * @param dt Time step (seconds).
 	 */
 	virtual void setTimeStep(const float dt) { (void)dt; }
-	/** Explicit name for DFSPH's adaptive-substep ceiling. */
+	/** Explicit name for DFSPH's adaptive-substep ceiling. An alias for
+	 *  setTimeStep() on the single-step solvers, which have no adaptive substep
+	 *  (see the note there). */
 	virtual void setMaxSubstep(const float dt) { setTimeStep(dt); }
 
 	/** Sets the kernel support radius on fluids already registered with the solver. */
