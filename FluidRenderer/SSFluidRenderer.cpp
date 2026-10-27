@@ -242,7 +242,11 @@ void SSFluidRenderer::resize(uint32_t width, uint32_t height)
 {
     width = width ? width : 1;
     height = height ? height : 1;
-    if (extent_.width == width && extent_.height == height) return;
+    // setExtent() may already contain the requested viewport size. Compare the
+    // allocated images instead, otherwise callers that set it before resize()
+    // silently keep the old reconstruction targets.
+    const VkExtent2D allocated = targets_.getExtent();
+    if (ctx_ && allocated.width == width && allocated.height == height) return;
     if (!ctx_) { extent_ = { width, height }; return; }
 
     vkDeviceWaitIdle(ctx_->getDevice());
